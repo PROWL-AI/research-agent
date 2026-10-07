@@ -48,14 +48,27 @@ Register the agent as an MCP server (stdio) in any MCP client:
 }
 ```
 
-Proving tool call (verifies install + both keys end to end):
+The server exposes four tools: `research.run`, `research.list_runbooks`,
+`research.get_status`, `research.get_report`.
 
-```bash
-prowl-research list-runbooks
+Proving tool call (verifies install and registration; needs **no keys** and
+makes **no billed calls**):
+
+```
+research.list_runbooks()
 ```
 
-Expected: a table of runbooks (`saas-competitor-teardown`, `ads-creative-research`, …)
-with their budgets. This makes no billed calls.
+Expected: the runbook list (`saas-competitor-teardown`, …) with inputs and
+budgets. `research.get_status` and `research.get_report` are key-free too —
+only `research.run` requires the keys above (it fails fast, naming the missing
+env var, before spending anything).
+
+Runs take minutes, so for long runs prefer the job pattern: call
+`research.run` with `wait=false` (the default) to get `{run_id, status:
+"running"}` back immediately, then poll `research.get_status(run_id)` until
+the checkpoint shows `complete`/`partial`, and fetch the result with
+`research.get_report(run_id)`. Use `wait=true` only when the caller can block
+for the whole run.
 
 First real run (makes billed Prowl calls, respects the runbook budget):
 

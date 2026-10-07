@@ -39,3 +39,21 @@ def test_lint_ignores_prose_without_metrics(tmp_path):
     ledger = _ledger_with(tmp_path, "x")
     result = lint_report("The rival positions itself as the fastest option on the market.", ledger)
     assert result.ok
+
+
+def test_writer_prompt_states_hard_rule_with_example():
+    from research_agent.agent.writer import WRITER_SYSTEM_TEMPLATE
+
+    assert "IMMEDIATELY after the figure" in WRITER_SYSTEM_TEMPLATE
+    assert "[UNVERIFIED]" in WRITER_SYSTEM_TEMPLATE
+    assert "WRONG" in WRITER_SYSTEM_TEMPLATE
+    assert "RIGHT" in WRITER_SYSTEM_TEMPLATE
+    assert "[CONFLICT]" in WRITER_SYSTEM_TEMPLATE
+    assert "Source Log" in WRITER_SYSTEM_TEMPLATE
+
+
+def test_repair_prompt_forbids_invented_citations():
+    from research_agent.agent.writer import REPAIR_SYSTEM_TEMPLATE
+
+    assert "NEVER invent" in REPAIR_SYSTEM_TEMPLATE or "do NOT invent" in REPAIR_SYSTEM_TEMPLATE
+    assert "subject" in REPAIR_SYSTEM_TEMPLATE

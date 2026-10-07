@@ -1,0 +1,8 @@
+{
+  "runbook": "saas-competitor-teardown",
+  "inputs": {
+    "competitors": ["example.com"]
+  },
+  "wait": true,
+  "trace_id": "fabric-admission-probe"
+}

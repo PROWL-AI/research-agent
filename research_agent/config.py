@@ -26,11 +26,13 @@ class Config:
     llm_model_strong: str
 
     @classmethod
-    def from_env(cls, environ: Mapping[str, str] | None = None) -> "Config":
+    def from_env(
+        cls, environ: Mapping[str, str] | None = None, *, require_prowl: bool = True
+    ) -> "Config":
         env = os.environ if environ is None else environ
 
         prowl_api_key = env.get("PROWL_API_KEY", "").strip()
-        if not prowl_api_key:
+        if require_prowl and not prowl_api_key:
             raise ConfigError(
                 "PROWL_API_KEY is not set — get a key at https://prowl.chat and export it"
             )

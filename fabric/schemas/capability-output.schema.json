@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.fabric.passioncode.ai/0.1.0/schemas/capability-output.schema.json",
+  "title": "research.run result envelope",
+  "description": "wait=false returns only {run_id, status: \"running\"}; wait=true returns the full envelope.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["running", "complete", "partial", "failed"]
+    },
+    "report_path": {
+      "type": "string"
+    },
+    "ledger_path": {
+      "type": "string"
+    },
+    "stats": {
+      "type": "object",
+      "description": "data_calls, total_calls, cost_usd, claims, duration_s, lint_issues"
+    },
+    "skipped_steps": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "required": ["run_id", "status"]
+}

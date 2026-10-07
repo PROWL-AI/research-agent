@@ -237,3 +237,55 @@ async def test_transform_failure_hard_aborts(
     assert result.status == "partial"
     assert "transform blew up" in result.skipped_steps[0]["reason"]
     assert len(fake_prowl.tool_calls) == 0
+
+
+async def test_repair_loop_fixes_lint_failing_draft(
+    patched_runbooks, tmp_path: Path, fake_llm: FakeLLM, fake_prowl: FakeProwl
+):
+    fake_llm.plan_payload = _plan(1)
+    fake_llm.claims_payload = {
+        "claims": [
+            {
+                "claim": "a.com traffic is 150,000",
+                "subject": "a.com monthly organic traffic",
+                "value": 150000,
+                "unit": "visits/month",
+            }
+        ]
+    }
+    fake_llm.text_queue = [
+        "The rival gets 150,000 monthly visitors.",
+        "The rival gets 150,000 monthly visitors [C1] (ASSUMED, ±40%).",
+    ]
+    orchestrator = Orchestrator(fake_prowl, fake_llm, runs_root=tmp_path / "runs")
+
+    result = await orchestrator.run("mini-teardown", {"competitors": ["a.com"]}, run_id="r-fix")
+
+    assert result.stats["lint_issues_before"] == 1
+    assert result.stats["lint_issues_after"] == 0
+    assert result.stats["lint_issues"] == 0
+    report = Path(result.report_path).read_text()
+    assert "[C1]" in report
+
+    checkpoint = json.loads(
+        (tmp_path / "runs" / "r-fix" / "checkpoint.json").read_text()
+    )
+    assert checkpoint["stats"]["lint_issues_before"] == 1
+    assert checkpoint["stats"]["lint_issues_after"] == 0
+
+
+async def test_repair_never_runs_when_lint_is_clean(
+    patched_runbooks, tmp_path: Path, fake_llm: FakeLLM, fake_prowl: FakeProwl
+):
+    fake_llm.plan_payload = _plan(1)
+    fake_llm.report_text = "# Report\n\nQualitative findings only, no metrics."
+    orchestrator = Orchestrator(fake_prowl, fake_llm, runs_root=tmp_path / "runs")
+
+    result = await orchestrator.run("mini-teardown", {"competitors": ["a.com"]}, run_id="r-clean")
+
+    assert result.stats["lint_issues_before"] == 0
+    assert result.stats["lint_issues_after"] == 0
+    writer_calls = [
+        c for c in fake_llm.calls if c["tier"] == "strong" and not c["json_mode"]
+    ]
+    assert len(writer_calls) == 1

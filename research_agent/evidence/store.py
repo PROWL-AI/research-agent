@@ -26,6 +26,7 @@ class Checkpoint(BaseModel):
     skipped_steps: list[dict[str, Any]] = []
     transform_notes: list[str] = []
     counters: dict[str, Any] = {"data_calls": 0, "cost_usd": None}
+    stats: dict[str, Any] = {}
     partial: bool = False
     stop_reason: str | None = None
 

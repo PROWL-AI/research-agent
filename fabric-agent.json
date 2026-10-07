@@ -1,0 +1,62 @@
+{
+  "contractVersion": "0.1.0",
+  "provider": {
+    "id": "https://prowl.chat/fabric/providers/research-agent",
+    "revision": 1,
+    "contentHash": "sha256:e3db3b327ff5be9dac219bbba8adf5877c6bf2bacf6be134a1d5de95d75ddede",
+    "createdAt": "2026-10-07T03:03:50Z",
+    "createdBy": "urn:fabric:operator:prowl-ai",
+    "name": "Prowl Research Agent",
+    "identity": {
+      "subject": "https://prowl.chat/fabric/providers/research-agent",
+      "method": "local-install"
+    },
+    "supportedContractVersions": [
+      "0.1.0"
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "https://prowl.chat/fabric/capabilities/research.run",
+      "name": "research.run",
+      "inputSchema": "https://schemas.fabric.passioncode.ai/0.1.0/schemas/capability-input.schema.json",
+      "outputSchema": "https://schemas.fabric.passioncode.ai/0.1.0/schemas/capability-output.schema.json",
+      "effect": "charge",
+      "idempotency": "none",
+      "dataClasses": [
+        "public"
+      ],
+      "profile": {
+        "kind": "mcp",
+        "protocolRevision": "2026-07-28",
+        "connection": {
+          "mode": "stdio",
+          "executableRef": "urn:executable:prowl-research",
+          "args": [
+            "mcp"
+          ]
+        },
+        "requiredFeatures": [
+          "tool:research.run"
+        ],
+        "probes": [
+          {
+            "id": "safe-shape-probe",
+            "inputFixture": "https://schemas.fabric.passioncode.ai/0.1.0/fixtures/admission-input.json",
+            "outputSchema": "https://schemas.fabric.passioncode.ai/0.1.0/schemas/capability-output.schema.json",
+            "timeoutMs": 30000,
+            "sideEffectCeiling": "none",
+            "assertions": [
+              "returns a typed result without external effects"
+            ]
+          }
+        ]
+      },
+      "extensions": {
+        "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1": {
+          "job": true
+        }
+      }
+    }
+  ]
+}

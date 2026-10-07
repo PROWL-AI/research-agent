@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.fabric.passioncode.ai/0.1.0/schemas/capability-input.schema.json",
+  "title": "research.run input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "runbook": {
+      "type": "string",
+      "description": "Runbook to execute",
+      "enum": ["saas-competitor-teardown"]
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Runbook inputs keyed by input name (e.g. {\"competitors\": [\"example.com\"]})"
+    },
+    "run_id": {
+      "type": "string",
+      "description": "Resume or reuse this run id; generated when omitted"
+    },
+    "wait": {
+      "type": "boolean",
+      "description": "false (default): return a job handle immediately; true: await the typed result",
+      "default": false
+    },
+    "trace_id": {
+      "type": "string",
+      "description": "Caller trace id (fabric-interop/0.1); logged with every line of the run"
+    }
+  },
+  "required": ["runbook", "inputs"]
+}

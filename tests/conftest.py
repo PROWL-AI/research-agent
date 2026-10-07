@@ -25,6 +25,13 @@ class FakeLLM:
         self.claims_payload: dict[str, Any] = {"claims": []}
         self.report_text = "# Report\n\nNo numbers here."
         self.transform_text = "Transform synthesis notes."
+        self.text_queue: list[str] = []
+
+    async def __aenter__(self) -> "FakeLLM":
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        return None
 
     async def complete(
         self,
@@ -40,6 +47,8 @@ class FakeLLM:
             return json.dumps(self.claims_payload)
         if tier == "cheap":
             return self.transform_text
+        if self.text_queue:
+            return self.text_queue.pop(0)
         return self.report_text
 
 
@@ -61,6 +70,12 @@ class FakeProwl:
     @property
     def data_calls(self) -> int:
         return len(self.tool_calls)
+
+    async def __aenter__(self) -> "FakeProwl":
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        return None
 
     async def list_tools(self) -> list[str]:
         self.list_tools_calls += 1

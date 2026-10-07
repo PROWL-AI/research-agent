@@ -35,6 +35,18 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("mcp", help="run as an MCP server (stdio)")
 
+    status_p = sub.add_parser("status", help="show run status from its checkpoint (offline)")
+    status_p.add_argument("run_id")
+
+    report_p = sub.add_parser("report", help="print a finished run's report markdown (offline)")
+    report_p.add_argument("run_id")
+
+    rewrite_p = sub.add_parser(
+        "rewrite",
+        help="re-run ONLY the writer for a run (draft + citation repair; LLM key needed, no Prowl spend)",
+    )
+    rewrite_p.add_argument("run_id")
+
     args, extra = parser.parse_known_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -49,8 +61,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "validate":
         return _cmd_validate(online=args.online)
     if args.command == "mcp":
-        print("MCP server lands in phase 3 — the CLI is the interface for now.")
+        from research_agent.mcp_server import serve
+
+        serve()
         return 0
+    if args.command == "status":
+        return _cmd_status(args.run_id)
+    if args.command == "report":
+        return _cmd_report(args.run_id)
+    if args.command == "rewrite":
+        return asyncio.run(_cmd_rewrite(args.run_id))
     return 2
 
 
@@ -133,6 +153,65 @@ def _cmd_validate(online: bool) -> int:
     import validate_runbooks
 
     return validate_runbooks.main(["--online"] if online else ["--offline"])
+
+
+def _cmd_status(run_id: str) -> int:
+    from research_agent.mcp_server import _status_dict
+
+    try:
+        status = _status_dict(run_id)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(f"run {status['run_id']} ({status['runbook']}): {status['status']}")
+    print(f"  steps:    {len(status['completed_steps'])}/{status['planned_steps']} completed, "
+          f"{len(status['skipped_steps'])} skipped")
+    print(f"  counters: {status['counters']}")
+    if status["duration_s"] is not None:
+        print(f"  duration: {status['duration_s']}s")
+    if status["stop_reason"]:
+        print(f"  stop:     {status['stop_reason']}")
+    return 0
+
+
+def _cmd_report(run_id: str) -> int:
+    report_path = Path("runs") / run_id / "report.md"
+    if not report_path.is_file():
+        print(f"error: no report at {report_path}", file=sys.stderr)
+        return 1
+    print(report_path.read_text(encoding="utf-8"))
+    return 0
+
+
+async def _cmd_rewrite(run_id: str) -> int:
+    from research_agent.agent.writer import RewriteError, rewrite_report
+    from research_agent.llm import LLMClient
+    from research_agent.runbook import RunbookError
+
+    try:
+        config = Config.from_env(require_prowl=False)
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    async with LLMClient(
+        base_url=config.llm_base_url,
+        api_key=config.llm_api_key,
+        model_cheap=config.llm_model,
+        model_strong=config.llm_model_strong,
+    ) as llm:
+        try:
+            outcome = await rewrite_report(llm, Path("runs"), run_id)
+        except (RewriteError, RunbookError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+
+    print(
+        f"run {run_id}: report rewritten "
+        f"(lint {outcome.lint_before} -> {outcome.lint_after} issues"
+        f"{'' if outcome.revised else ', no repair needed'})"
+    )
+    return 0 if outcome.lint_after == 0 else 1
 
 
 if __name__ == "__main__":

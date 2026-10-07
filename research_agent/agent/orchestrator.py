@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 
-from research_agent.agent.writer import lint_report, write_report
+from research_agent.agent.writer import write_and_repair
 from research_agent.evidence.ledger import Ledger
 from research_agent.evidence.store import ArtifactStore, Checkpoint
 from research_agent.llm import LLMClient
@@ -208,19 +208,27 @@ class Orchestrator:
         plan = validate_plan(checkpoint.plan, runbook.meta.tools, catalog)
         await self._execute(runbook, checkpoint, plan, store, ledger, started_monotonic)
 
-        report_md = await write_report(
+        outcome = await write_and_repair(
             self.llm, runbook, ledger, brief,
             partial=checkpoint.partial, skipped_steps=checkpoint.skipped_steps,
             transform_notes=checkpoint.transform_notes,
         )
-        lint = lint_report(report_md, ledger)
-        for issue in lint.issues:
-            log.warning("report lint: %s: %s — %s", issue.kind, issue.text, issue.detail)
 
         report_path = store.run_dir / "report.md"
-        report_path.write_text(report_md, encoding="utf-8")
+        report_path.write_text(outcome.report_md, encoding="utf-8")
         ledger.save()
         checkpoint.status = "partial" if checkpoint.partial else "complete"
+        stats = {
+            "data_calls": checkpoint.counters.get("data_calls", 0),
+            "total_calls": self.prowl.calls_made,
+            "cost_usd": checkpoint.counters.get("cost_usd"),
+            "claims": len(ledger.claims),
+            "duration_s": round(time.monotonic() - started_monotonic, 1),
+            "lint_issues": outcome.lint_after,
+            "lint_issues_before": outcome.lint_before,
+            "lint_issues_after": outcome.lint_after,
+        }
+        checkpoint.stats = stats
         store.save_checkpoint(checkpoint)
 
         return RunResult(
@@ -230,14 +238,7 @@ class Orchestrator:
             report_path=str(report_path),
             ledger_path=str(ledger.path),
             skipped_steps=checkpoint.skipped_steps,
-            stats={
-                "data_calls": checkpoint.counters.get("data_calls", 0),
-                "total_calls": self.prowl.calls_made,
-                "cost_usd": checkpoint.counters.get("cost_usd"),
-                "claims": len(ledger.claims),
-                "duration_s": round(time.monotonic() - started_monotonic, 1),
-                "lint_issues": len(lint.issues),
-            },
+            stats=stats,
         )
 
     async def _plan(
