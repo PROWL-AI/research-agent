@@ -1,0 +1,35 @@
+{
+  "note": "Real evaluation queries for live gate runs. Each maps to a runbook + inputs; live runs are billed and stay on basic-tier budgets.",
+  "queries": [
+    {
+      "id": "q1",
+      "runbook": "saas-competitor-teardown",
+      "inputs": {"competitors": ["linear.app", "height.app"], "market": "project management software"},
+      "why": "Two real SaaS rivals with ads, reviews and SEO footprints — exercises discovery-free path."
+    },
+    {
+      "id": "q2",
+      "runbook": "saas-competitor-teardown",
+      "inputs": {"target": "cron.com", "market": "calendar software"},
+      "why": "Discovery path: competitors must be found from the target alone (runbook step 2)."
+    },
+    {
+      "id": "q3",
+      "runbook": "saas-competitor-teardown",
+      "inputs": {"competitors": ["superhuman.com", "sparkmailapp.com"]},
+      "why": "Offline/enterprise pricing is likely — pricing archaeology must mark it, never invent it."
+    },
+    {
+      "id": "q4",
+      "runbook": "saas-competitor-teardown",
+      "inputs": {"competitors": ["notion.so", "coda.io", "clickup.com"], "market": "all-in-one workspace"},
+      "why": "Three-way teardown near the input cap; forces selection and budget discipline."
+    },
+    {
+      "id": "q5",
+      "runbook": "saas-competitor-teardown",
+      "inputs": {"competitors": ["todoist.com", "ticktick.com"]},
+      "why": "Subscription apps with heavy review volume — voice-of-customer section quality check."
+    }
+  ]
+}

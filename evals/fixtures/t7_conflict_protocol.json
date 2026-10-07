@@ -1,0 +1,25 @@
+{
+  "trap": "T7",
+  "origin": "Conflicting sources silently averaged instead of surfaced; protocol requires a [CONFLICT] marker with both sides kept.",
+  "claims": [
+    {
+      "claim": "example.com monthly organic traffic per SpyFu",
+      "subject": "example.com monthly organic traffic",
+      "value": 42000,
+      "unit": "visits/month",
+      "source_tool": "spyfu_get_domain_stats"
+    },
+    {
+      "claim": "example.com monthly organic traffic per DataForSEO",
+      "subject": "example.com monthly organic traffic",
+      "value": 118000,
+      "unit": "visits/month",
+      "source_tool": "dataforseo_labs_bulk_traffic_estimation"
+    }
+  ],
+  "expect": {
+    "status": "conflict",
+    "kept": 2,
+    "never_averaged": true
+  }
+}

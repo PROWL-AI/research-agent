@@ -1,0 +1,9 @@
+{
+  "trap": "T6",
+  "origin": "Traffic/estimate numbers quoted without error bands read as precision; guidelines cap them (30-50%, >70% under 50-100k visits).",
+  "report_excerpt": "Rival.io is the clear traffic leader in the space. It attracts an estimated 150,000 monthly visitors and converts them efficiently, which suggests a strong organic engine behind the brand.",
+  "ledger_claim_ids": ["C1"],
+  "expect": {
+    "lint_flags_uncited": ["150,000"]
+  }
+}

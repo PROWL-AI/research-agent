@@ -1,0 +1,12 @@
+{
+  "trap": "T1",
+  "origin": "Guidelines described Apify as an active fallback, but the registry had zero Apify tools — an agent reading prose planned calls that could never run.",
+  "runbook_fragment": {
+    "name": "trap-t1-apify-fallback",
+    "tools": ["spyfu_get_domain_stats", "apify_instagram_scraper"]
+  },
+  "expect": {
+    "validator_result": "fail",
+    "unknown_tools": ["apify_instagram_scraper"]
+  }
+}

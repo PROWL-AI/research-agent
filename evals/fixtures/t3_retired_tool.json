@@ -1,0 +1,16 @@
+{
+  "trap": "T3",
+  "origin": "Stale tool profiles for retired providers (Pinterest, google_events) left agents planning calls to dead tools.",
+  "plan_item": {
+    "step": "Pinterest share of voice",
+    "tool": "dataforseo_labs_pinterest",
+    "arguments": {"domain": "example.com"},
+    "on_error_skip": true
+  },
+  "runbook_allowlist": ["dataforseo_labs_pinterest", "spyfu_get_domain_stats"],
+  "live_catalog": ["spyfu_get_domain_stats", "dataforseo_bl_summary"],
+  "expect": {
+    "dropped": true,
+    "warning_contains": "not in live catalog"
+  }
+}
