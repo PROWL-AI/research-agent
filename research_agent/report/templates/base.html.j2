@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+  :root { --ink: #1a1d23; --muted: #5b6470; --line: #e2e6ec; --accent: #2f6fed; --bg: #f7f8fa; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         color: var(--ink); background: var(--bg); line-height: 1.55; }
+  .layout { display: flex; max-width: 1180px; margin: 0 auto; gap: 32px; padding: 32px 24px; }
+  nav.toc { position: sticky; top: 24px; align-self: flex-start; width: 240px; flex-shrink: 0;
+            font-size: 13px; max-height: calc(100vh - 48px); overflow-y: auto; }
+  nav.toc ul { list-style: none; padding-left: 12px; margin: 4px 0; }
+  nav.toc > ul { padding-left: 0; }
+  nav.toc a { color: var(--muted); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+  main { flex: 1; max-width: 860px; background: #fff; border: 1px solid var(--line);
+         border-radius: 10px; padding: 40px 48px; }
+  header.run { border-bottom: 1px solid var(--line); margin-bottom: 28px; padding-bottom: 20px; }
+  header.run h1 { font-size: 22px; margin: 0 0 4px; }
+  header.run .subject { color: var(--muted); font-size: 14px; }
+  header.run .date { color: var(--muted); font-size: 13px; }
+  .partial-banner { background: #fff4e0; border: 1px solid #f0d49a; border-radius: 6px;
+                    padding: 8px 12px; font-size: 13px; margin-top: 10px; }
+  table.stats { border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  table.stats td { border: 1px solid var(--line); padding: 3px 10px; }
+  table.stats td:first-child { color: var(--muted); }
+  h1, h2, h3, h4 { line-height: 1.25; }
+  main h1 { font-size: 24px; } main h2 { font-size: 19px; margin-top: 1.6em; }
+  main h3 { font-size: 16px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 14px 0; }
+  th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--bg); }
+  code { background: var(--bg); border-radius: 4px; padding: 1px 5px; font-size: 0.92em; }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+        padding: 12px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  blockquote { border-left: 3px solid var(--line); margin-left: 0; padding-left: 14px; color: var(--muted); }
+  .chart { margin: 18px 0; }
+  .chart svg { max-width: 100%; height: auto; }
+  .chart-rejected { color: var(--muted); font-style: italic; }
+  @media (max-width: 900px) { nav.toc { display: none; } main { padding: 24px; } }
+  @media print {
+    nav.toc { display: none; }
+    body { background: #fff; }
+    main { border: none; max-width: none; }
+    .partial-banner { border-color: #999; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc">{{ toc | safe }}</nav>
+  <main>
+    <header class="run">
+      <h1>{{ runbook }}</h1>
+      <div class="subject">{{ subject }}</div>
+      <div class="date">{{ date }}</div>
+      {% if partial %}<div class="partial-banner">Partial run — some planned steps were skipped; gaps are marked in the report.</div>{% endif %}
+      {% if stats_rows %}
+      <table class="stats">
+        {% for label, value in stats_rows %}<tr><td>{{ label }}</td><td>{{ value }}</td></tr>{% endfor %}
+      </table>
+      {% endif %}
+    </header>
+    {{ body | safe }}
+  </main>
+</div>
+</body>
+</html>

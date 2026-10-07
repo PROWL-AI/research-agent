@@ -5,13 +5,16 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
 from research_agent.evidence.ledger import Ledger
 from research_agent.llm import LLMClient
 from research_agent.runbook import Runbook
+
+if TYPE_CHECKING:
+    from research_agent.agent.citations import FidelityResult
 
 log = logging.getLogger(__name__)
 
@@ -24,6 +27,10 @@ _NUMBER_RE = re.compile(
     r"|revenue|traffic|searches|impressions|clicks))"
 )
 _CITATION_LOOKAHEAD = 160
+_SOURCE_LOG_ROW_RE = re.compile(r"^\s*\|\s*C\d+\s*\|.*$", re.MULTILINE)
+_ASSUMPTION_MARKER = "(target, assumption — not data)"
+_UNVERIFIED_MARKER = "[UNVERIFIED"
+_MAX_REPAIR_PASSES = 3
 
 WRITER_SYSTEM_TEMPLATE = """\
 You are the writer for a research run. Write the final markdown report.
@@ -38,6 +45,23 @@ You are the writer for a research run. Write the final markdown report.
   [UNVERIFIED]. NEVER invent a citation.
 - When two ledger claims conflict on the same subject, cite BOTH with
   [CONFLICT] — never average them silently.
+- Derived numbers: a computed figure (ratio, average, per-month cadence, total)
+  is allowed ONLY when the same sentence carries the [C..] refs of EVERY input
+  figure plus the word "derived".
+  RIGHT: "Engagement is 3.4% (derived: 113K views [C7] / 3.3M followers [C9])."
+- Assumed targets: a KPI target, benchmark, or illustrative goal must be marked
+  "(target, assumption — not data)" and must not be dressed up as a measured
+  figure. RIGHT: "Aim for 5%+ CTR (target, assumption — not data)."
+- If a number fits none of these rules, it does not go in the report.
+
+## Charts (OPTIONAL, max 3 per report)
+For genuinely comparative numeric series that exist in the ledger you may embed
+up to 3 chart directives as fenced blocks — nothing else charts, and prose must
+never describe a chart instead:
+```chart {{"type": "bar"|"line", "title": "...", "labels": ["..."], "values": [<numbers>], "claim_refs": ["C1", "C2"]}}
+```
+Every value must come from the referenced claims — the renderer rejects charts
+whose values are not in the ledger.
 
 WRONG: "Their channel has 430K subscribers [C20]."
        (C20's subject is a different brand's channel — subject mismatch)
@@ -69,14 +93,18 @@ You are the citation-repair pass for a research report. The draft below failed
 citation lint; fix EVERY listed issue.
 
 Rules:
-- For each uncited number: attach the correct [C..] citation from the ledger
-  IMMEDIATELY after the figure — but ONLY if the ledger claim's subject matches
-  what the sentence states. Check the subject before citing; citing a claim
-  about a different entity is worse than not citing.
-- If no ledger claim supports a figure, do NOT invent a citation: delete the
-  figure or mark it as [UNVERIFIED] text.
+- For each uncited number choose EXACTLY ONE action:
+  (a) attach the correct [C..] ref IMMEDIATELY after the figure — but ONLY if
+      the ledger claim's subject matches what the sentence states (check the
+      subject; citing a claim about a different entity is worse than not citing);
+  (b) rewrite it as a derivation — same sentence, [C..] refs for EVERY input
+      figure, plus the word "derived";
+  (c) mark it as an assumption with the exact marker
+      "(target, assumption — not data)";
+  (d) delete it.
+  Never leave a bare number behind, and NEVER invent a citation to cover one.
 - For each missing_ref (a [C..] that does not exist in the ledger): replace it
-  with the correct claim id, or remove/mark the figure as above.
+  with the correct claim id, or handle the figure per the actions above.
 - Where two ledger claims conflict on the same subject, cite BOTH with
   [CONFLICT].
 - Change nothing else: structure, sections, and already-correct text stay
@@ -93,6 +121,7 @@ class WriterOutcome(BaseModel):
     lint_before: int
     lint_after: int
     revised: bool
+    repair_passes: int = 0
 
 
 class RewriteError(Exception):
@@ -135,10 +164,16 @@ def lint_report(report_md: str, ledger: Ledger) -> LintResult:
                 )
             )
 
-    for match in _NUMBER_RE.finditer(report_md):
-        window = report_md[max(0, match.start() - _CITATION_LOOKAHEAD):match.end() + _CITATION_LOOKAHEAD]
-        if not _CITATION_RE.search(window):
-            result.issues.append(
+    scan_text = _SOURCE_LOG_ROW_RE.sub("", report_md)
+    for match in _NUMBER_RE.finditer(scan_text):
+        window = scan_text[max(0, match.start() - _CITATION_LOOKAHEAD):match.end() + _CITATION_LOOKAHEAD]
+        if (
+            _CITATION_RE.search(window)
+            or _ASSUMPTION_MARKER in window
+            or _UNVERIFIED_MARKER in window
+        ):
+            continue
+        result.issues.append(
                 LintIssue(
                     kind="uncited_number",
                     text=match.group(0).strip(),
@@ -225,26 +260,62 @@ async def write_and_repair(
         llm, runbook, ledger, brief,
         partial=partial, skipped_steps=skipped_steps, transform_notes=transform_notes,
     )
-    lint_before = lint_report(draft, ledger)
-    if lint_before.ok:
-        return WriterOutcome(report_md=draft, lint_before=0, lint_after=0, revised=False)
-    log.info(
-        "writer draft failed lint (%d issues); running one repair pass",
-        len(lint_before.issues),
-    )
-    repaired = await repair_report(llm, draft, lint_before, ledger)
-    lint_after = lint_report(repaired, ledger)
-    if lint_after.issues:
-        log.warning(
-            "repair pass left %d lint issues (was %d)",
-            len(lint_after.issues), len(lint_before.issues),
+    lint_current = lint_report(draft, ledger)
+    lint_before = len(lint_current.issues)
+    if not lint_current.issues:
+        return WriterOutcome(
+            report_md=draft, lint_before=0, lint_after=0, revised=False
         )
+    log.info("writer draft failed lint (%d issues); running repair passes", lint_before)
+
+    report = draft
+    previous = lint_before
+    passes = 0
+    for pass_no in range(1, _MAX_REPAIR_PASSES + 1):
+        report = await repair_report(llm, report, lint_current, ledger)
+        passes = pass_no
+        lint_current = lint_report(report, ledger)
+        current = len(lint_current.issues)
+        log.info("repair pass %d: %d -> %d lint issues", pass_no, previous, current)
+        if not lint_current.issues:
+            break
+        if current >= previous:
+            log.warning(
+                "repair pass %d failed to reduce issues (%d -> %d); stopping",
+                pass_no, previous, current,
+            )
+            break
+        previous = current
+
     return WriterOutcome(
-        report_md=repaired,
-        lint_before=len(lint_before.issues),
-        lint_after=len(lint_after.issues),
+        report_md=report,
+        lint_before=lint_before,
+        lint_after=len(lint_current.issues),
         revised=True,
+        repair_passes=passes,
     )
+
+
+async def produce_report(
+    llm: LLMClient,
+    runbook: Runbook,
+    ledger: Ledger,
+    brief: dict[str, Any],
+    *,
+    partial: bool = False,
+    skipped_steps: list[dict[str, Any]] | None = None,
+    transform_notes: list[str] | None = None,
+) -> tuple[WriterOutcome, "FidelityResult"]:
+    from research_agent.agent.citations import verify_citations
+
+    outcome = await write_and_repair(
+        llm, runbook, ledger, brief,
+        partial=partial, skipped_steps=skipped_steps, transform_notes=transform_notes,
+    )
+    fidelity = await verify_citations(llm, outcome.report_md, ledger)
+    if fidelity.unverified:
+        outcome = outcome.model_copy(update={"report_md": fidelity.report_md})
+    return outcome, fidelity
 
 
 async def rewrite_report(
@@ -265,7 +336,7 @@ async def rewrite_report(
         )
     ledger = Ledger.load(ledger_path)
     runbook = get_runbook(checkpoint.runbook)
-    outcome = await write_and_repair(
+    outcome, fidelity = await produce_report(
         llm, runbook, ledger, checkpoint.brief,
         partial=checkpoint.partial,
         skipped_steps=checkpoint.skipped_steps,
@@ -275,5 +346,6 @@ async def rewrite_report(
     checkpoint.stats["lint_issues_before"] = outcome.lint_before
     checkpoint.stats["lint_issues_after"] = outcome.lint_after
     checkpoint.stats["lint_issues"] = outcome.lint_after
+    checkpoint.stats["citation_fidelity"] = fidelity.stats
     store.save_checkpoint(checkpoint)
     return outcome

@@ -26,6 +26,7 @@ class FakeLLM:
         self.report_text = "# Report\n\nNo numbers here."
         self.transform_text = "Transform synthesis notes."
         self.text_queue: list[str] = []
+        self.fidelity_payload: dict[str, Any] = {"verdicts": []}
 
     async def __aenter__(self) -> "FakeLLM":
         return self
@@ -44,6 +45,8 @@ class FakeLLM:
         if tier == "strong" and json_mode:
             return json.dumps(self.plan_payload)
         if tier == "cheap" and json_mode:
+            if "citation-fidelity" in messages[0]["content"]:
+                return json.dumps(self.fidelity_payload)
             return json.dumps(self.claims_payload)
         if tier == "cheap":
             return self.transform_text
@@ -183,3 +186,9 @@ Template `test`. Required sections:
         encoding="utf-8",
     )
     return tmp_path / "runbooks"
+
+
+@pytest.fixture
+def patched_runbooks(monkeypatch, mini_runbooks_dir):
+    monkeypatch.setattr("research_agent.runbook.RUNBOOKS_DIR", mini_runbooks_dir)
+    return mini_runbooks_dir

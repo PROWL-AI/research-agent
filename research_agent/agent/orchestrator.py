@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 
-from research_agent.agent.writer import write_and_repair
+from research_agent.agent.writer import produce_report
 from research_agent.evidence.ledger import Ledger
 from research_agent.evidence.store import ArtifactStore, Checkpoint
 from research_agent.llm import LLMClient
@@ -208,7 +208,7 @@ class Orchestrator:
         plan = validate_plan(checkpoint.plan, runbook.meta.tools, catalog)
         await self._execute(runbook, checkpoint, plan, store, ledger, started_monotonic)
 
-        outcome = await write_and_repair(
+        outcome, fidelity = await produce_report(
             self.llm, runbook, ledger, brief,
             partial=checkpoint.partial, skipped_steps=checkpoint.skipped_steps,
             transform_notes=checkpoint.transform_notes,
@@ -227,9 +227,12 @@ class Orchestrator:
             "lint_issues": outcome.lint_after,
             "lint_issues_before": outcome.lint_before,
             "lint_issues_after": outcome.lint_after,
+            "lint_repair_passes": outcome.repair_passes,
+            "citation_fidelity": fidelity.stats,
         }
         checkpoint.stats = stats
         store.save_checkpoint(checkpoint)
+        self._export_html(store.run_dir)
 
         return RunResult(
             run_id=run_id,
@@ -240,6 +243,15 @@ class Orchestrator:
             skipped_steps=checkpoint.skipped_steps,
             stats=stats,
         )
+
+    @staticmethod
+    def _export_html(run_dir: Path) -> None:
+        try:
+            from research_agent.report.render import render_run
+
+            render_run(run_dir)
+        except Exception as exc:
+            log.warning("HTML export failed for %s: %s", run_dir, exc)
 
     async def _plan(
         self, runbook: Runbook, brief: dict[str, Any], catalog: list[str]

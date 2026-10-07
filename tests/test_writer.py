@@ -57,3 +57,90 @@ def test_repair_prompt_forbids_invented_citations():
 
     assert "NEVER invent" in REPAIR_SYSTEM_TEMPLATE or "do NOT invent" in REPAIR_SYSTEM_TEMPLATE
     assert "subject" in REPAIR_SYSTEM_TEMPLATE
+
+
+def _outcome_ledger(tmp_path):
+    ledger = Ledger(tmp_path / "ledger.json")
+    ledger.add(claim="views are 113K", subject="video views", value=113000,
+               source_tool="youtube_search")
+    ledger.add(claim="followers are 3.3M", subject="channel followers", value=3300000,
+               source_tool="youtube_search")
+    return ledger
+
+
+def _strong_nonjson_calls(fake_llm):
+    return [c for c in fake_llm.calls if c["tier"] == "strong" and not c["json_mode"]]
+
+
+async def test_multi_pass_repair_reduces_then_cleans(tmp_path, fake_llm, mini_runbooks_dir, monkeypatch):
+    from research_agent.agent.writer import write_and_repair
+    from research_agent.runbook import get_runbook
+
+    monkeypatch.setattr("research_agent.runbook.RUNBOOKS_DIR", mini_runbooks_dir)
+    ledger = _outcome_ledger(tmp_path)
+    fake_llm.text_queue = [
+        "Numbers: 100,000 monthly visitors, 200,000 monthly visitors, 50%, $10,000, 25,000 keywords.",
+        "Remaining: 200,000 monthly visitors and 50%.",
+        "All figures now cited [C1].",
+    ]
+    outcome = await write_and_repair(
+        fake_llm, get_runbook("mini-teardown"), ledger, {"competitors": ["a.com"]}
+    )
+    assert outcome.lint_before == 5
+    assert outcome.lint_after == 0
+    assert outcome.repair_passes == 2
+    assert outcome.revised is True
+    assert len(_strong_nonjson_calls(fake_llm)) == 3
+
+
+async def test_repair_stops_early_when_a_pass_does_not_reduce(
+    tmp_path, fake_llm, mini_runbooks_dir, monkeypatch
+):
+    from research_agent.agent.writer import write_and_repair
+    from research_agent.runbook import get_runbook
+
+    monkeypatch.setattr("research_agent.runbook.RUNBOOKS_DIR", mini_runbooks_dir)
+    ledger = _outcome_ledger(tmp_path)
+    fake_llm.text_queue = [
+        "Figures: 100,000 monthly visitors, 200,000 monthly visitors, 50%.",
+        "Figures: 300,000 monthly visitors, 400,000 monthly visitors, 60%.",
+        "this third text must never be used",
+    ]
+    outcome = await write_and_repair(
+        fake_llm, get_runbook("mini-teardown"), ledger, {"competitors": ["a.com"]}
+    )
+    assert outcome.lint_before == 3
+    assert outcome.lint_after == 3
+    assert outcome.repair_passes == 1
+    assert len(_strong_nonjson_calls(fake_llm)) == 2
+
+
+def test_lint_accepts_assumption_marker(tmp_path):
+    ledger = _outcome_ledger(tmp_path)
+    report = "Aim for 5%+ CTR on the hero creative (target, assumption — not data)."
+    result = lint_report(report, ledger)
+    assert result.ok, result.issues
+
+
+def test_lint_accepts_derived_with_input_refs(tmp_path):
+    ledger = _outcome_ledger(tmp_path)
+    report = "Engagement is 3.4% (derived: 113K views [C1] / 3.3M followers [C2])."
+    result = lint_report(report, ledger)
+    assert result.ok, result.issues
+
+
+def test_lint_still_flags_bare_target_without_marker(tmp_path):
+    ledger = _outcome_ledger(tmp_path)
+    result = lint_report("Aim for 5% CTR on the hero creative.", ledger)
+    assert not result.ok
+    assert "5%" in result.uncited_numbers
+
+
+def test_templates_carry_derived_and_assumption_rules():
+    from research_agent.agent.writer import REPAIR_SYSTEM_TEMPLATE, WRITER_SYSTEM_TEMPLATE
+
+    assert "derived" in WRITER_SYSTEM_TEMPLATE
+    assert "(target, assumption — not data)" in WRITER_SYSTEM_TEMPLATE
+    assert "EXACTLY ONE action" in REPAIR_SYSTEM_TEMPLATE
+    assert "(target, assumption — not data)" in REPAIR_SYSTEM_TEMPLATE
+    assert "Never leave a bare number" in REPAIR_SYSTEM_TEMPLATE

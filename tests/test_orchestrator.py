@@ -18,12 +18,6 @@ def _plan(steps: int, tool: str = "spyfu_get_domain_stats") -> dict:
     }
 
 
-@pytest.fixture
-def patched_runbooks(monkeypatch, mini_runbooks_dir):
-    monkeypatch.setattr("research_agent.runbook.RUNBOOKS_DIR", mini_runbooks_dir)
-    return mini_runbooks_dir
-
-
 async def test_budget_max_tool_calls_stops_execution(
     patched_runbooks, tmp_path: Path, fake_llm: FakeLLM, fake_prowl: FakeProwl
 ):

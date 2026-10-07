@@ -47,6 +47,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     rewrite_p.add_argument("run_id")
 
+    export_p = sub.add_parser("export", help="render a run's report (self-contained HTML or markdown path)")
+    export_p.add_argument("run_id")
+    export_p.add_argument("--format", choices=["html", "md"], default="html")
+
     args, extra = parser.parse_known_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -71,6 +75,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_report(args.run_id)
     if args.command == "rewrite":
         return asyncio.run(_cmd_rewrite(args.run_id))
+    if args.command == "export":
+        return _cmd_export(args.run_id, args.format)
     return 2
 
 
@@ -212,6 +218,26 @@ async def _cmd_rewrite(run_id: str) -> int:
         f"{'' if outcome.revised else ', no repair needed'})"
     )
     return 0 if outcome.lint_after == 0 else 1
+
+
+def _cmd_export(run_id: str, fmt: str) -> int:
+    run_dir = Path("runs") / run_id
+    if fmt == "md":
+        report_path = run_dir / "report.md"
+        if not report_path.is_file():
+            print(f"error: no report at {report_path}", file=sys.stderr)
+            return 1
+        print(report_path)
+        return 0
+    from research_agent.report.render import RenderError, render_run
+
+    try:
+        out_path = render_run(run_dir)
+    except RenderError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(out_path)
+    return 0
 
 
 if __name__ == "__main__":
