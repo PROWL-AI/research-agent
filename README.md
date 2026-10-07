@@ -93,8 +93,8 @@ Architecture decisions and inherited traps: `docs/knowledge-pack.md`.
 ## How it works
 
 ```
-runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
-                     →  evidence ledger  →  one-shot writer
+runbook (SKILL.md)  →  brief  →  plan  →  execute (data tools + transforms)
+                     →  evidence ledger  →  writer + citation-repair loop
                      →  citation verification pass  →  markdown + HTML
 ```
 
