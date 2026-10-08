@@ -22,7 +22,7 @@ DUMMY_CONFIG = Config(
 @pytest.fixture
 def wired(monkeypatch, mini_runbooks_dir, tmp_path, fake_llm, fake_prowl):
     monkeypatch.setattr("research_agent.runbook.RUNBOOKS_DIR", mini_runbooks_dir)
-    monkeypatch.setattr(srv, "_RUNS_ROOT", tmp_path / "runs")
+    monkeypatch.setenv("RESEARCH_RUNS_DIR", str(tmp_path / "runs"))
     monkeypatch.setattr(srv, "_config_from_env", lambda: DUMMY_CONFIG)
     monkeypatch.setattr(srv, "_make_prowl", lambda config: fake_prowl)
     monkeypatch.setattr(srv, "_make_llm", lambda config: fake_llm)
@@ -169,3 +169,49 @@ def test_cli_mcp_invokes_serve(monkeypatch):
 
     assert main(["mcp"]) == 0
     assert called == [True]
+
+
+class TestRunIdValidation:
+    async def test_traversal_run_id_rejected(self, wired):
+        with pytest.raises(ValueError, match="invalid run_id"):
+            await srv.research_run("mini-teardown", {"competitors": ["a.com"]}, run_id="../evil")
+
+    async def test_get_status_validates_run_id(self, wired):
+        with pytest.raises(ValueError, match="invalid run_id"):
+            await srv.research_get_status("../../etc")
+
+    async def test_get_report_validates_run_id(self, wired):
+        with pytest.raises(ValueError, match="invalid run_id"):
+            await srv.research_get_report("a/b")
+
+
+class TestJobLifecycle:
+    async def test_run_exists_in_status_before_planning_finishes(self, wired, fake_llm):
+        fake_llm.plan_payload = _one_step_plan()
+        handle = await srv.research_run("mini-teardown", {"competitors": ["a.com"]}, run_id="early1")
+        assert handle["status"] == "running"
+        # give the background task a moment to write the stub checkpoint
+        import asyncio as _asyncio
+        await _asyncio.sleep(0.05)
+        status = await srv.research_get_status("early1")
+        assert status["run_id"] == "early1"
+        await _asyncio.wait_for(srv._TASKS["early1"], timeout=30)
+
+    async def test_duplicate_run_id_rejected_while_running(self, wired, fake_llm):
+        import asyncio as _asyncio
+        fake_llm.plan_payload = _one_step_plan()
+        await srv.research_run("mini-teardown", {"competitors": ["a.com"]}, run_id="dup1")
+        await _asyncio.sleep(0.01)
+        if "dup1" in srv._TASKS and not srv._TASKS["dup1"].done():
+            with pytest.raises(ValueError, match="already running"):
+                await srv.research_run("mini-teardown", {"competitors": ["a.com"]}, run_id="dup1")
+        await _asyncio.wait_for(srv._TASKS["dup1"], timeout=30)
+
+    async def test_wait_run_returns_typed_envelope(self, wired, fake_llm):
+        fake_llm.plan_payload = _one_step_plan()
+        result = await srv.research_run(
+            "mini-teardown", {"competitors": ["a.com"]}, run_id="wait1", wait=True
+        )
+        assert result["run_id"] == "wait1"
+        assert result["status"] in ("complete", "partial")
+        assert "stats" in result and "skipped_steps" in result

@@ -8,7 +8,22 @@
     "runbook": {
       "type": "string",
       "description": "Runbook to execute",
-      "enum": ["saas-competitor-teardown"]
+      "enum": [
+        "ads-creative-research",
+        "ai-visibility-audit",
+        "channel-economics",
+        "competitor-seo",
+        "domain-baseline",
+        "finance-equity-research",
+        "growth-signals",
+        "idea-validation",
+        "market-pulse",
+        "market-sizing",
+        "reviews-voice",
+        "saas-competitor-teardown",
+        "seo-site-audit",
+        "subscription-app-audit"
+      ]
     },
     "inputs": {
       "type": "object",
@@ -28,5 +43,8 @@
       "description": "Caller trace id (fabric-interop/0.1); logged with every line of the run"
     }
   },
-  "required": ["runbook", "inputs"]
+  "required": [
+    "runbook",
+    "inputs"
+  ]
 }

@@ -4,11 +4,24 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+#: A run_id is a directory name — nothing else. Caller-supplied ids must never
+#: escape runs/ via separators or traversal.
+RUN_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def validate_run_id(run_id: str) -> str:
+    if not RUN_ID_RE.match(run_id) or run_id in (".", ".."):
+        raise ValueError(
+            f"invalid run_id '{run_id}' — letters, digits, '.', '_', '-' only, no path separators"
+        )
+    return run_id
 
 
 class Checkpoint(BaseModel):

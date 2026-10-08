@@ -111,3 +111,46 @@ async def test_orchestrator_writes_html_next_to_report(
     html_path = Path(result.report_path).with_suffix(".html")
     assert html_path.is_file()
     assert "mini-teardown" in html_path.read_text()
+
+
+class TestRawHtmlIsNeutralised:
+    def test_scraped_script_does_not_reach_the_export(self, tmp_path):
+        from research_agent.report.render import render_report_html
+        from research_agent.evidence.ledger import Ledger
+
+        ledger = Ledger(tmp_path / "ledger.json")
+        html = render_report_html(
+            'Safe text.\n\n<script>alert(1)</script>\n\n<img src=x onerror="alert(2)">',
+            ledger, runbook="t", brief={}, stats={},
+        )
+        assert "<script>" not in html
+        assert "<img src=x" not in html
+        assert "&lt;script&gt;" in html
+        assert "&lt;img src=x" in html
+
+    def test_blockquotes_and_markdown_survive(self, tmp_path):
+        from research_agent.report.render import render_report_html
+        from research_agent.evidence.ledger import Ledger
+
+        ledger = Ledger(tmp_path / "ledger.json")
+        html = render_report_html(
+            "> a quoted finding\n\n**bold** and [a link](https://x.com?a=1&b=2)",
+            ledger, runbook="t", brief={}, stats={},
+        )
+        assert "<blockquote>" in html
+        assert "<strong>bold</strong>" in html
+
+
+class TestChartFenceForms:
+    def test_same_line_fence_is_rendered(self, tmp_path):
+        from research_agent.charts import substitute_charts
+        from research_agent.evidence.ledger import Ledger
+
+        ledger = Ledger(tmp_path / "ledger.json")
+        ledger.add(claim="a.com has 100 visitors", value=100, unit="visitors", source_tool="t")
+        ledger.add(claim="b.com has 200 visitors", value=200, unit="visitors", source_tool="t")
+        md = ('```chart {"type": "bar", "title": "traffic", "labels": ["a", "b"], '
+              '"values": [100, 200], "claim_refs": ["C1", "C2"]}\n```')
+        out = substitute_charts(md, ledger)
+        assert "<svg" in out
+        assert "```chart" not in out

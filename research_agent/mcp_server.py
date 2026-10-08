@@ -3,6 +3,10 @@
 Tools: research.run, research.list_runbooks, research.get_status,
 research.get_report. Keys (PROWL_API_KEY / LLM keys) are read from the
 server process env; only research.run needs them.
+
+Runs live under RESEARCH_RUNS_DIR (default ./runs relative to the server
+process CWD — set it explicitly in the MCP client config when the host
+launches the server from another directory).
 """
 
 from __future__ import annotations
@@ -10,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,7 +29,7 @@ from research_agent.agent.orchestrator import (
     build_brief,
 )
 from research_agent.config import Config, ConfigError
-from research_agent.evidence.store import ArtifactStore
+from research_agent.evidence.store import ArtifactStore, Checkpoint, validate_run_id
 from research_agent.llm import LLMClient
 from research_agent.prowl_client import ProwlClient
 from research_agent.runbook import RunbookError, get_runbook, list_runbooks
@@ -50,8 +55,10 @@ if not getattr(logging.getLogRecordFactory(), "_research_trace", False):
 
 mcp = FastMCP("prowl-research-agent")
 
-_RUNS_ROOT = Path("runs")
 _TASKS: dict[str, asyncio.Task] = {}
+
+def _runs_root() -> Path:
+    return Path(os.environ.get("RESEARCH_RUNS_DIR", "runs"))
 
 
 def _config_from_env() -> Config:
@@ -95,15 +102,31 @@ async def _execute_run(
     token = TRACE_ID.set(trace_id)
     try:
         log.info("run %s starting (runbook=%s)", run_id, runbook)
+        # Persist the run's existence BEFORE planning: a planner/list_tools
+        # failure must not leave get_status answering "unknown run_id" for an
+        # id this server just handed out.
+        store = ArtifactStore(_runs_root() / run_id)
+        if store.load_checkpoint() is None:
+            store.save_checkpoint(Checkpoint(run_id=run_id, runbook=runbook))
         config = _config_from_env()
         async with _make_prowl(config) as prowl, _make_llm(config) as llm:
-            orchestrator = Orchestrator(prowl, llm, runs_root=_RUNS_ROOT)
+            orchestrator = Orchestrator(prowl, llm, runs_root=_runs_root())
             result = await orchestrator.run(runbook, inputs, run_id=run_id)
         log.info("run %s finished: %s", run_id, result.status)
         return result
+    except asyncio.CancelledError:
+        # Cancellation is a typed partial outcome, not a ghost "running"
+        # checkpoint: whatever evidence was gathered stays on disk.
+        checkpoint = ArtifactStore(_runs_root() / run_id).load_checkpoint()
+        if checkpoint is not None:
+            checkpoint.status = "partial"
+            checkpoint.partial = True
+            checkpoint.stop_reason = "cancelled"
+            store.save_checkpoint(checkpoint)
+        log.warning("run %s cancelled", run_id)
+        raise
     except Exception as exc:
-        store = ArtifactStore(_RUNS_ROOT / run_id)
-        checkpoint = store.load_checkpoint()
+        checkpoint = ArtifactStore(_runs_root() / run_id).load_checkpoint()
         if checkpoint is not None:
             checkpoint.status = "failed"
             checkpoint.stop_reason = str(exc)[:300]
@@ -140,17 +163,39 @@ async def research_run(
     except ConfigError as exc:
         raise ValueError(f"research.run requires server-side keys: {exc}") from exc
 
-    run_id = run_id or _new_run_id(runbook)
+    run_id = validate_run_id(run_id) if run_id else _new_run_id(runbook)
+    # Prune finished tasks so _TASKS does not grow for the server's lifetime.
+    for stale_id in [rid for rid, t in _TASKS.items() if t.done()]:
+        _TASKS.pop(stale_id, None)
     if run_id in _TASKS and not _TASKS[run_id].done():
         raise ValueError(f"run '{run_id}' is already running in this server process")
 
     if wait:
-        result = await _execute_run(runbook, inputs, run_id, trace_id)
+        current = asyncio.current_task()
+        assert current is not None
+        _TASKS[run_id] = current
+        try:
+            result = await _execute_run(runbook, inputs, run_id, trace_id)
+        finally:
+            _TASKS.pop(run_id, None)
         return _result_envelope(result)
 
     task = asyncio.create_task(_execute_run(runbook, inputs, run_id, trace_id))
     _TASKS[run_id] = task
-    task.add_done_callback(lambda t: log.info("run %s task done", run_id))
+
+    def _observe(done: asyncio.Task) -> None:
+        # Retrieve the outcome: an unobserved task exception is an event-loop
+        # warning AND a failure nobody recorded.
+        if done.cancelled():
+            log.warning("run %s task cancelled", run_id)
+            return
+        exc = done.exception()
+        if exc is not None:
+            log.error("run %s task failed: %s", run_id, exc)
+        else:
+            log.info("run %s task done", run_id)
+
+    task.add_done_callback(_observe)
     return {"run_id": run_id, "status": "running"}
 
 
@@ -170,7 +215,8 @@ async def research_list_runbooks() -> list[dict[str, Any]]:
 
 
 def _status_dict(run_id: str) -> dict[str, Any]:
-    checkpoint = ArtifactStore(_RUNS_ROOT / run_id).load_checkpoint()
+    validate_run_id(run_id)
+    checkpoint = ArtifactStore(_runs_root() / run_id).load_checkpoint()
     if checkpoint is None:
         raise ValueError(f"unknown run_id '{run_id}' (no checkpoint at runs/{run_id})")
     try:
@@ -202,7 +248,8 @@ async def research_get_status(run_id: str) -> dict[str, Any]:
 @mcp.tool(name="research.get_report")
 async def research_get_report(run_id: str) -> dict[str, Any]:
     """The finished report markdown plus run stats."""
-    run_dir = _RUNS_ROOT / run_id
+    validate_run_id(run_id)
+    run_dir = _runs_root() / run_id
     if not run_dir.is_dir():
         raise ValueError(f"unknown run_id '{run_id}'")
     report_path = run_dir / "report.md"

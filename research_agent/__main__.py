@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from research_agent.config import Config, ConfigError
+from research_agent.evidence.store import validate_run_id
 from research_agent.runbook import RunbookError, list_runbooks
 
 
@@ -119,6 +120,12 @@ def _parse_input_pairs(extra: list[str]) -> dict[str, object]:
 
 
 async def _cmd_run(runbook_name: str, inputs: dict[str, object], run_id: str | None) -> int:
+    if run_id is not None:
+        try:
+            validate_run_id(run_id)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
     from research_agent.agent.orchestrator import InputError, Orchestrator, OrchestratorError
     from research_agent.llm import LLMClient
     from research_agent.prowl_client import ProwlClient
@@ -162,6 +169,11 @@ def _cmd_validate(online: bool) -> int:
 
 
 def _cmd_status(run_id: str) -> int:
+    try:
+        validate_run_id(run_id)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     from research_agent.mcp_server import _status_dict
 
     try:
@@ -181,6 +193,11 @@ def _cmd_status(run_id: str) -> int:
 
 
 def _cmd_report(run_id: str) -> int:
+    try:
+        validate_run_id(run_id)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     report_path = Path("runs") / run_id / "report.md"
     if not report_path.is_file():
         print(f"error: no report at {report_path}", file=sys.stderr)
@@ -190,6 +207,11 @@ def _cmd_report(run_id: str) -> int:
 
 
 async def _cmd_rewrite(run_id: str) -> int:
+    try:
+        validate_run_id(run_id)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     from research_agent.agent.writer import RewriteError, rewrite_report
     from research_agent.llm import LLMClient
     from research_agent.runbook import RunbookError
@@ -221,6 +243,11 @@ async def _cmd_rewrite(run_id: str) -> int:
 
 
 def _cmd_export(run_id: str, fmt: str) -> int:
+    try:
+        validate_run_id(run_id)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     run_dir = Path("runs") / run_id
     if fmt == "md":
         report_path = run_dir / "report.md"

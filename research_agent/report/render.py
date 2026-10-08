@@ -44,6 +44,18 @@ def _stats_rows(stats: dict[str, Any]) -> list[tuple[str, str]]:
     return rows
 
 
+def _escape_raw_html(text: str) -> str:
+    """Neutralise raw HTML in LLM-produced markdown.
+
+    python-markdown passes raw HTML through untouched, and the report body is
+    generated from scraped web content — without this a scraped ``<script>``
+    or ``<img onerror>`` would ship inside our "self-contained" HTML export.
+    Only ``&`` and ``<`` are escaped: ``>`` must stay for blockquotes, and
+    charts inject their trusted SVG after this step.
+    """
+    return text.replace("&", "&amp;").replace("<", "&lt;")
+
+
 def render_report_html(
     report_md: str,
     ledger: Ledger,
@@ -53,7 +65,7 @@ def render_report_html(
     stats: dict[str, Any],
     partial: bool = False,
 ) -> str:
-    with_charts = substitute_charts(report_md, ledger)
+    with_charts = substitute_charts(_escape_raw_html(report_md), ledger)
     md = md_lib.Markdown(extensions=_MD_EXTENSIONS)
     body = md.convert(with_charts)
     subject_parts: list[str] = []

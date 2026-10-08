@@ -82,12 +82,19 @@ class JudgeResult:
 def load_run(run_dir: Path) -> tuple[str, Ledger, Checkpoint, Runbook]:
     report_path = run_dir / "report.md"
     checkpoint_path = run_dir / "checkpoint.json"
+    ledger_path = run_dir / "ledger.json"
     if not report_path.is_file():
         raise JudgeError(f"{run_dir}: no report.md — run has not produced a report")
     if not checkpoint_path.is_file():
         raise JudgeError(f"{run_dir}: no checkpoint.json — cannot identify the runbook")
     report_md = report_path.read_text(encoding="utf-8")
-    ledger = Ledger.load(run_dir / "ledger.json")
+    if not report_md.strip():
+        # An empty report lints clean (no numbers to flag), which would hand
+        # the citation cap to a document that says nothing.
+        raise JudgeError(f"{run_dir}: report.md is empty — nothing to judge")
+    if not ledger_path.is_file():
+        raise JudgeError(f"{run_dir}: no ledger.json — the run's evidence is missing")
+    ledger = Ledger.load(ledger_path)
     checkpoint = Checkpoint.model_validate_json(checkpoint_path.read_text(encoding="utf-8"))
     runbook = get_runbook(checkpoint.runbook)
     return report_md, ledger, checkpoint, runbook

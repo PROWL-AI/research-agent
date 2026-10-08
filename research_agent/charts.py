@@ -19,7 +19,10 @@ from research_agent.evidence.ledger import Claim, Ledger
 
 log = logging.getLogger(__name__)
 
-CHART_FENCE_RE = re.compile(r"```chart\s*\n(.*?)\n\s*```", re.DOTALL)
+#: Accepts both writer forms: ```chart\n{json}\n``` and ```chart {json}\n``` —
+#: the writer prompt's own example uses the same-line form, so requiring a
+#: newline silently skipped validation AND rendering for exactly what we teach.
+CHART_FENCE_RE = re.compile(r"```chart[ \t]*\n?(.*?)\n\s*```", re.DOTALL)
 
 MAX_CHARTS_PER_REPORT = 3
 _CHART_TYPES = ("bar", "line")
