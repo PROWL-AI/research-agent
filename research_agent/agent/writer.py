@@ -29,6 +29,7 @@ _NUMBER_RE = re.compile(
     r"|revenue|traffic|searches|impressions|clicks))"
 )
 _YEAR_PREFIX_RE = re.compile(r"(?:^|\b(?:in|on|of|from|by|year)\s+)$", re.IGNORECASE)
+_BARE_ID_RE = re.compile(r"\bC(\d+)\b")
 _SOURCE_LOG_ROW_RE = re.compile(r"^\s*\|\s*C\d+\s*\|.*$", re.MULTILINE)
 _ASSUMPTION_MARKER = "(target, assumption — not data)"
 _UNVERIFIED_MARKER = "[UNVERIFIED"
@@ -208,10 +209,15 @@ def lint_report(report_md: str, ledger: Ledger) -> LintResult:
         if _looks_like_year(scan_text, match):
             continue
         sentence = _sentence_at(scan_text, match.start())
+        # A bare claim id that exists in the ledger (the conflict register's
+        # "C41 vs C126" style) is a traceable reference — unbracketed, but not
+        # uncited. Unknown bare ids stay prose and never cover a figure.
+        bare_refs = (f"C{n}" for n in _BARE_ID_RE.findall(sentence))
         if (
             _CITATION_BLOCK_RE.search(sentence)
             or _ASSUMPTION_MARKER in sentence
             or _UNVERIFIED_MARKER in sentence
+            or any(ref in known_ids for ref in bare_refs)
         ):
             continue
         result.issues.append(

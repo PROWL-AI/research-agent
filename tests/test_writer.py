@@ -169,3 +169,24 @@ def test_templates_carry_derived_and_assumption_rules():
     assert "EXACTLY ONE action" in REPAIR_SYSTEM_TEMPLATE
     assert "(target, assumption — not data)" in REPAIR_SYSTEM_TEMPLATE
     assert "Never leave a bare number" in REPAIR_SYSTEM_TEMPLATE
+
+
+def test_lint_accepts_bare_ledger_ids_in_conflict_register(tmp_path):
+    # The conflict register writes refs unbracketed ("C41 vs C126: ..."):
+    # the reference is traceable, only the format differs from RULE 0.
+    ledger = _outcome_ledger(tmp_path)
+    first = next(iter([c for c in ledger.claims]), None)
+    assert first is not None
+    report = (
+        f'- {first.id} vs C2: "Some Video — 2026" views '
+        f'(365,608 vs 365,614; likely measurement timing difference)'
+    )
+    result = lint_report(report, ledger)
+    assert result.ok, result.issues
+
+
+def test_lint_unknown_bare_id_never_covers_a_figure(tmp_path):
+    ledger = _outcome_ledger(tmp_path)
+    report = "- C999 vs C998: views hit 365,608 and climbing"
+    result = lint_report(report, ledger)
+    assert any(i.kind == "uncited_number" for i in result.issues)
