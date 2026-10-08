@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
@@ -86,8 +85,7 @@ class WorkerContext:
     store: ArtifactStore
     ledger: Ledger
     budget: Any
-    started_monotonic: float
-    extract_claims: Callable[[PlanItem, Any, Any, Ledger], Awaitable[None]] = field(
+    extract_claims: Callable[[PlanItem, Any, Any, Ledger], Awaitable[int]] = field(
         repr=False, default=None  # wired by the lead; None only in tests that stub it
     )
 
@@ -140,15 +138,30 @@ def split_segments(
     return segments
 
 
+def _safe_save(checkpoint: Checkpoint, store: ArtifactStore, ledger: Ledger | None = None) -> None:
+    """Persistence must not kill a worker: a disk error is logged and the run
+    continues in memory — the alternative is one OSError wiping out every
+    other worker's evidence via the gather boundary."""
+    try:
+        store.save_checkpoint(checkpoint)
+    except Exception as exc:  # noqa: BLE001 — see docstring
+        log.error("checkpoint save failed (continuing in memory): %s", exc)
+    if ledger is not None:
+        try:
+            ledger.save()
+        except Exception as exc:  # noqa: BLE001
+            log.error("ledger save failed (continuing in memory): %s", exc)
+
+
 async def run_worker(worker_id: int, items: list[tuple[int, PlanItem]], ctx: WorkerContext) -> WorkerSummary:
-    """Execute one worker's slice. Never raises: a hard failure stops this
-    worker (its remaining steps become skipped), marks the run partial, and
-    leaves the other workers to finish — one dead worker must not cost the
-    run the evidence the others already gathered."""
+    """Execute one worker's slice. Never raises on content or tool grounds: a
+    hard failure stops this worker (its remaining steps become skipped), marks
+    the run partial, and leaves the other workers to finish — one dead worker
+    must not cost the run the evidence the others already gathered."""
     summary = WorkerSummary(worker_id=worker_id)
     checkpoint = ctx.checkpoint
     for position, (index, item) in enumerate(items):
-        stop_reason = ctx.orch._budget_stop_reason(ctx.budget, checkpoint, ctx.started_monotonic)
+        stop_reason = ctx.orch._budget_stop_reason(ctx.budget, checkpoint)
         if stop_reason is not None:
             for j, rest in items[position:]:
                 checkpoint.skipped_steps.append(
@@ -160,7 +173,7 @@ async def run_worker(worker_id: int, items: list[tuple[int, PlanItem]], ctx: Wor
                 )
             checkpoint.partial = True
             checkpoint.stop_reason = checkpoint.stop_reason or stop_reason
-            ctx.store.save_checkpoint(checkpoint)
+            _safe_save(checkpoint, ctx.store)
             log.warning("worker %d: budget exhausted (%s), %d step(s) skipped", worker_id, stop_reason, len(items) - position)
             return summary
 
@@ -168,13 +181,16 @@ async def run_worker(worker_id: int, items: list[tuple[int, PlanItem]], ctx: Wor
         try:
             result = await ctx.orch.prowl.call_tool(item.tool, item.arguments)
         except Exception as exc:
+            # Failed dispatches are billed by the server — they spend the
+            # tool-call budget even though they produce no data.
+            checkpoint.counters["attempted_calls"] = checkpoint.counters.get("attempted_calls", 0) + 1
             if item.on_error_skip:
                 log.warning("worker %d: step %d failed (on_error_skip): %s", worker_id, index, exc)
                 checkpoint.skipped_steps.append(
                     {"index": index, "step": item.step, "tool": item.tool, "reason": str(exc)[:200]}
                 )
                 checkpoint.completed_steps.append(index)
-                ctx.store.save_checkpoint(checkpoint)
+                _safe_save(checkpoint, ctx.store)
                 summary.outcomes.append(
                     StepOutcome(index=index, step=item.step, tool=item.tool, status="skipped", note=str(exc)[:120])
                 )
@@ -182,7 +198,16 @@ async def run_worker(worker_id: int, items: list[tuple[int, PlanItem]], ctx: Wor
             reason = f"step '{item.step}' failed: {exc}"
             checkpoint.partial = True
             checkpoint.stop_reason = checkpoint.stop_reason or reason
-            for j, rest in items[position:]:
+            # The failed step itself is NOT marked completed: a transient
+            # error above the client's retries stays resumable. The steps
+            # after it are — re-running them would double-bill.
+            checkpoint.skipped_steps.append(
+                {"index": index, "step": item.step, "tool": item.tool, "reason": reason}
+            )
+            summary.outcomes.append(
+                StepOutcome(index=index, step=item.step, tool=item.tool, status="failed", note=str(exc)[:120])
+            )
+            for j, rest in items[position + 1:]:
                 checkpoint.skipped_steps.append(
                     {"index": j, "step": rest.step, "tool": rest.tool, "reason": reason}
                 )
@@ -190,43 +215,75 @@ async def run_worker(worker_id: int, items: list[tuple[int, PlanItem]], ctx: Wor
                 summary.outcomes.append(
                     StepOutcome(index=j, step=rest.step, tool=rest.tool, status="failed", note=str(exc)[:120])
                 )
-            ctx.store.save_checkpoint(checkpoint)
+            _safe_save(checkpoint, ctx.store)
             log.error("worker %d: hard failure at step %d, worker stops: %s", worker_id, index, exc)
             return summary
 
-        claims_before = len(ctx.ledger.claims)
+        checkpoint.counters["attempted_calls"] = checkpoint.counters.get("attempted_calls", 0) + 1
         checkpoint.counters["data_calls"] = checkpoint.counters.get("data_calls", 0) + 1
         if ctx.orch.prowl.cost_usd is not None:
             checkpoint.counters["cost_usd"] = ctx.orch.prowl.cost_usd
-        raw_path = ctx.store.save_raw(index, item.tool, result)
+        else:
+            # Server gave no billing data: accumulate the catalog price hint so
+            # max_usd still means something and the report can say "estimated".
+            price = ctx.orch.prowl.tool_prices.get(item.tool)
+            if price is not None:
+                checkpoint.counters["cost_estimate_usd"] = round(
+                    checkpoint.counters.get("cost_estimate_usd", 0.0) + price, 6
+                )
         try:
-            await ctx.extract_claims(item, result, raw_path, ctx.ledger)
+            raw_path = ctx.store.save_raw(index, item.tool, result)
+        except Exception as exc:  # noqa: BLE001 — keep the step's data in memory
+            log.error("worker %d: raw artifact save failed for step %d: %s", worker_id, index, exc)
+            raw_path = ctx.store.raw_dir / f"{index:02d}_{item.tool}.json"
+        claims_added = 0
+        try:
+            claims_added = await ctx.extract_claims(item, result, raw_path, ctx.ledger) or 0
         except Exception as exc:
             log.warning("worker %d: claim extraction failed for step %d: %s", worker_id, index, exc)
-        ctx.ledger.save()
+        _safe_save(checkpoint, ctx.store, ctx.ledger)
 
         checkpoint.completed_steps.append(index)
-        ctx.store.save_checkpoint(checkpoint)
         summary.outcomes.append(
             StepOutcome(
                 index=index, step=item.step, tool=item.tool, status="done",
-                claims=len(ctx.ledger.claims) - claims_before,
+                claims=claims_added,
             )
         )
     return summary
 
 
 async def run_data_segment(items: list[tuple[int, PlanItem]], ctx: WorkerContext, n_workers: int) -> list[WorkerSummary]:
-    """Fan a data segment out to workers and merge their summaries."""
+    """Fan a data segment out to workers and merge their summaries. A worker
+    that somehow still raises becomes a failed summary — it must never take
+    the whole segment (and every other worker's evidence) down with it."""
     chunks = partition_workers(items, n_workers)
     if len(chunks) == 1:
         return [await run_worker(0, chunks[0], ctx)]
     log.info("data segment: %d steps across %d workers", len(items), len(chunks))
-    summaries = await asyncio.gather(
-        *(run_worker(worker_id, chunk, ctx) for worker_id, chunk in enumerate(chunks))
+    results = await asyncio.gather(
+        *(run_worker(worker_id, chunk, ctx) for worker_id, chunk in enumerate(chunks)),
+        return_exceptions=True,
     )
-    return list(summaries)
-
-
-def elapsed_minutes(started_monotonic: float) -> float:
-    return (time.monotonic() - started_monotonic) / 60
+    summaries: list[WorkerSummary] = []
+    for worker_id, outcome in enumerate(results):
+        if isinstance(outcome, BaseException):
+            log.error("worker %d crashed outside its guard: %s", worker_id, outcome)
+            ctx.checkpoint.partial = True
+            ctx.checkpoint.stop_reason = ctx.checkpoint.stop_reason or f"worker {worker_id} crashed: {outcome}"
+            summaries.append(
+                WorkerSummary(
+                    worker_id=worker_id,
+                    outcomes=[
+                        StepOutcome(
+                            index=j, step=rest.step, tool=rest.tool, status="failed",
+                            note=f"worker crash: {str(outcome)[:120]}",
+                        )
+                        for j, rest in chunks[worker_id]
+                        if j not in ctx.checkpoint.completed_steps
+                    ],
+                )
+            )
+        else:
+            summaries.append(outcome)
+    return summaries

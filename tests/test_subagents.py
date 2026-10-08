@@ -75,7 +75,7 @@ def para_runbooks(patched_runbooks) -> Path:
 def _data_plan(steps: int, tool: str = "spyfu_get_domain_stats") -> dict:
     return {
         "plan": [
-            {"step": f"step-{i}", "tool": tool, "arguments": {"domain": "x.com"}}
+            {"step": f"step-{i}", "tool": tool, "arguments": {"domain": f"x{i}.com"}}
             for i in range(steps)
         ]
     }
@@ -216,7 +216,7 @@ class TestFanOut:
                 {"step": "d0", "tool": "spyfu_get_domain_stats", "arguments": {}},
                 {"step": "d1", "tool": "dataforseo_bl_summary", "arguments": {}},
                 {"step": "synth", "tool": "transform", "instruction": "merge baselines"},
-                {"step": "d2", "tool": "spyfu_get_domain_stats", "arguments": {}},
+                {"step": "d2", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "y.com"}},
             ]
         }
         orch = Orchestrator(prowl, fake_llm, runs_root=tmp_path / "runs")
@@ -248,8 +248,8 @@ class TestFailureSemantics:
             "plan": [
                 {"step": "bad-0", "tool": "spyfu_get_domain_stats", "arguments": {}},
                 {"step": "good-1", "tool": "dataforseo_bl_summary", "arguments": {}},
-                {"step": "bad-2", "tool": "spyfu_get_domain_stats", "arguments": {}},
-                {"step": "good-3", "tool": "dataforseo_bl_summary", "arguments": {}},
+                {"step": "bad-2", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "b2.com"}},
+                {"step": "good-3", "tool": "dataforseo_bl_summary", "arguments": {"domain": "g3.com"}},
             ]
         }
         orch = Orchestrator(prowl, fake_llm, runs_root=tmp_path / "runs")

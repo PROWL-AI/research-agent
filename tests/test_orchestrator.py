@@ -12,7 +12,7 @@ from conftest import FakeLLM, FakeProwl
 def _plan(steps: int, tool: str = "spyfu_get_domain_stats") -> dict:
     return {
         "plan": [
-            {"step": f"step-{i}", "tool": tool, "arguments": {"domain": "x.com"}}
+            {"step": f"step-{i}", "tool": tool, "arguments": {"domain": f"x{i}.com"}}
             for i in range(steps)
         ]
     }
@@ -50,7 +50,7 @@ async def test_on_error_skip_continues(
     fake_llm.plan_payload = {
         "plan": [
             {"step": "s0", "tool": "spyfu_get_domain_stats", "arguments": {}, "on_error_skip": True},
-            {"step": "s1", "tool": "spyfu_get_domain_stats", "arguments": {}},
+            {"step": "s1", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "b.com"}},
         ]
     }
     fake_prowl.fail_on.add("spyfu_get_domain_stats")
@@ -69,7 +69,7 @@ async def test_hard_failure_aborts_to_writer(
     fake_llm.plan_payload = {
         "plan": [
             {"step": "s0", "tool": "spyfu_get_domain_stats", "arguments": {}},
-            {"step": "s1", "tool": "spyfu_get_domain_stats", "arguments": {}},
+            {"step": "s1", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "b.com"}},
         ]
     }
     fake_prowl.fail_on.add("spyfu_get_domain_stats")
@@ -128,7 +128,7 @@ async def test_resume_skips_completed_steps(
     checkpoint = json.loads(checkpoint_path.read_text())
     checkpoint["status"] = "running"
     checkpoint["completed_steps"] = [0]
-    checkpoint["counters"]["data_calls"] = 1
+    checkpoint["counters"] = {"data_calls": 1, "attempted_calls": 1, "cost_usd": None}
     checkpoint_path.write_text(json.dumps(checkpoint))
 
     fake_prowl.tool_calls.clear()
@@ -156,7 +156,7 @@ async def test_max_usd_hard_enforcement_stops_execution(
 async def test_transform_step_survives_validation():
     from research_agent.agent.orchestrator import validate_plan
 
-    valid = validate_plan(
+    valid, dropped = validate_plan(
         [
             {"step": "Baseline", "tool": "spyfu_get_domain_stats", "arguments": {}},
             {"step": "Synthesize", "tool": "transform", "instruction": "compare the two"},
@@ -165,6 +165,7 @@ async def test_transform_step_survives_validation():
         allowlist=["spyfu_get_domain_stats"],
         catalog=["spyfu_get_domain_stats"],
     )
+    assert dropped == []
     assert [item.step for item in valid] == ["Baseline", "Synthesize", "LLM notes"]
 
 
@@ -257,7 +258,7 @@ async def test_repair_loop_fixes_lint_failing_draft(
 
     assert result.stats["lint_issues_before"] == 1
     assert result.stats["lint_issues_after"] == 0
-    assert result.stats["lint_issues"] == 0
+    assert "lint_issues" not in result.stats
     report = Path(result.report_path).read_text()
     assert "[C1]" in report
 

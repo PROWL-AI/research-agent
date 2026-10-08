@@ -20,6 +20,10 @@ log = logging.getLogger(__name__)
 
 _MAX_ATTEMPTS = 3
 _BACKOFF_BASE_S = 1.0
+#: The catalog is ~450 names at 200/page; 50 pages is ten times that — a
+#: server regression grows offsets forever otherwise, and the page is a
+#: network call each iteration.
+_MAX_CATALOG_PAGES = 50
 
 COST_META_KEYS = ("cost_usd", "cost", "price_usd", "price")
 
@@ -54,14 +58,13 @@ class ProwlClient:
     _session: ClientSession | None = field(default=None, init=False, repr=False)
     _catalog_cache: list[str] | None = field(default=None, init=False, repr=False)
     _tool_info_cache: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+    _connect_lock: asyncio.Lock = field(
+        default_factory=asyncio.Lock, init=False, repr=False
+    )
 
     @property
     def calls_made(self) -> int:
         return len(self.call_log)
-
-    @property
-    def data_calls(self) -> int:
-        return sum(1 for record in self.call_log if record.tool == "prowl_call_tool")
 
     async def __aenter__(self) -> "ProwlClient":
         self._stack = AsyncExitStack()
@@ -90,13 +93,21 @@ class ProwlClient:
         self._session = session
 
     async def _reconnect(self) -> None:
-        await self.aclose()
-        self._stack = AsyncExitStack()
-        await self._connect()
+        # Parallel workers share this client: two workers hitting a transport
+        # error at the same moment must not each tear down the other's fresh
+        # stack mid-flight — reconnects are serialized. Two queued reconnects
+        # in a row are harmless: callers re-read ``self._session`` afterwards.
+        async with self._connect_lock:
+            await self.aclose()
+            self._stack = AsyncExitStack()
+            await self._connect()
 
-    async def _rpc(self, name: str, arguments: dict[str, Any] | None = None) -> CallToolResult:
+    async def _rpc(
+        self, name: str, arguments: dict[str, Any] | None = None, *, retry: bool = True
+    ) -> CallToolResult:
+        attempts = _MAX_ATTEMPTS if retry else 1
         last_error: Exception | None = None
-        for attempt in range(1, _MAX_ATTEMPTS + 1):
+        for attempt in range(1, attempts + 1):
             try:
                 if self._session is None:
                     await self._reconnect()
@@ -108,16 +119,16 @@ class ProwlClient:
                 last_error = exc
                 log.warning(
                     "prowl RPC %s failed (attempt %d/%d): %s",
-                    name, attempt, _MAX_ATTEMPTS, exc,
+                    name, attempt, attempts, exc,
                 )
-                if attempt < _MAX_ATTEMPTS:
+                if attempt < attempts:
                     await asyncio.sleep(_BACKOFF_BASE_S * attempt)
                     try:
                         await self._reconnect()
                     except Exception as reconnect_exc:
                         log.warning("prowl reconnect failed: %s", reconnect_exc)
         raise ProwlError(
-            f"prowl RPC '{name}' failed after {_MAX_ATTEMPTS} attempts: {last_error}"
+            f"prowl RPC '{name}' failed after {attempts} attempts: {last_error}"
         )
 
     async def _invoke(self, prowl_tool: str, arguments: dict[str, Any]) -> Any:
@@ -128,8 +139,13 @@ class ProwlClient:
             at=datetime.now(timezone.utc).isoformat(),
         )
         self.call_log.append(record)
+        # NEVER retry the billed data plane: the server debits the wallet per
+        # dispatch, so a timed-out-but-executed call retried by the client is
+        # paid for twice. Meta calls (catalog, search, wallet) are unmetered
+        # and retry normally.
+        retry = prowl_tool != "prowl_call_tool"
         try:
-            result = await self._rpc(prowl_tool, arguments)
+            result = await self._rpc(prowl_tool, arguments, retry=retry)
         except McpError as exc:
             record.error = f"JSON-RPC {exc.error.code}: {exc.error.message}"
             raise ToolCallError(f"{prowl_tool}: {record.error}") from exc
@@ -159,7 +175,7 @@ class ProwlClient:
             names: list[str] = []
             prices: dict[str, float | None] = {}
             offset = 0
-            while True:
+            for _page in range(_MAX_CATALOG_PAGES):
                 payload = await self._invoke(
                     "prowl_list_tools",
                     {"names": True, "limit": 200, "offset": offset},
@@ -175,6 +191,10 @@ class ProwlClient:
                         f"next_offset={next_offset} <= offset={offset}"
                     )
                 offset = next_offset
+            else:
+                raise ProwlError(
+                    f"prowl_list_tools pagination exceeded {_MAX_CATALOG_PAGES} pages"
+                )
             self._catalog_cache = names
             self.tool_prices = prices
         return list(self._catalog_cache)

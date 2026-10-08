@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -73,9 +74,10 @@ class ArtifactStore:
     def save_checkpoint(self, checkpoint: Checkpoint) -> None:
         checkpoint.updated_at = datetime.now(timezone.utc).isoformat()
         self.run_dir.mkdir(parents=True, exist_ok=True)
-        self.checkpoint_path.write_text(
-            checkpoint.model_dump_json(indent=2), encoding="utf-8"
-        )
+        # Atomic: a checkpoint truncated by a crash is an unrecoverable run.
+        tmp = self.checkpoint_path.with_suffix(".json.tmp")
+        tmp.write_text(checkpoint.model_dump_json(indent=2), encoding="utf-8")
+        os.replace(tmp, self.checkpoint_path)
 
     def load_checkpoint(self) -> Checkpoint | None:
         if not self.checkpoint_path.is_file():

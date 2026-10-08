@@ -29,6 +29,9 @@ _RAW_SNIPPET_CHARS = 12_000
 _TRANSFORM_CONTEXT_CHARS = 4_000
 _TRANSFORM_CONTEXT_ARTIFACTS = 3
 TRANSFORM_TOOLS = frozenset({"transform", "llm_transform"})
+#: Each transform is an LLM call outside every budget — the planner does not
+#: get to spawn them without bound.
+_MAX_TRANSFORM_STEPS = 25
 
 
 class OrchestratorError(Exception):
@@ -116,33 +119,56 @@ def validate_plan(
     plan: list[dict[str, Any]],
     allowlist: list[str],
     catalog: list[str],
-) -> list[PlanItem]:
-    allowed = set(allowlist)
-    live = set(catalog)
+) -> tuple[list[PlanItem], list[dict[str, Any]]]:
+    """Filter the raw plan to executable steps; report every drop.
+
+    Returns (valid, dropped). Tool names are normalised to the live catalog's
+    canonical casing — an LLM's case drift must not silently kill a step.
+    Duplicate (tool, arguments) steps run and bill twice, so they are dropped
+    too. Transforms bypass tool checks by design but are capped: each one is
+    an LLM call, and an uncapped planner can spend without bound.
+    """
+    allowed_lower = {t.lower() for t in allowlist}
+    live = {t.lower(): t for t in catalog}
     valid: list[PlanItem] = []
+    dropped: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    transforms = 0
+
+    def _drop(index: int, raw: Any, reason: str) -> None:
+        step = raw.get("step", "?") if isinstance(raw, dict) else "?"
+        tool = raw.get("tool", "?") if isinstance(raw, dict) else "?"
+        log.warning("plan item %d (%s) dropped: %s", index, step, reason)
+        dropped.append({"index": index, "step": str(step), "tool": str(tool), "reason": reason})
+
     for index, raw in enumerate(plan):
         try:
             item = PlanItem.model_validate(raw)
         except Exception as exc:
-            log.warning("plan item %d dropped: not a valid plan item: %s", index, exc)
+            _drop(index, raw, f"not a valid plan item: {exc}"[:200])
             continue
         if item.tool.lower() in TRANSFORM_TOOLS:
+            transforms += 1
+            if transforms > _MAX_TRANSFORM_STEPS:
+                _drop(index, raw, f"transform cap ({_MAX_TRANSFORM_STEPS}) exceeded")
+                continue
             valid.append(item)
             continue
-        if item.tool not in allowed:
-            log.warning(
-                "plan item %d dropped: tool '%s' is not in the runbook allowlist",
-                index, item.tool,
-            )
+        if item.tool.lower() not in allowed_lower:
+            _drop(index, raw, f"tool '{item.tool}' is not in the runbook allowlist")
             continue
-        if item.tool not in live:
-            log.warning(
-                "plan item %d dropped: tool '%s' not in live catalog (retired or renamed)",
-                index, item.tool,
-            )
+        canonical = live.get(item.tool.lower())
+        if canonical is None:
+            _drop(index, raw, f"tool '{item.tool}' not in live catalog (retired or renamed)")
             continue
+        item = item.model_copy(update={"tool": canonical})
+        key = (canonical, json.dumps(item.arguments, sort_keys=True, default=str))
+        if key in seen:
+            _drop(index, raw, "duplicate step (same tool and arguments)")
+            continue
+        seen.add(key)
         valid.append(item)
-    return valid
+    return valid, dropped
 
 
 _PLAN_INSTRUCTIONS = """\
@@ -192,9 +218,19 @@ class Orchestrator:
             raise OrchestratorError(
                 f"run {run_id} already belongs to runbook '{checkpoint.runbook}'"
             )
+        if checkpoint is not None and checkpoint.status != "running":
+            raise OrchestratorError(
+                f"run {run_id} already finished with status '{checkpoint.status}' — "
+                "reusing the id would silently re-plan over its artifacts and mix "
+                "two runs' claims in one ledger; choose a new run-id"
+            )
         resuming = checkpoint is not None and checkpoint.status == "running" and checkpoint.plan
         if resuming:
             log.info("resuming run %s after step %s", run_id, checkpoint.completed_steps[-1] if checkpoint.completed_steps else -1)
+            # The plan was built against the checkpoint's brief — reporting
+            # against freshly passed inputs would mix two briefs' data.
+            if checkpoint.brief:
+                brief = checkpoint.brief
         else:
             checkpoint = Checkpoint(run_id=run_id, runbook=runbook_name, brief=brief)
         started_monotonic = time.monotonic()
@@ -202,11 +238,16 @@ class Orchestrator:
         catalog = await self.prowl.list_tools()
 
         if not resuming:
-            plan = await self._plan(runbook, brief, catalog)
+            plan, dropped = await self._plan(runbook, brief, catalog)
             checkpoint.plan = [item.model_dump() for item in plan]
+            checkpoint.skipped_steps.extend(dropped)
             store.save_checkpoint(checkpoint)
 
-        plan = validate_plan(checkpoint.plan, runbook.meta.tools, catalog)
+        plan, dropped = validate_plan(checkpoint.plan, runbook.meta.tools, catalog)
+        if dropped:
+            already = {entry.get("index") for entry in checkpoint.skipped_steps}
+            checkpoint.skipped_steps.extend(d for d in dropped if d.get("index") not in already)
+            store.save_checkpoint(checkpoint)
         await self._execute(runbook, checkpoint, plan, store, ledger, started_monotonic)
 
         outcome, fidelity = await produce_report(
@@ -221,16 +262,27 @@ class Orchestrator:
         checkpoint.status = "partial" if checkpoint.partial else "complete"
         stats = {
             "data_calls": checkpoint.counters.get("data_calls", 0),
+            "attempted_calls": checkpoint.counters.get(
+                "attempted_calls", checkpoint.counters.get("data_calls", 0)
+            ),
             "total_calls": self.prowl.calls_made,
             "cost_usd": checkpoint.counters.get("cost_usd"),
+            "cost_estimate_usd": checkpoint.counters.get("cost_estimate_usd"),
+            # None reads as "free" in a report — it is not: it means the server
+            # never told us. The estimate falls back to catalog price hints.
+            "cost_source": (
+                "server" if self.prowl.cost_usd is not None else "estimate_or_none"
+            ),
             "claims": len(ledger.claims),
             "duration_s": round(time.monotonic() - started_monotonic, 1),
-            "lint_issues": outcome.lint_after,
             "lint_issues_before": outcome.lint_before,
             "lint_issues_after": outcome.lint_after,
             "lint_repair_passes": outcome.repair_passes,
             "citation_fidelity": fidelity.stats,
         }
+        usage_snapshot = getattr(self.llm, "usage_snapshot", None)
+        if callable(usage_snapshot):
+            stats["llm_usage"] = usage_snapshot()
         if checkpoint.stats.get("worker_segments"):
             stats["worker_segments"] = checkpoint.stats["worker_segments"]
         checkpoint.stats = stats
@@ -258,7 +310,7 @@ class Orchestrator:
 
     async def _plan(
         self, runbook: Runbook, brief: dict[str, Any], catalog: list[str]
-    ) -> list[PlanItem]:
+    ) -> tuple[list[PlanItem], list[dict[str, Any]]]:
         schemas = await self._tool_schemas(runbook.meta.tools, catalog)
         budget = runbook.meta.budget
         user = (
@@ -281,10 +333,10 @@ class Orchestrator:
         raw_plan = payload.get("plan") if isinstance(payload, dict) else None
         if not isinstance(raw_plan, list):
             raise OrchestratorError("planner did not return a JSON object with a 'plan' list")
-        plan = validate_plan(raw_plan, runbook.meta.tools, catalog)
+        plan, dropped = validate_plan(raw_plan, runbook.meta.tools, catalog)
         if not plan:
             raise OrchestratorError("planner produced no executable steps after validation")
-        return plan
+        return plan, dropped
 
     async def _tool_schemas(self, tools: list[str], catalog: list[str]) -> dict[str, Any]:
         live = set(catalog)
@@ -329,7 +381,6 @@ class Orchestrator:
             store=store,
             ledger=ledger,
             budget=budget,
-            started_monotonic=started_monotonic,
             extract_claims=self._extract_claims,
         )
         log.info("execution effort=%s workers=%d", effort, n_workers)
@@ -346,26 +397,19 @@ class Orchestrator:
                 # A worker (or a transform) hit a hard failure / budget stop in an
                 # earlier segment: every step never reached still has to be
                 # disclosed in the partial report, not silently absent.
-                remaining = [
-                    {"index": j, "step": item.step, "tool": item.tool, "reason": checkpoint.stop_reason}
-                    for _, later_items in segments[seg_index:]
-                    for j, item in later_items
-                ]
-                checkpoint.skipped_steps.extend(remaining)
+                self._skip_remaining(checkpoint, segments[seg_index:], checkpoint.stop_reason)
                 store.save_checkpoint(checkpoint)
                 break
 
-            stop_reason = self._budget_stop_reason(budget, checkpoint, started_monotonic)
+            stop_reason = self._budget_stop_reason(budget, checkpoint)
             if stop_reason is not None:
-                remaining = [
-                    {"index": j, "step": item.step, "tool": item.tool, "reason": stop_reason}
-                    for _, later_items in segments[seg_index:]
-                    for j, item in later_items
-                ]
-                checkpoint.skipped_steps.extend(remaining)
+                self._skip_remaining(checkpoint, segments[seg_index:], stop_reason)
                 checkpoint.partial = True
                 checkpoint.stop_reason = stop_reason
-                log.warning("budget exhausted (%s); skipping %d steps", stop_reason, len(remaining))
+                log.warning("budget exhausted (%s); skipping remaining steps", stop_reason)
+                # Persist BEFORE the writer runs: dying here without a saved
+                # stop_reason makes resume re-execute (and re-bill) skipped steps.
+                store.save_checkpoint(checkpoint)
                 break
 
             if kind == "transform":
@@ -384,6 +428,22 @@ class Orchestrator:
                 }
             )
             store.save_checkpoint(checkpoint)
+
+    @staticmethod
+    def _skip_remaining(
+        checkpoint: Checkpoint,
+        segments: list[tuple[str, list[tuple[int, "PlanItem"]]]],
+        reason: str | None,
+    ) -> None:
+        """Disclose every unreached step in the partial report — once. Resume
+        re-enters this branch, so indexes already recorded are not duplicated."""
+        already = {entry.get("index") for entry in checkpoint.skipped_steps}
+        checkpoint.skipped_steps.extend(
+            {"index": j, "step": item.step, "tool": item.tool, "reason": reason}
+            for _, items in segments
+            for j, item in items
+            if j not in already
+        )
 
     async def _execute_transform(
         self,
@@ -448,22 +508,37 @@ class Orchestrator:
             max_tokens=2000,
         )
 
-    def _budget_stop_reason(
-        self, budget: Any, checkpoint: Checkpoint, started_monotonic: float
-    ) -> str | None:
-        if checkpoint.counters.get("data_calls", 0) >= budget.max_tool_calls:
+    def _budget_stop_reason(self, budget: Any, checkpoint: Checkpoint) -> str | None:
+        # Attempted (not just successful) calls: the server bills failed
+        # dispatches too, so a budget that ignores them is not a budget.
+        attempted = checkpoint.counters.get(
+            "attempted_calls", checkpoint.counters.get("data_calls", 0)
+        )
+        if attempted >= budget.max_tool_calls:
             return f"max_tool_calls={budget.max_tool_calls}"
-        elapsed_minutes = (time.monotonic() - started_monotonic) / 60
+        # Elapsed is measured from the checkpoint's creation, not from this
+        # process start — otherwise every resume resets the clock and a
+        # crashing run outlives max_minutes forever.
+        created = datetime.fromisoformat(checkpoint.created_at)
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        elapsed_minutes = (datetime.now(timezone.utc) - created).total_seconds() / 60
         if elapsed_minutes >= budget.max_minutes:
             return f"max_minutes={budget.max_minutes}"
         cost = self.prowl.cost_usd
-        if cost is not None and cost >= budget.max_usd:
+        if cost is None:
+            cost = checkpoint.counters.get("cost_estimate_usd")
+            if cost is not None and cost >= budget.max_usd:
+                return f"max_usd={budget.max_usd} (estimated from catalog prices)"
+        elif cost >= budget.max_usd:
             return f"max_usd={budget.max_usd}"
         return None
 
     async def _extract_claims(
         self, item: PlanItem, result: Any, raw_path: Path, ledger: Ledger
-    ) -> None:
+    ) -> int:
+        """Extract ledger claims from a raw result; returns how many were added
+        (the caller's accounting must not diff a shared ledger under fan-out)."""
         raw_text = json.dumps(result, ensure_ascii=False, default=str)[:_RAW_SNIPPET_CHARS]
         system = (
             "You extract evidence-ledger claims from a raw tool result. Output JSON: "
@@ -485,6 +560,7 @@ class Orchestrator:
         )
         payload = _parse_json_object(text)
         claims = payload.get("claims", []) if isinstance(payload, dict) else []
+        added = 0
         for raw_claim in claims[:8]:
             if not isinstance(raw_claim, dict) or not raw_claim.get("claim"):
                 continue
@@ -498,6 +574,8 @@ class Orchestrator:
                 raw_ref=str(raw_path),
                 verbatim=bool(raw_claim.get("verbatim")),
             )
+            added += 1
+        return added
 
     @staticmethod
     def _new_run_id(runbook_name: str) -> str:

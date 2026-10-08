@@ -97,7 +97,7 @@ class FakeMCPProwl(ProwlClient):
         self.payloads = payloads
         self.rpc_calls: list[dict[str, Any]] = []
 
-    async def _rpc(self, name: str, arguments: dict[str, Any] | None = None) -> CallToolResult:
+    async def _rpc(self, name: str, arguments: dict[str, Any] | None = None, *, retry: bool = True) -> CallToolResult:
         self.rpc_calls.append({"tool": name, "arguments": arguments})
         payload = self.payloads[len(self.rpc_calls) - 1]
         return CallToolResult(
@@ -152,7 +152,7 @@ async def test_no_billing_block_leaves_cost_unknown():
 
 async def test_meta_cost_fallback_when_no_billing_block():
     class MetaProwl(FakeMCPProwl):
-        async def _rpc(self, name, arguments=None):
+        async def _rpc(self, name, arguments=None, *, retry=True):
             self.rpc_calls.append({"tool": name, "arguments": arguments})
             return CallToolResult(
                 content=[TextContent(type="text", text='{"result": {}}')],

@@ -59,18 +59,19 @@ def test_build_brief_rejects_unknown_input():
 def test_retired_tool_dropped_with_warning(caplog):
     fixture = load_fixture("t3_retired_tool.json")
     with caplog.at_level(logging.WARNING):
-        valid = validate_plan(
+        valid, dropped = validate_plan(
             [fixture["plan_item"]],
             fixture["runbook_allowlist"],
             fixture["live_catalog"],
         )
     assert valid == []
+    assert dropped and "not in live catalog" in dropped[0]["reason"]
     assert any("not in live catalog" in rec.message for rec in caplog.records)
 
 
 def test_non_allowlisted_tool_dropped_with_warning(caplog):
     with caplog.at_level(logging.WARNING):
-        valid = validate_plan(
+        valid, _ = validate_plan(
             [{"step": "s", "tool": "moz_get_domain_metrics", "arguments": {}}],
             allowlist=["spyfu_get_domain_stats"],
             catalog=["moz_get_domain_metrics", "spyfu_get_domain_stats"],
@@ -80,7 +81,7 @@ def test_non_allowlisted_tool_dropped_with_warning(caplog):
 
 
 def test_valid_plan_items_survive():
-    valid = validate_plan(
+    valid, dropped = validate_plan(
         [
             {"step": "a", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "x.com"}},
             {"step": "b", "tool": "dataforseo_bl_summary", "on_error_skip": True},
@@ -88,6 +89,7 @@ def test_valid_plan_items_survive():
         allowlist=["spyfu_get_domain_stats", "dataforseo_bl_summary"],
         catalog=["spyfu_get_domain_stats", "dataforseo_bl_summary"],
     )
+    assert dropped == []
     assert [item.step for item in valid] == ["a", "b"]
     assert valid[1].on_error_skip is True
     assert valid[0].arguments == {"domain": "x.com"}
