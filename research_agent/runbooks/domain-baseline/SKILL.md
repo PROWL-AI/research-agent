@@ -202,6 +202,8 @@ budget; steps 1-3 and 12 are never optional.
   a primary source — cross-check against a data tool.
 - Majestic vs DataForSEO backlink counts: within ~2x is expected (independent
   crawls); a larger gap is a `[CONFLICT]`, not a number to average away.
+  Their authority scores (Trust Flow vs Authority/Rank) disagreeing by >20
+  points is likewise a `[CONFLICT]` — report both with sources.
 - No bare estimates: every traffic figure carries its error band; no revenue
   inference from traffic alone — if asked, give a banded range tagged ASSUMED
   with the stated assumptions.

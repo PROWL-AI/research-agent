@@ -183,6 +183,17 @@ no discovery phase — the user already knows who they fight.
 - Link-gap shortlist requires presence in both indexes; single-index
   prospects are labeled and ranked below.
 
+## Budget degradation (drop order)
+
+A full sequence runs ~110 calls at 4 competitors; max_tool_calls is 60.
+When the budget tightens, drop in this order and name each dropped block in
+the partial report: (1) the optional backlink-velocity/enrichment step
+(marked optional — drop it FIRST), (2) SERP-feature fan-out reduced to the
+top-3 money keywords, (3) link enrichment to 5 targets, (4) EEAT scrape to
+2 pages, (5) the fourth competitor entirely. The difficulty-qualified
+keyword-gap attack list and the two-index backlink gap confirmation are
+never dropped.
+
 ## Output instructions
 
 Template `competitor-seo`. Required sections:

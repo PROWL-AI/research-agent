@@ -19,8 +19,6 @@ tools:
   - dataforseo_serp_google_finance_explore
   - dataforseo_serp_google_finance_markets
   - google_search
-  - bing_search
-  - firecrawl_search
   - firecrawl_scrape_page_markdown
   - firecrawl_scrape_website
   - firecrawl_map_domain
@@ -30,7 +28,6 @@ tools:
   - google_scholar
   - google_news
   - google_news_light
-  - bing_news
   - google_jobs
   - google_trends
   - reddit_search
@@ -109,6 +106,18 @@ advocacy; refuse to produce it.
    growth vs revenue growth, goodwill as % of assets, capitalized-vs-expensed
    cost choices, one-time items pattern. Every forensic flag cites its line
    item; no flag, no section — do not manufacture suspicion.
+   Cheap red-flag sweep (never skip): `google_news` on "{company} auditor
+   resigns" and "{company} going concern" (on_error=skip) — an auditor
+   change or a going-concern paragraph outranks every ratio in this step.
+5b. **Earnings-call narrative vs the statements** — Parallel:
+   `youtube_search` ("{company} Q{N} earnings call") → `youtube_transcripts`
+   on the most recent official call (on_error=skip); fallback
+   `exa_get_contents` on the call summary from the investor-relations page
+   (on_error=skip). Transform: the three claims management stresses most —
+   then mark where the narrative and the statements diverge (guidance raised
+   while receivables outgrow revenue; "record demand" with declining cash
+   conversion). This is Principles-2 made a step: no divergence check, no
+   verdict on earnings quality.
 6. **Management & governance** — `google_search` ("{company} DEF 14A proxy
    statement {latest year}") + `firecrawl_scrape_page_markdown` on the proxy
    or its best summary (on_error=skip) + `google_news_light` on insider

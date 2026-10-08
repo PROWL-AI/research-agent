@@ -51,8 +51,10 @@ engines actually cite today.
 
 - **One engine is an anecdote.** A claim about AI visibility requires at
   least two independent engines; a claim about "AI search" requires the full
-  fan-out. ChatGPT, Claude, Gemini, Perplexity, and Google AI Mode retrieve
-  and cite differently — report per-engine, never blended.
+  fan-out. ChatGPT, Claude, Gemini, and Perplexity are independent of each
+  other; the Google AI surface (google_ai_mode, dataforseo_serp_google_ai_mode,
+  serpapi_google_ai_overview) is ONE engine behind three renderers — it counts
+  once toward independence. Report per-engine, never blended.
 - **Mentions and citations are different problems.** Being *named* in an
   answer without a page being *cited* means the model knows the brand but
   finds nothing worth retrieving. Track both, always.
@@ -69,13 +71,15 @@ engines actually cite today.
 1. **Scope** — Transform: normalize domains (strip scheme/path/www). Cap
    `competitors` at 4. If none given, defer to step 4 (derive from
    `dataforseo_ai_llm_mentions_top_domains`).
-2. **Prompt set construction** — Transform: build 5-6 category prompts from
-   `market` spanning three intents: problem ("how do I {job-to-be-done}"),
+2. **Prompt set construction** — Transform: build the category prompt set
+   from `market` spanning three intents: problem ("how do I {job-to-be-done}"),
    solution ("best {market} tools", "top {market} for {use case}"),
    comparison ("{market} alternatives", "{domain brand} vs {competitor}").
-   Plus one brand-sentiment prompt per domain ("what is {brand}, is it
-   good"). Cap total at 8 — budget is the binding constraint.
-3. **Engine fan-out** — Fan-out: for each of the 5-6 category prompts, run
+   The arithmetic is the budget: each prompt costs one call per engine in
+   step 3 (5 engines), so CAP the set at 5 prompts (25 calls) — the
+   brand-sentiment check runs in step 4 via `dataforseo_ai_llm_mentions`,
+   not as extra fanned-out prompts.
+3. **Engine fan-out** — Fan-out: for each of the ≤5 category prompts, run
    Parallel: `dataforseo_ai_chatgpt_responses` +
    `dataforseo_ai_claude_responses` + `dataforseo_ai_gemini_responses` +
    `dataforseo_ai_perplexity_responses` + `google_ai_mode` (on_error=skip).
@@ -94,8 +98,10 @@ engines actually cite today.
    2-4 non-target domains from `top_domains` as the benchmark set.
 5. **Google AI cross-validation** — Parallel for the top-3 prompts:
    `dataforseo_serp_google_ai_mode` + `serpapi_google_ai_overview`
-   (on_error=skip). Three independent views of Google's AI surface;
-   disagreement on who is mentioned is a `[CONFLICT]`, not a vote.
+   (on_error=skip). These are SAME-ENGINE redundancy (one upstream surface,
+   three renderers) — they buy resilience against a single renderer's parse
+   quirks, NOT triangulation; disagreement on who is mentioned is a
+   `[CONFLICT]` about the renderers, not about the market.
 6. **Citation extraction** — Transform: from all engine responses, extract
    every cited domain and page. Compute: mention share per domain per engine,
    citation share per domain per engine, and the mentioned-not-cited list
@@ -133,6 +139,15 @@ engines actually cite today.
 11. **Synthesis** — Transform: AI-visibility scorecard (brand × engine ×
     mentioned/cited), share-of-voice table, and fixes ranked by expected
     impact — each fix citing the winning-page comparison from step 7.
+
+## Budget degradation (drop order)
+
+The engine fan-out dominates the budget (5 prompts x 5 engines = 25
+calls of 50). When it tightens, drop in this order: (1) engine fan-out
+reduced to the top-3 prompts, (2) Google AI cross-validation to the top-2
+prompts, (3) winning-page scrapes to 2 pages total. The mentions /
+share-of-voice aggregation (step 4) is never dropped — without it there is
+no scorecard.
 
 ## Verification (hard rules)
 

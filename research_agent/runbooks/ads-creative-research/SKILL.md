@@ -75,6 +75,14 @@ out of that, one-page creative briefs that describe a testable bet. Depth on
 - **The brief is a bet, not a deliverable.** Campaign goal + KPI + funnel
   stage, one single angle, 2-3 hook variants, a named success metric. If it
   cannot be falsified by a test, it is not a brief.
+- **Ad-library semantics (do not plan around these).** Meta Ad Library
+  returns ACTIVE ads only — it has no date-window parameter and no paused
+  counts; filter recency post-factum from each ad's start date, never by
+  planning a window parameter. Spend/impression figures exist only for
+  political/issue ads — never expect them for commercial pages. Paused
+  counts and active-vs-paused ratios come from Foreplay only; tag them
+  single-source. Longevity from any active-only library is survivorship-
+  biased (killed ads are invisible) — say "among currently active ads".
 
 ## Sequence
 
@@ -95,7 +103,9 @@ out of that, one-page creative briefs that describe a testable bet. Depth on
    `google_ads_transparency_advertiser_search` + `google_ads_advertiser_info`
    (on_error=skip). Transform: one advertiser-ID table — brand × platform ×
    IDs (Foreplay brand_id, Meta page_id, TikTok advertiser_id).
-4. **Top-ads pull** — Fan-out per brand, 30-day window, geo filter:
+4. **Top-ads pull** — Fan-out per brand (recency is filtered POST-FACTUM
+   from each ad's start date — no library takes a date-window parameter),
+   geo filter where the library supports one:
    `meta_ad_library` + `linkedin_ad_library` (B2B especially) +
    `tiktok_ads_library` + `foreplay_get_ads_by_brand_ids` (one bulk call when
    ≥3 Foreplay brand IDs exist; otherwise `foreplay_discovery_ads` per brand;
@@ -105,10 +115,13 @@ out of that, one-page creative briefs that describe a testable bet. Depth on
 5. **Advertiser deep-dive** (2 direct + 1 adjacent only) — Fan-out per
    deep-dive brand: `foreplay_brand_analytics` (creative cadence, spend
    trajectory, format distribution) + `meta_ad_library_page_info` (likes,
-   verification, spend estimates) + `spyfu_get_ad_history` per domain,
+   verification — spend/impressions exist for political ads only, never
+   expect them here) + `spyfu_get_ad_history` per domain,
    past_n_months=12 + `spyfu_get_paid_search` + `spyfu_get_ppc_competitors`
    for the target brand (on_error=skip). Transform: per advertiser — active
-   ad count, paused count, active-vs-paused ratio, cadence, platform mix.
+   ad count, paused count and active-vs-paused ratio FROM FOREPLAY ONLY
+   (Meta/LinkedIn/TikTok libraries are active-only; tag the ratio
+   single-source), cadence, platform mix.
 6. **Hook extraction** — Fan-out `foreplay_ad_details` on the top 3-5 ads
    per deep-dive brand (hooks, transcription, emotional drivers — never skip
    for top ads) + `meta_ad_library_ad_details` on the top Meta creatives

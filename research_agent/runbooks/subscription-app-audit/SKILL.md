@@ -13,6 +13,8 @@ inputs:
   - { name: competitors, type: "string", required: false, doc: "Comma-separated competitor app names or store URLs (max 4). If omitted, discovered in step 3." }
   - { name: category, type: "string", required: false, doc: "App category (fitness, language learning, ...) — required for valid quartile benchmarking." }
 tools:
+  - find_subdomains
+  - crawl_funnel_path
   - resolve_app_store_ids
   - apple_app_store
   - google_play_store
@@ -139,6 +141,12 @@ quartile and category. Depth on the subject app beats breadth across rivals.
 11. **Demand trend** — `google_trends` brand terms, 12-month, one batched
     call across the set + `google_news` for launches, price changes, outages
     (on_error=skip).
+11b. **Web2app surface (do not skip for subscription apps)** — Parallel:
+   `find_subdomains` on the developer domain + `crawl_funnel_path`
+   (on_error=skip). Transform: does monetization bypass the store — web
+   paywall, web2app landing, "cheaper on the web" funnel? A store-only audit
+   misses one of the most common modern funnel leaks; price deltas vs the
+   in-app tiers from step 7 go into the leak ranking.
 12. **Benchmark placement** — Transform: assign the subject (and each rival,
     if data allows) a quartile position from steps 4-5 (revenue estimate,
     keyword footprint, review velocity) within `category`. Then and only
@@ -169,6 +177,14 @@ quartile and category. Depth on the subject app beats breadth across rivals.
   verify it.
 - US-locale caveat on all Labs app data; flag when the subject's market is
   elsewhere.
+
+## Budget degradation (drop order)
+
+A full subject+4-rivals run is ~70 calls at max_tool_calls 50. When
+the budget tightens, drop in this order: (1) rival fan-out to 2 rivals in
+the app-store, ASO and review steps, (2) ASO keyword gap to 10 keywords,
+(3) review mining to 2 platforms. The paywall/offer teardown and the
+churn-trigger mining are never dropped.
 
 ## Output instructions
 

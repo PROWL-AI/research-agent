@@ -63,7 +63,10 @@ evidence stays mixed: conflicting classes are named, never averaged away.
 
 ## Principles (read first)
 
-- **Six independence classes, three minimum.** Signals inside one class share
+- **Six independence classes, three minimum — deliberately stricter than the
+  source guideline's two.** Do not "harmonize" this back down: one strong
+  class plus one weak one is exactly the false-positive this gate exists to
+  kill. Signals inside one class share
   a root cause and do not corroborate each other. A verdict needs agreeing
   signals from ≥3 of: (1) funding/financial, (2) hiring, (3) marketing/ad
   spend, (4) product/website change, (5) traffic/SEO trajectory, (6)

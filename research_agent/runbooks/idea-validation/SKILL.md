@@ -21,7 +21,6 @@ tools:
   - dataforseo_labs_bulk_keyword_difficulty
   - google_search
   - exa_keyword_search
-  - exa_similar_search
   - exa_answer
   - firecrawl_search
   - gemini_extract_competitors
@@ -44,7 +43,6 @@ tools:
   - firecrawl_scrape_website
   - gemini_analyze_website
   - perplexity_responses
-  - perplexity_chat
   - google_finance
   - google_news
   - google_jobs
@@ -183,6 +181,15 @@ their evidence.
   inferred, never asserted — tag ASSUMED unless a second signal agrees.
 - Every ICE Impact/Confidence score cites its claim ids; a score without
   citations is deleted, not averaged.
+
+## Budget degradation (drop order)
+
+Step 6 alone runs ~30 calls at 3 incumbents; the full run is ~65 at
+max_tool_calls 45. When the budget tightens, drop in this order: (1) the
+ad-library fan-out to 2 incumbents and 4 ad tools, (2) community complaint
+mining to 2 sources, (3) the sizing quick-pass to the bottom-up method only.
+Problem-demand evidence and the existing-solutions complaints mine are
+never dropped — a validation without them is an opinion.
 
 ## Output instructions
 

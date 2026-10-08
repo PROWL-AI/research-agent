@@ -41,7 +41,7 @@ tools:
   - meta_ad_library_ad_details
   - linkedin_ad_library
   - tiktok_ads_library
-  - google_ads_transparency
+  - google_ads_transparency_advertiser_search
   - foreplay_discovery_ads
   - foreplay_get_brands_by_domain
   - youtube_search
@@ -69,7 +69,10 @@ is decaying, and is the math viable.
   and never emit a point estimate. Viability line: LTV:CAC >= 3:1.
 - **Every channel decays.** A snapshot traffic share is trivia; the 12-month
   trend is the finding. Always classify the decay stage (growth / plateau /
-  decline) per channel and never report a bare current-state number.
+  decline) per channel and never report a bare current-state number. Before
+  calling decline in a seasonal niche (tax, travel, education, gifting),
+  check the same window a year ago: a repeated annual dip is seasonality,
+  not decay — say which one the curve shows.
 - **Ad presence is not a paid-growth loop.** Diagnose the loop from traffic
   mix + ad longevity + referral evidence together. One-off boosts (launches,
   press hits) are named separately from compounding engines.
@@ -128,7 +131,7 @@ is decaying, and is the math viable.
 7. **Paid engine & spend trajectory** — `spyfu_get_paid_search` +
    `spyfu_get_ppc_keywords` + `spyfu_get_ad_history` for search spend and
    longevity. Parallel social: `meta_ad_library` + `linkedin_ad_library` +
-   `tiktok_ads_library` + `google_ads_transparency` +
+   `tiktok_ads_library` + `google_ads_transparency_advertiser_search` +
    `foreplay_discovery_ads` / `foreplay_get_brands_by_domain` (on_error=skip);
    `meta_ad_library_ad_details` on the longest-running creatives.
    Transform: platform mix, creative longevity, spend verdict (scaling /

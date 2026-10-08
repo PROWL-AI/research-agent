@@ -15,10 +15,7 @@ inputs:
 tools:
   - google_trends
   - google_trends_autocomplete
-  - google_trending_now
-  - google_trending_now_news
   - serpapi_google_trends
-  - youtube_trends
   - google_news
   - google_news_light
   - google_news_portal
@@ -77,11 +74,13 @@ what does that mean for timing.
    (12-month shape vs 5-year shape), breakout queries. Cross-check the 2-3
    most important terms with `serpapi_google_trends` (on_error=skip);
    direction disagreement is a `[CONFLICT]`.
-3. **Right-now scan** — Parallel: `google_trending_now` +
-   `google_trending_now_news` filtered to the niche (on_error=skip) +
-   `youtube_trends` for video-first categories (on_error=skip). Transform:
-   any niche-relevant breakout already accelerating — each must get a named
-   driver in step 6 or be tagged UNEXPLAINED.
+3. **Right-now scan** — Parallel: `google_trends` on 3-5 niche-adjacent
+   breakout-candidate terms (short recent window — breakouts live there,
+   not in the 12-month baseline) + `youtube_search` for video-first
+   categories (on_error=skip). Transform: any niche-relevant breakout
+   already accelerating — each must get a named driver in step 6 or be
+   tagged UNEXPLAINED. (The dedicated trending endpoints — google_trending_now,
+   google_trending_now_news, youtube_trends — are retired; do not plan them.)
 4. **News velocity** — Parallel: `google_news` for the market term and each
    rising theme candidate + `google_news_light` as cheap volume re-check +
    `google_news_portal` for the industry section (on_error=skip) +

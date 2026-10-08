@@ -35,18 +35,14 @@ tools:
   - dataforseo_bl_domain_intersection
   - dataforseo_bl_timeseries_summary
   - dataforseo_domain_technologies
-  - dataforseo_serp_google_organic
   - majestic_get_index_item_info
   - majestic_get_ref_domains
   - firecrawl_search
   - firecrawl_scrape_website
-  - firecrawl_scrape_page_markdown
-  - firecrawl_map_domain
   - crawl_funnel_path
   - find_subdomains
   - meta_ad_library
   - meta_ad_library_ad_details
-  - meta_ad_library_page_info
   - linkedin_ad_library
   - tiktok_ads_library
   - google_ads_advertiser_info
@@ -64,7 +60,6 @@ tools:
   - dataforseo_ai_llm_mentions_top_domains
   - perplexity_responses
   - gemini_analyze_website
-  - gemini_keyword_report
   - reddit_search
 budget: { max_tool_calls: 90, max_usd: 3.00, max_minutes: 30 }
 outputs: { report_template: competitor-depth, formats: [markdown, html] }
@@ -84,7 +79,10 @@ breadth across ten.
   positioning section from the homepage alone.
 - **Sustained ad spend is the most reliable health signal.** Ads running
   60-90+ days are almost certainly profitable — advertisers kill losers fast.
-  Weight every ad finding by longevity.
+  Weight every ad finding by longevity. Every ad library here is active-only:
+  longevity verdicts are survivorship-biased (killed ads are invisible), so
+  phrase them "among currently active ads" and lean on Foreplay/SpyFu
+  history for anything about the past.
 - **Traffic is reach, not revenue.** Every traffic/estimate number carries its
   error band (30-50% typically; >70% under ~100k monthly visits) and a
   VERIFIED/ASSUMED tag. Never quote a bare estimate.
@@ -178,6 +176,16 @@ breadth across ten.
 - Majestic vs DataForSEO authority disagreement >20 points → `[CONFLICT]`.
 - No bare estimates: every traffic/revenue figure carries its error band.
 - Ghost-jobs caveat on any hiring-based inference.
+
+## Budget degradation (drop order)
+
+A full fan-out at 5 competitors exceeds max_tool_calls. When the budget
+tightens, drop in this order and name each dropped block in the partial
+report: (1) enrichment scrapes (changelog, docs depth), (2) hiring/jobs
+signals, (3) AI-visibility fan-out reduced to 2 competitors, (4) backlink
+cross-check reduced to one index, (5) competitor set reduced to the 3
+strongest named. Positioning, pricing archaeology, SEO baseline and the
+ads-health read are never dropped.
 
 ## Output instructions
 

@@ -16,7 +16,7 @@ def test_flagship_runbook_loads():
     assert runbook.meta.budget.max_tool_calls == 90
     assert runbook.meta.budget.max_usd == 3.00
     assert runbook.meta.budget.max_minutes == 30
-    assert len(runbook.meta.tools) == 53
+    assert len(runbook.meta.tools) == 48  # 53 - 5 orphan allowlist entries removed in the batch-D audit
     competitors = next(i for i in runbook.meta.inputs if i.name == "competitors")
     assert competitors.type == "list[domain]"
     assert competitors.max == 5

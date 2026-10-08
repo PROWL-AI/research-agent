@@ -35,7 +35,7 @@ tools:
   - dataforseo_biz_listings_search
   - scrape_review_platforms
   - reddit_search
-  - apple_top_charts
+  - apple_app_store
   - google_play_store
   - firecrawl_search
 budget: { max_tool_calls: 40, max_usd: 1.50, max_minutes: 20 }
@@ -91,10 +91,12 @@ incumbent share) says whether the number is backed by real pull.
    BLS occupational counts via `perplexity_responses` (x0.5-0.7 title
    inflation); SMB/local -> `dataforseo_biz_listings_search` for business
    listings in the vertical + geo (x0.7-0.9 stale listings); B2C app-led ->
-   `apple_top_charts` + `google_play_store` category presence (x0.2-0.4
+   `apple_app_store` + `google_play_store` category presence (x0.2-0.4
    downloads-to-active, x0.02-0.1 to paying; on_error=skip); category
-   buyers -> review-platform listing + review counts via
-   `scrape_review_platforms` as a floor, never an estimate.
+   buyers -> review counts of the CATEGORY's listing pages via
+   `firecrawl_search` on G2/Capterra category grids (scrape_review_platforms
+   takes a brand, not a category — do not plan it here) as a floor, never an
+   estimate.
 4. **Bottom-up: realized ARPA** — Parallel: `firecrawl_search` for incumbent
    pricing pages + `perplexity_chat` quick lookups of list prices for 3-5
    category incumbents. Transform: anchor on the tier the ICP actually buys
