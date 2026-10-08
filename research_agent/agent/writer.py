@@ -18,15 +18,17 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-_CITATION_RE = re.compile(r"\[C(\d+)\]")
+_CITATION_BLOCK_RE = re.compile(r"\[[^\]]*?\bC\d+[^\]]*?\]")
+_CITATION_ID_RE = re.compile(r"C(\d+)")
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 _NUMBER_RE = re.compile(
-    r"(?<![\w\d])(?:[$€£]\s?\d[\d,]*(?:\.\d+)?|\d[\d,]*(?:\.\d+)?\s?%|\d{1,3}(?:,\d{3})+(?:\.\d+)?"
+    r"(?<![\w\d-])(?:[$€£]\s?\d[\d,]*(?:\.\d+)?|\d[\d,]*(?:\.\d+)?\s?%|\d{1,3}(?:,\d{3})+(?:\.\d+)?"
     r"|\d+(?:\.\d+)?\s?(?:k|K|M|B)\b"
     r"|\d[\d,]*(?:\.\d+)?\s+(?:monthly\s+)?(?:visitors|visits|users|downloads|installs|reviews"
     r"|keywords|backlinks|referring\s+domains|ads|creatives|employees|jobs|queries|mentions"
     r"|revenue|traffic|searches|impressions|clicks))"
 )
-_CITATION_LOOKAHEAD = 160
+_YEAR_PREFIX_RE = re.compile(r"(?:^|\b(?:in|on|of|from|by|year)\s+)$", re.IGNORECASE)
 _SOURCE_LOG_ROW_RE = re.compile(r"^\s*\|\s*C\d+\s*\|.*$", re.MULTILINE)
 _ASSUMPTION_MARKER = "(target, assumption — not data)"
 _UNVERIFIED_MARKER = "[UNVERIFIED"
@@ -101,7 +103,9 @@ Rules:
       figure, plus the word "derived";
   (c) mark it as an assumption with the exact marker
       "(target, assumption — not data)";
-  (d) delete it.
+  (d) delete it;
+  (e) mark it [UNVERIFIED] — when the figure is worth keeping visible but no
+      ledger claim backs it.
   Never leave a bare number behind, and NEVER invent a citation to cover one.
 - For each missing_ref (a [C..] that does not exist in the ledger): replace it
   with the correct claim id, or handle the figure per the actions above.
@@ -150,11 +154,46 @@ class LintResult(BaseModel):
         return [i.text for i in self.issues if i.kind == "uncited_number"]
 
 
+def _sentence_at(text: str, position: int) -> str:
+    """The sentence containing ``position`` — citations cover a figure only
+    inside the same sentence; a neighbour sentence's [C..] is not support."""
+    line_start = text.rfind("\n", 0, position) + 1
+    line_end = text.find("\n", position)
+    if line_end < 0:
+        line_end = len(text)
+    line = text[line_start:line_end]
+    rel = position - line_start
+    cursor = 0
+    for sentence in _SENTENCE_SPLIT_RE.split(line):
+        idx = line.find(sentence, cursor)
+        if idx < 0:
+            continue
+        cursor = idx + len(sentence)
+        if idx <= rel < idx + len(sentence):
+            return sentence
+    return line
+
+
+def _looks_like_year(scan_text: str, match: re.Match[str]) -> bool:
+    """A bare 4-digit 1900-2099 number after 'in/of/…' is a year, not a metric —
+    flagging it makes repair delete legitimate prose."""
+    digits = match.group(0).split(" ")[0].rstrip("%")
+    if not (digits.isdigit() and len(digits) == 4 and 1900 <= int(digits) <= 2099):
+        return False
+    prefix = scan_text[:match.start()].rstrip()
+    last_nl = prefix.rfind("\n")
+    prefix = prefix[last_nl + 1:]
+    return bool(_YEAR_PREFIX_RE.search(prefix + " "))
+
+
 def lint_report(report_md: str, ledger: Ledger) -> LintResult:
     result = LintResult()
     known_ids = {c.id for c in ledger.claims}
 
-    for ref in dict.fromkeys(f"C{n}" for n in _CITATION_RE.findall(report_md)):
+    cited: list[str] = []
+    for block in _CITATION_BLOCK_RE.findall(report_md):
+        cited.extend(f"C{n}" for n in _CITATION_ID_RE.findall(block))
+    for ref in dict.fromkeys(cited):
         if ref not in known_ids:
             result.issues.append(
                 LintIssue(
@@ -166,18 +205,20 @@ def lint_report(report_md: str, ledger: Ledger) -> LintResult:
 
     scan_text = _SOURCE_LOG_ROW_RE.sub("", report_md)
     for match in _NUMBER_RE.finditer(scan_text):
-        window = scan_text[max(0, match.start() - _CITATION_LOOKAHEAD):match.end() + _CITATION_LOOKAHEAD]
+        if _looks_like_year(scan_text, match):
+            continue
+        sentence = _sentence_at(scan_text, match.start())
         if (
-            _CITATION_RE.search(window)
-            or _ASSUMPTION_MARKER in window
-            or _UNVERIFIED_MARKER in window
+            _CITATION_BLOCK_RE.search(sentence)
+            or _ASSUMPTION_MARKER in sentence
+            or _UNVERIFIED_MARKER in sentence
         ):
             continue
         result.issues.append(
                 LintIssue(
                     kind="uncited_number",
                     text=match.group(0).strip(),
-                    detail="numeric claim without a nearby [C..] citation",
+                    detail="numeric claim without a [C..] citation in its sentence",
                 )
             )
     return result
@@ -269,23 +310,30 @@ async def write_and_repair(
     log.info("writer draft failed lint (%d issues); running repair passes", lint_before)
 
     report = draft
-    previous = lint_before
+    previous_keys = _issue_keys(lint_current)
     passes = 0
     for pass_no in range(1, _MAX_REPAIR_PASSES + 1):
         report = await repair_report(llm, report, lint_current, ledger)
         passes = pass_no
         lint_current = lint_report(report, ledger)
-        current = len(lint_current.issues)
-        log.info("repair pass %d: %d -> %d lint issues", pass_no, previous, current)
-        if not lint_current.issues:
+        keys = _issue_keys(lint_current)
+        log.info("repair pass %d: %d -> %d lint issues", pass_no, len(previous_keys), len(keys))
+        if not keys:
             break
-        if current >= previous:
-            log.warning(
-                "repair pass %d failed to reduce issues (%d -> %d); stopping",
-                pass_no, previous, current,
-            )
+        if keys == previous_keys:
+            # Same (kind, text) set twice: the repair is going in circles.
+            # A smaller but DIFFERENT set means it fixed some and broke others —
+            # that is progress worth another pass, not a stop signal.
+            log.warning("repair pass %d produced an identical issue set; stopping", pass_no)
             break
-        previous = current
+        previous_keys = keys
+
+    # A dangling [C99] the repair could not resolve is unverifiable by
+    # construction — mark it instead of shipping a phantom citation.
+    if lint_current.missing_refs:
+        report = sweep_missing_refs(report, lint_current.missing_refs)
+        lint_current = lint_report(report, ledger)
+        log.info("missing_ref sweep: %d issue(s) remain", len(lint_current.issues))
 
     return WriterOutcome(
         report_md=report,
@@ -294,6 +342,19 @@ async def write_and_repair(
         revised=True,
         repair_passes=passes,
     )
+
+
+def _issue_keys(lint: LintResult) -> set[tuple[str, str]]:
+    return {(issue.kind, issue.text) for issue in lint.issues}
+
+
+def sweep_missing_refs(report_md: str, missing_refs: list[str]) -> str:
+    """Mark citations whose claim id does not exist as [UNVERIFIED]."""
+    out = report_md
+    for ref in missing_refs:
+        out = out.replace(f"[{ref}]", "[UNVERIFIED]")
+        out = re.sub(rf"\b{re.escape(ref)}\b", "UNVERIFIED", out)
+    return out
 
 
 async def produce_report(
@@ -315,6 +376,11 @@ async def produce_report(
     fidelity = await verify_citations(llm, outcome.report_md, ledger)
     if fidelity.unverified:
         outcome = outcome.model_copy(update={"report_md": fidelity.report_md})
+    # lint_after must describe the text that actually ships — fidelity rewrites
+    # are lint-safe by design, but a stale pre-fidelity count is how a dangling
+    # ref once reached a final report.
+    final_lint = lint_report(outcome.report_md, ledger)
+    outcome = outcome.model_copy(update={"lint_after": len(final_lint.issues)})
     return outcome, fidelity
 
 

@@ -93,7 +93,7 @@ async def test_multi_pass_repair_reduces_then_cleans(tmp_path, fake_llm, mini_ru
     assert len(_strong_nonjson_calls(fake_llm)) == 3
 
 
-async def test_repair_stops_early_when_a_pass_does_not_reduce(
+async def test_repair_stops_when_the_issue_SET_repeats(
     tmp_path, fake_llm, mini_runbooks_dir, monkeypatch
 ):
     from research_agent.agent.writer import write_and_repair
@@ -103,7 +103,7 @@ async def test_repair_stops_early_when_a_pass_does_not_reduce(
     ledger = _outcome_ledger(tmp_path)
     fake_llm.text_queue = [
         "Figures: 100,000 monthly visitors, 200,000 monthly visitors, 50%.",
-        "Figures: 300,000 monthly visitors, 400,000 monthly visitors, 60%.",
+        "Figures: 100,000 monthly visitors, 200,000 monthly visitors, 50%.",
         "this third text must never be used",
     ]
     outcome = await write_and_repair(
@@ -113,6 +113,31 @@ async def test_repair_stops_early_when_a_pass_does_not_reduce(
     assert outcome.lint_after == 3
     assert outcome.repair_passes == 1
     assert len(_strong_nonjson_calls(fake_llm)) == 2
+
+
+async def test_repair_continues_when_the_set_changes_at_equal_count(
+    tmp_path, fake_llm, mini_runbooks_dir, monkeypatch
+):
+    # The bug: stopping on "8 -> 8 issues" when the repair fixed 8 old ones
+    # and introduced 8 new ones. A DIFFERENT (kind, text) set at equal count
+    # is progress — the loop must continue.
+    from research_agent.agent.writer import write_and_repair
+    from research_agent.runbook import get_runbook
+
+    monkeypatch.setattr("research_agent.runbook.RUNBOOKS_DIR", mini_runbooks_dir)
+    ledger = _outcome_ledger(tmp_path)
+    fake_llm.text_queue = [
+        "Figures: 100,000 monthly visitors, 200,000 monthly visitors, 50%.",
+        "Figures: 300,000 monthly visitors, 400,000 monthly visitors, 60%.",
+        "All figures now derived from [C1].",
+    ]
+    outcome = await write_and_repair(
+        fake_llm, get_runbook("mini-teardown"), ledger, {"competitors": ["a.com"]}
+    )
+    assert outcome.lint_before == 3
+    assert outcome.lint_after == 0
+    assert outcome.repair_passes == 2
+    assert len(_strong_nonjson_calls(fake_llm)) == 3
 
 
 def test_lint_accepts_assumption_marker(tmp_path):

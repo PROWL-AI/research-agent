@@ -68,12 +68,15 @@ async def test_mixed_sentence_keeps_good_ref_marks_bad(tmp_path, fake_llm: FakeL
     assert "[UNVERIFIED]" in result.report_md
 
 
-async def test_missing_verdict_defaults_to_supported(tmp_path, fake_llm: FakeLLM):
+async def test_missing_verdict_counts_as_unchecked_not_supported(tmp_path, fake_llm: FakeLLM):
+    # A ref the LLM never ruled on is unchecked — silence must not report as
+    # a clean pass (the old default-supported hid full batch failures).
     ledger = _ledger(tmp_path)
     report = "a.com gets 150,000 monthly visitors [C1]."
     result = await verify_citations(fake_llm, report, ledger)
-    assert result.checked == 1
-    assert result.supported == 1
+    assert result.checked == 0
+    assert result.supported == 0
+    assert result.unchecked == 1
     assert result.report_md == report
 
 
@@ -113,7 +116,7 @@ async def test_fidelity_stats_in_run_result(
     result = await orchestrator.run("mini-teardown", {"competitors": ["a.com"]}, run_id="r-fid")
 
     assert result.stats["citation_fidelity"] == {
-        "checked": 2, "supported": 1, "unverified": 1,
+        "checked": 2, "supported": 1, "unverified": 1, "unchecked": 0,
     }
     report = Path(result.report_path).read_text()
     assert "[UNVERIFIED:" in report
