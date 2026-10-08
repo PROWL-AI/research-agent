@@ -56,18 +56,18 @@ not as prose.
    because a synthesis step reconciles them; LangChain's failure without one
    is the cautionary tale.
 
-## Traps (recorded failures and dead ends — each becomes a fixture)
+## Traps (recorded failures and dead ends — planted fixtures where one exists)
 
-| # | Trap | Origin | Planted fixture |
+| # | Trap | Origin | Coverage |
 |---|---|---|---|
 | T1 | Guidelines described Apify as an active fallback, but the registry had **zero** Apify tools — an agent reading prose planned calls that could never run | `0xDEV` manifest vs guidelines audit, T-303 | `t1_nonexistent_tool.json` — `validate_runbooks.py` must FAIL on a runbook referencing an unregistered tool |
-| T2 | Moz (29 tools) and Keywords Everywhere (14) fully registered but **never named in guidelines** — whole capability classes invisible to the planner | same audit | `t2_catalog_drift.json` — validation warns when a runbook's allowlist misses the manifest's declared `alternatives` for its tools |
-| T3 | Stale tool profiles for retired providers (Pinterest, google_events) left in `tool_profiles/` — response-shape docs for dead tools | same audit | `t3_retired_tool.json` — planner must reject a plan step naming a retired tool, with a clear error |
+| T2 | Moz (29 tools) and Keywords Everywhere (14) fully registered but **never named in guidelines** — whole capability classes invisible to the planner | same audit | covered by design, not a fixture: the planner binds ONLY the live MCP catalog + the runbook allowlist, so catalog drift cannot hide or invent capability; the 2026-10 audit additionally closed the parent-side verification gap (T398) |
+| T3 | Stale tool profiles for retired providers (Pinterest, google_events) left in `tool_profiles/` — response-shape docs for dead tools | same audit | `t3_retired_tool.json` — planner must reject a plan step naming a retired tool, with a clear error; the offline validator additionally fails runbooks naming retired tools since 2026-10-08 (clean catalog snapshot) |
 | T4 | Wayback module existed with no registered tools; growth-signals referenced "archive.org homepage diff" that no agent could call | same audit | covered by T1 fixture (same failure class, different instance) |
 | T5 | Three sources of truth for tool alternatives (`TOOL_ALTERNATIVES`, manifest `alternatives`, `serp_consolidation.py`) drifted apart | same audit | this repo has exactly one: the live MCP catalog + runbook allowlist |
-| T6 | Traffic/estimate numbers quoted without error bands read as precision; guidelines cap them (30–50%, >70% under 50–100k visits) | `research_guidelines/80-market-sizing.md`, `70-channel-economics.md` | `t6_hallucinated_precision.json` — judge fails a report whose traffic/revenue estimates lack a band or a VERIFIED/ASSUMED tag |
+| T6 | Traffic/estimate numbers quoted without error bands read as precision; guidelines cap them (30–50%, >70% under 50–100k visits) | `research_guidelines/80-market-sizing.md`, `70-channel-economics.md` | `t6_hallucinated_precision.json` — planted as a LINT test (`tests/test_writer.py`): a bare estimate without citation fails lint |
 | T7 | Conflicting sources silently averaged instead of surfaced | `95-verification.md` | `t7_conflict_protocol.json` — a run with contradictory inputs must emit `[CONFLICT]`, not a blended number |
-| T8 | Benchmark quoted without its qualifiers (trial conversion without paywall type/trial length; capture rate without horizon) | external research (RevenueCat, FirstPageSage) | encoded as runbook guards; judge checks benchmark citations carry qualifiers |
+| T8 | Benchmark quoted without its qualifiers (trial conversion without paywall type/trial length; capture rate without horizon) | external research (RevenueCat, FirstPageSage) | encoded as runbook guards (subscription-app-audit requires quartile qualifiers); no judge/lint automation exists for this — do not cite this row as a check |
 
 ## What this agent deliberately does NOT inherit
 

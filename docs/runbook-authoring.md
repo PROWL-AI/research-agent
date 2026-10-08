@@ -49,10 +49,15 @@ Rules:
 - The allowlist is the tool-selection mechanism: 20-60 tools that cover the
   scenario, nothing more. If you need a tool that doesn't exist, that's a
   finding — report it, don't plan around it.
-- Budgets are enforced exactly on `max_tool_calls` (billed `prowl_call_tool`
-  invocations) and `max_minutes`; `max_usd` is enforced when the server
-  returns billing data. Size them for the scenario's real cost, not
-  aspirationally.
+- Budgets are enforced per step on `max_tool_calls` (every billed
+  `prowl_call_tool` dispatch — failed ones included, the server charges them
+  too) and on `max_minutes` (wall time since the run was created, across
+  resumes). Under worker fan-out the tool-call check is advisory: racing
+  workers can overshoot by at most `workers − 1` calls before the stop
+  lands. `max_usd` is enforced on the server's billing data, falling back to
+  catalog price hints (marked "estimated" in stats) when the server returns
+  none. Size budgets for the scenario's real cost, not aspirationally, and
+  give the runbook a drop order for the day the fan-out outgrows them.
 
 ## Body grammar
 

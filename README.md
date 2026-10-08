@@ -32,6 +32,20 @@ Two keys, both via environment (key names only — values never in the repo):
   Any OpenAI-compatible endpoint works: set `RESEARCH_LLM_BASE_URL` /
   `RESEARCH_LLM_API_KEY` / `RESEARCH_LLM_MODEL` to override.
 
+Other environment knobs (all optional):
+
+- `PROWL_MCP_URL` — Prowl MCP endpoint (default `https://prowl.chat/mcp`).
+- `RESEARCH_LLM_MODEL_STRONG` — the strong-tier model (planning, writing,
+  repair); `RESEARCH_LLM_MODEL` covers the cheap tier.
+- `RESEARCH_RUNS_DIR` — where runs are written (default `./runs` relative to
+  the server process; set it explicitly in MCP client configs).
+- `RESEARCH_NO_SUBAGENTS=1` — force sequential execution (no worker fan-out).
+
+Exit codes: `run` exits 1 when the run ends `partial` (budget or failure —
+the report says why); `rewrite` exits 1 when lint issues remain; input and
+usage errors exit 2. `list-runbooks`, `status`, `report`, `export` exit 0 on
+success.
+
 ### MCP
 
 Register the agent as an MCP server (stdio) in any MCP client:
