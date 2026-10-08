@@ -28,8 +28,16 @@ inputs:
 tools: [exact, tool, names]        # allowlist — only these may be planned
 budget: { max_tool_calls: 60, max_usd: 2.00, max_minutes: 25 }
 outputs: { report_template: <kebab>, formats: [markdown, html] }
+effort: deep                    # optional: lookup | comparison | deep
 ---
 ```
+
+`effort` controls sub-agent fan-out: data steps between two Transform
+markers run in parallel workers (`lookup` = 1 inline agent, `comparison` = 3,
+`deep` = 5). Omit it to derive the class from `max_tool_calls` (≤15 lookup,
+≤45 comparison, above that deep) — declaring it is for runbooks whose budget
+misleads (a 60-call runbook of strictly serial steps wants `effort: lookup`).
+Set `RESEARCH_NO_SUBAGENTS=1` to force sequential execution for a run.
 
 Rules:
 

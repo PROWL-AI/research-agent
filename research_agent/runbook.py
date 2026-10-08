@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 RUNBOOKS_DIR = Path(__file__).resolve().parent / "runbooks"
 
 INPUT_TYPES = ("domain", "list[domain]", "string")
+EFFORT_CLASSES = ("lookup", "comparison", "deep")
 
 _RUNBOOK_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9\-]*$")
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)
@@ -57,6 +58,9 @@ class RunbookMeta(BaseModel):
     tools: list[str]
     budget: Budget
     outputs: Outputs
+    #: Optional effort class for sub-agent fan-out (lookup | comparison | deep);
+    #: derived from the tool-call budget when omitted — see agent.subagent.effort_for.
+    effort: str | None = None
 
 
 @dataclass(frozen=True)
@@ -102,6 +106,10 @@ def _parse_frontmatter(raw: str, path: Path) -> RunbookMeta:
                 f"{path}: input '{input_.name}' has unknown type '{input_.type}'"
                 f" (allowed: {', '.join(INPUT_TYPES)})"
             )
+    if meta.effort is not None and meta.effort not in EFFORT_CLASSES:
+        raise RunbookError(
+            f"{path}: unknown effort '{meta.effort}' (allowed: {', '.join(EFFORT_CLASSES)})"
+        )
     return meta
 
 

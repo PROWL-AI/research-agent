@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import time
 import uuid
@@ -230,6 +231,8 @@ class Orchestrator:
             "lint_repair_passes": outcome.repair_passes,
             "citation_fidelity": fidelity.stats,
         }
+        if checkpoint.stats.get("worker_segments"):
+            stats["worker_segments"] = checkpoint.stats["worker_segments"]
         checkpoint.stats = stats
         store.save_checkpoint(checkpoint)
         self._export_html(store.run_dir)
@@ -307,27 +310,57 @@ class Orchestrator:
         ledger: Ledger,
         started_monotonic: float,
     ) -> None:
+        # Imported lazily: subagent.py imports PlanItem from this module.
+        from research_agent.agent.subagent import (
+            EFFORT_WORKERS,
+            WorkerContext,
+            effort_for,
+            run_data_segment,
+            split_segments,
+        )
+
         budget = runbook.meta.budget
         completed = set(checkpoint.completed_steps)
-        cost_advisory_logged = False
+        effort = effort_for(budget.max_tool_calls, runbook.meta.effort)
+        n_workers = 1 if os.environ.get("RESEARCH_NO_SUBAGENTS") else EFFORT_WORKERS[effort]
+        ctx = WorkerContext(
+            orch=self,
+            checkpoint=checkpoint,
+            store=store,
+            ledger=ledger,
+            budget=budget,
+            started_monotonic=started_monotonic,
+            extract_claims=self._extract_claims,
+        )
+        log.info("execution effort=%s workers=%d", effort, n_workers)
 
-        for index, item in enumerate(plan):
-            if index in completed:
-                continue
-
-            stop_reason = self._budget_stop_reason(
-                budget, checkpoint, started_monotonic
+        if self.prowl.cost_usd is None:
+            log.info(
+                "no cost metadata from server; max_usd=%.2f enforced only if cost info appears",
+                budget.max_usd,
             )
-            if stop_reason is None and self.prowl.cost_usd is None and not cost_advisory_logged:
-                log.info(
-                    "no cost metadata from server; max_usd=%.2f enforced only if cost info appears",
-                    budget.max_usd,
-                )
-                cost_advisory_logged = True
+
+        segments = split_segments(plan, completed)
+        for seg_index, (kind, items) in enumerate(segments):
+            if checkpoint.stop_reason is not None:
+                # A worker (or a transform) hit a hard failure / budget stop in an
+                # earlier segment: every step never reached still has to be
+                # disclosed in the partial report, not silently absent.
+                remaining = [
+                    {"index": j, "step": item.step, "tool": item.tool, "reason": checkpoint.stop_reason}
+                    for _, later_items in segments[seg_index:]
+                    for j, item in later_items
+                ]
+                checkpoint.skipped_steps.extend(remaining)
+                store.save_checkpoint(checkpoint)
+                break
+
+            stop_reason = self._budget_stop_reason(budget, checkpoint, started_monotonic)
             if stop_reason is not None:
                 remaining = [
-                    {"index": j, "step": plan[j].step, "tool": plan[j].tool, "reason": stop_reason}
-                    for j in range(index, len(plan)) if j not in completed
+                    {"index": j, "step": item.step, "tool": item.tool, "reason": stop_reason}
+                    for _, later_items in segments[seg_index:]
+                    for j, item in later_items
                 ]
                 checkpoint.skipped_steps.extend(remaining)
                 checkpoint.partial = True
@@ -335,47 +368,59 @@ class Orchestrator:
                 log.warning("budget exhausted (%s); skipping %d steps", stop_reason, len(remaining))
                 break
 
-            log.info("step %d/%d: %s (%s)", index + 1, len(plan), item.step, item.tool)
-            is_transform = item.tool.lower() in TRANSFORM_TOOLS
-            try:
-                if is_transform:
-                    result = await self._run_transform(item, store)
-                else:
-                    result = await self.prowl.call_tool(item.tool, item.arguments)
-            except Exception as exc:
-                if item.on_error_skip:
-                    log.warning("step %d failed (on_error_skip): %s", index, exc)
-                    checkpoint.skipped_steps.append(
-                        {"index": index, "step": item.step, "tool": item.tool, "reason": str(exc)[:200]}
-                    )
-                    checkpoint.completed_steps.append(index)
-                    store.save_checkpoint(checkpoint)
-                    continue
-                checkpoint.partial = True
-                checkpoint.stop_reason = f"step '{item.step}' failed: {exc}"
-                checkpoint.skipped_steps.extend(
-                    {"index": j, "step": plan[j].step, "tool": plan[j].tool, "reason": checkpoint.stop_reason}
-                    for j in range(index, len(plan)) if j not in completed
-                )
-                log.error("step %d failed, aborting to writer: %s", index, exc)
-                break
+            if kind == "transform":
+                index, item = items[0]
+                await self._execute_transform(index, item, checkpoint, store, ledger)
+                continue
 
-            if is_transform:
-                raw_path = store.save_markdown(index, "transform", str(result))
-                checkpoint.transform_notes.append(str(result))
-            else:
-                checkpoint.counters["data_calls"] = checkpoint.counters.get("data_calls", 0) + 1
-                if self.prowl.cost_usd is not None:
-                    checkpoint.counters["cost_usd"] = self.prowl.cost_usd
-                raw_path = store.save_raw(index, item.tool, result)
-            try:
-                await self._extract_claims(item, result, raw_path, ledger)
-            except Exception as exc:
-                log.warning("claim extraction failed for step %d: %s", index, exc)
-            ledger.save()
-
-            checkpoint.completed_steps.append(index)
+            summaries = await run_data_segment(items, ctx, n_workers)
+            checkpoint.stats.setdefault("worker_segments", []).append(
+                {
+                    "effort": effort,
+                    "workers": len(summaries),
+                    "steps": len(items),
+                    "done": sum(s.done for s in summaries),
+                    "claims": sum(s.claims_added for s in summaries),
+                }
+            )
             store.save_checkpoint(checkpoint)
+
+    async def _execute_transform(
+        self,
+        index: int,
+        item: PlanItem,
+        checkpoint: Checkpoint,
+        store: ArtifactStore,
+        ledger: Ledger,
+    ) -> None:
+        log.info("transform step %d: %s", index, item.step)
+        try:
+            result = await self._run_transform(item, store)
+        except Exception as exc:
+            if item.on_error_skip:
+                log.warning("transform step %d failed (on_error_skip): %s", index, exc)
+                checkpoint.skipped_steps.append(
+                    {"index": index, "step": item.step, "tool": item.tool, "reason": str(exc)[:200]}
+                )
+                checkpoint.completed_steps.append(index)
+                store.save_checkpoint(checkpoint)
+                return
+            checkpoint.partial = True
+            checkpoint.stop_reason = f"step '{item.step}' failed: {exc}"
+            checkpoint.skipped_steps.append(
+                {"index": index, "step": item.step, "tool": item.tool, "reason": checkpoint.stop_reason}
+            )
+            log.error("transform step %d failed, aborting to writer: %s", index, exc)
+            return
+        raw_path = store.save_markdown(index, "transform", str(result))
+        checkpoint.transform_notes.append(str(result))
+        try:
+            await self._extract_claims(item, result, raw_path, ledger)
+        except Exception as exc:
+            log.warning("claim extraction failed for transform step %d: %s", index, exc)
+        ledger.save()
+        checkpoint.completed_steps.append(index)
+        store.save_checkpoint(checkpoint)
 
     async def _run_transform(self, item: PlanItem, store: ArtifactStore) -> str:
         instruction = item.instruction or (
