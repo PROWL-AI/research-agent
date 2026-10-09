@@ -4,8 +4,8 @@ Runbook-driven research agent. It follows structured **research runbooks** (SaaS
 competitor teardowns, ads & creative research, subscription-app audits, market
 sizing, equity research, SEO, AI visibility and more), calls the
 [Prowl](https://prowl.chat) MCP tool bank (440+ data tools: SEO, ads libraries,
-reviews, scraping, app intelligence, LLM cross-checks), keeps every fact in an
-**evidence ledger**, and produces reports where every number traces to a source.
+reviews, scraping, app intelligence, LLM cross-checks), stores extracted claims in an
+**evidence ledger**, and produces reports with source citations and verification disclosures.
 
 It is both a CLI for humans and an **MCP server** for agents
 (`research.run`, `research.list_runbooks`, `research.get_report`,
@@ -96,11 +96,13 @@ env var, before spending anything).
 Runs take minutes, so for long runs prefer the job pattern: call
 `research.run` with `wait=false` (the default) to get `{run_id, status:
 "running"}` back immediately, then poll `research.get_status(run_id)` until
-the checkpoint shows `complete`/`partial`, and fetch the result with
+the checkpoint shows `complete`, `partial`, `failed`, or `interrupted`.
+`failed`/`interrupted` require inspecting the checkpoint; a report may not exist.
+For `complete`/`partial`, fetch the result with
 `research.get_report(run_id)`. Use `wait=true` only when the caller can block
 for the whole run.
 
-First real run (makes billed Prowl calls, respects the runbook budget):
+First real run (makes billed Prowl calls; see budget limits below):
 
 ```bash
 prowl-research run saas-competitor-teardown --competitors example.com,rival.com
@@ -129,8 +131,10 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
                      →  citation verification pass  →  markdown + HTML
 ```
 
-- Every number in a report must exist in the evidence ledger with a source
-  (two independent sources or a verbatim quote). No ledger entry, no number.
+- Runbooks ask for sourced numbers and triangulation. The writer consumes the
+  evidence ledger and runs citation repair/verification, but this is not a
+  guarantee that every fact is true or has two independent sources. Inspect
+  the report's verification disclosures and source evidence before relying on it.
 - Runbooks declare their **tool allowlist** and **budget**
   (`max_tool_calls` / `max_usd` / `max_minutes`). On budget exhaustion the agent
   emits a partial report that marks what is missing — it never fails silently.
@@ -140,6 +144,24 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   under `stats.llm_usage` in every run's output.
 - Charts are rendered deterministically from ledger data, never described by
   the LLM.
+
+## Current verification and resume limits
+
+The [2026-10-10 handoff](docs/HANDOFF.md) records the audited source revision,
+checks and next repair tasks. The offline suite passed 304 tests at `1dced8e`;
+this does not establish live provider quality or Fabric host acceptance.
+
+Resume currently has confirmed gaps: pruning a changed tool catalog can shift
+step indices and skip pending work; a worker failure marks unstarted tail steps
+completed; and a worker writes its checkpoint before adding successful completion.
+These can omit work or replay a previously executed step after a crash. Inspect
+checkpoint, raw artifacts and remaining steps before resuming a paid run. A stable
+caller idempotency key alone does not guarantee exactly-once execution or billing.
+See the handoff for source locations and reproducible acceptance tests.
+
+Finance/subscription live acceptance remains unverified. `max_usd` limits the
+Prowl tool-call budget, with concurrent in-flight calls potentially overshooting
+it; it is not a cap on the separate LLM provider spend.
 
 ## License
 
