@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
 from datetime import datetime, timezone
@@ -11,9 +12,17 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 log = logging.getLogger(__name__)
+
+#: Written into every ledger.json; load() refuses dicts without a claims key,
+#: so this is a forward-compat marker rather than a migration machinery.
+SCHEMA_VERSION = 1
+
+
+class LedgerError(Exception):
+    pass
 
 
 class ClaimStatus(str, Enum):
@@ -34,6 +43,16 @@ class Claim(BaseModel):
     raw_ref: str | None = None
     verbatim: bool = False
     status: ClaimStatus = ClaimStatus.assumed
+
+    @field_validator("value")
+    @classmethod
+    def _value_must_be_finite(cls, value: Any) -> Any:
+        # json.loads accepts NaN/Infinity literals from the extractor LLM, and
+        # pydantic would take them: a NaN normalises to 'nan' in _norm_value,
+        # so two NaN claims would falsely "corroborate" each other.
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError("claim value must be a finite number")
+        return value
 
 
 _SUBJECT_STOPWORDS = frozenset({"the", "a", "an", "of", "per"})
@@ -89,12 +108,23 @@ class Ledger:
         if not path.is_file():
             return cls(path)
         data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or "claims" not in data:
+            # A dict without claims is not an empty ledger — it is a foreign or
+            # truncated file. Silently loading it as empty lets a resume append
+            # a report with zero evidence over a full raw/ directory.
+            log.warning("ledger at %s has no 'claims' key — refusing to load it as empty", path)
+            raise LedgerError(f"ledger at {path} is not a ledger file (no 'claims' key)")
         claims = [Claim.model_validate(item) for item in data.get("claims", [])]
         return cls(path, claims)
 
     def save(self) -> None:
-        payload = {"claims": [c.model_dump(mode="json") for c in self.claims]}
-        _atomic_write_text(self.path, json.dumps(payload, indent=2, ensure_ascii=False))
+        payload = {
+            "schema_version": SCHEMA_VERSION,
+            "claims": [c.model_dump(mode="json") for c in self.claims],
+        }
+        _atomic_write_text(
+            self.path, json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False)
+        )
 
     def _next_id(self) -> str:
         highest = 0
@@ -194,4 +224,4 @@ class Ledger:
             }
             for c in self.claims
         ]
-        return json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
+        return json.dumps(rows, ensure_ascii=False, separators=(",", ":"), allow_nan=False)

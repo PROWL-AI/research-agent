@@ -90,12 +90,12 @@ class ConcurrentFakeProwl(FakeProwl):
         self.in_flight = 0
         self.max_in_flight = 0
 
-    async def call_tool(self, name, arguments):
+    async def call_tool(self, name, arguments, idempotency_key=None):
         self.in_flight += 1
         self.max_in_flight = max(self.max_in_flight, self.in_flight)
         try:
             await asyncio.sleep(self.delay)
-            return await super().call_tool(name, arguments)
+            return await super().call_tool(name, arguments, idempotency_key=idempotency_key)
         finally:
             self.in_flight -= 1
 

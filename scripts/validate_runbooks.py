@@ -2,9 +2,14 @@
 """Validate every runbook: frontmatter parses, budgets are sane, tool names exist.
 
 Offline mode uses evals/fixtures/live_catalog_snapshot.json.
-Online mode queries the live Prowl catalog (needs PROWL_API_KEY).
+Online mode queries the live Prowl catalog (needs PROWL_API_KEY only — no LLM
+key, the catalog call is not an LLM flow).
 Exits 1 on any unknown tool name (trap T1: prose must never name tools that
 cannot be called).
+
+Exit codes: 0 = all runbooks valid, 1 = validation failed, 2 = usage or
+network/config error (so CI can tell "runbook invalid" apart from "could not
+reach the catalog").
 
 TODO: warn when a runbook's allowlist misses the declared failover alternatives
 of its tools (trap T2) once a machine-readable alternatives map is available
@@ -53,7 +58,8 @@ async def _load_catalog(offline: bool) -> list[str]:
     from research_agent.config import Config
     from research_agent.prowl_client import ProwlClient
 
-    config = Config.from_env()
+    # Online validation only talks to the Prowl catalog — no LLM key needed.
+    config = Config.from_env(require_llm=False)
     async with ProwlClient(api_key=config.prowl_api_key, mcp_url=config.prowl_mcp_url) as client:
         return await client.list_tools()
 
@@ -84,7 +90,14 @@ def main(argv: list[str] | None = None) -> int:
             failures += 1
     print(f"frontmatter: {len(runbooks)} runbook(s) parsed")
 
-    catalog = asyncio.run(_load_catalog(offline))
+    try:
+        catalog = asyncio.run(_load_catalog(offline))
+    except Exception as exc:
+        print(
+            f"error: could not load the {'snapshot' if offline else 'live'} catalog: {exc}",
+            file=sys.stderr,
+        )
+        return 2
     print(f"catalog: {len(catalog)} tools ({'snapshot' if offline else 'live'})")
 
     for runbook in runbooks:

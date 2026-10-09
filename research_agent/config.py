@@ -24,11 +24,24 @@ class Config:
     llm_api_key: str
     llm_model: str
     llm_model_strong: str
+    #: Independent judge model (RESEARCH_JUDGE_MODEL) — empty means "use the
+    #: strong model", so a report need not be graded by the model that wrote it.
+    llm_model_judge: str = ""
 
     @classmethod
     def from_env(
-        cls, environ: Mapping[str, str] | None = None, *, require_prowl: bool = True
+        cls,
+        environ: Mapping[str, str] | None = None,
+        *,
+        require_prowl: bool = True,
+        require_llm: bool = True,
     ) -> "Config":
+        """Build a Config from the environment.
+
+        ``require_prowl=False`` is for LLM-only flows (e.g. ``rewrite``);
+        ``require_llm=False`` is for Prowl-only flows (e.g. online runbook
+        validation) — the returned ``llm_api_key`` is then empty and unusable.
+        """
         env = os.environ if environ is None else environ
 
         prowl_api_key = env.get("PROWL_API_KEY", "").strip()
@@ -41,10 +54,12 @@ class Config:
             env.get("RESEARCH_LLM_API_KEY", "").strip()
             or env.get("OPENROUTER_API_KEY", "").strip()
         )
-        if not llm_api_key:
+        if require_llm and not llm_api_key:
             raise ConfigError(
                 "no LLM key found — set RESEARCH_LLM_API_KEY or OPENROUTER_API_KEY"
             )
+
+        model_strong = env.get("RESEARCH_LLM_MODEL_STRONG", DEFAULT_LLM_MODEL_STRONG).strip() or DEFAULT_LLM_MODEL_STRONG
 
         return cls(
             prowl_api_key=prowl_api_key,
@@ -55,6 +70,6 @@ class Config:
             llm_api_key=llm_api_key,
             llm_model=env.get("RESEARCH_LLM_MODEL", DEFAULT_LLM_MODEL).strip()
             or DEFAULT_LLM_MODEL,
-            llm_model_strong=env.get("RESEARCH_LLM_MODEL_STRONG", DEFAULT_LLM_MODEL_STRONG).strip()
-            or DEFAULT_LLM_MODEL_STRONG,
+            llm_model_strong=model_strong,
+            llm_model_judge=env.get("RESEARCH_JUDGE_MODEL", "").strip() or model_strong,
         )

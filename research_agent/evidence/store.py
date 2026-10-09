@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from research_agent.evidence.ledger import _atomic_write_text
+
+#: Written into every checkpoint.json. Checkpoints without it still load (the
+#: field defaults) — pre-versioning checkpoints stay resumable.
+SCHEMA_VERSION = 1
 
 #: A run_id is a directory name — nothing else. Caller-supplied ids must never
 #: escape runs/ via separators or traversal.
@@ -37,6 +42,7 @@ def validate_run_id(run_id: str) -> str:
 class Checkpoint(BaseModel):
     run_id: str
     runbook: str
+    schema_version: int = SCHEMA_VERSION
     status: str = "running"
     created_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
@@ -69,9 +75,9 @@ class ArtifactStore:
         while path.exists():
             path = self.raw_dir / f"{step_index:02d}_{tool}_{suffix}.json"
             suffix += 1
-        path.write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False, default=str),
-            encoding="utf-8",
+        _atomic_write_text(
+            path,
+            json.dumps(payload, indent=2, ensure_ascii=False, default=str, allow_nan=False),
         )
         return path
 
@@ -98,9 +104,13 @@ class ArtifactStore:
         checkpoint.updated_at = datetime.now(timezone.utc).isoformat()
         self.run_dir.mkdir(parents=True, exist_ok=True)
         # Atomic: a checkpoint truncated by a crash is an unrecoverable run.
-        tmp = self.checkpoint_path.with_suffix(".json.tmp")
-        tmp.write_text(checkpoint.model_dump_json(indent=2), encoding="utf-8")
-        os.replace(tmp, self.checkpoint_path)
+        # allow_nan=False: a NaN counter must fail the write, not persist as
+        # an invalid-JSON literal (mode='json' would silently coerce it to
+        # null, so dump the python form instead — all fields are JSON-native).
+        text = json.dumps(
+            checkpoint.model_dump(mode="python"), indent=2, ensure_ascii=False, allow_nan=False
+        )
+        _atomic_write_text(self.checkpoint_path, text)
 
     def load_checkpoint(self) -> Checkpoint | None:
         if not self.checkpoint_path.is_file():

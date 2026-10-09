@@ -165,7 +165,8 @@ async def run_worker(worker_id: int, items: list[tuple[int, PlanItem]], ctx: Wor
         if stop_reason is not None:
             for j, rest in items[position:]:
                 checkpoint.skipped_steps.append(
-                    {"index": j, "step": rest.step, "tool": rest.tool, "reason": stop_reason}
+                    {"index": j, "step": rest.step, "tool": rest.tool, "reason": stop_reason,
+                     "kind": "runtime_skip"}
                 )
                 checkpoint.completed_steps.append(j)
                 summary.outcomes.append(
@@ -179,7 +180,13 @@ async def run_worker(worker_id: int, items: list[tuple[int, PlanItem]], ctx: Wor
 
         log.info("worker %d: step %d %s (%s)", worker_id, index, item.step, item.tool)
         try:
-            result = await ctx.orch.prowl.call_tool(item.tool, item.arguments)
+            # A stable per-step key lets the server dedupe a resume that
+            # re-dispatches a step it already executed and billed (transport
+            # died after the server settled), instead of double-charging.
+            result = await ctx.orch.prowl.call_tool(
+                item.tool, item.arguments,
+                idempotency_key=f"{checkpoint.run_id}:{index}:{item.tool}",
+            )
         except Exception as exc:
             # Failed dispatches are billed by the server — they spend the
             # tool-call budget even though they produce no data.
@@ -187,7 +194,8 @@ async def run_worker(worker_id: int, items: list[tuple[int, PlanItem]], ctx: Wor
             if item.on_error_skip:
                 log.warning("worker %d: step %d failed (on_error_skip): %s", worker_id, index, exc)
                 checkpoint.skipped_steps.append(
-                    {"index": index, "step": item.step, "tool": item.tool, "reason": str(exc)[:200]}
+                    {"index": index, "step": item.step, "tool": item.tool, "reason": str(exc)[:200],
+                     "kind": "runtime_skip"}
                 )
                 checkpoint.completed_steps.append(index)
                 _safe_save(checkpoint, ctx.store)
@@ -202,14 +210,16 @@ async def run_worker(worker_id: int, items: list[tuple[int, PlanItem]], ctx: Wor
             # error above the client's retries stays resumable. The steps
             # after it are — re-running them would double-bill.
             checkpoint.skipped_steps.append(
-                {"index": index, "step": item.step, "tool": item.tool, "reason": reason}
+                {"index": index, "step": item.step, "tool": item.tool, "reason": reason,
+                 "kind": "runtime_skip"}
             )
             summary.outcomes.append(
                 StepOutcome(index=index, step=item.step, tool=item.tool, status="failed", note=str(exc)[:120])
             )
             for j, rest in items[position + 1:]:
                 checkpoint.skipped_steps.append(
-                    {"index": j, "step": rest.step, "tool": rest.tool, "reason": reason}
+                    {"index": j, "step": rest.step, "tool": rest.tool, "reason": reason,
+                     "kind": "runtime_skip"}
                 )
                 checkpoint.completed_steps.append(j)
                 summary.outcomes.append(
@@ -222,7 +232,12 @@ async def run_worker(worker_id: int, items: list[tuple[int, PlanItem]], ctx: Wor
         checkpoint.counters["attempted_calls"] = checkpoint.counters.get("attempted_calls", 0) + 1
         checkpoint.counters["data_calls"] = checkpoint.counters.get("data_calls", 0) + 1
         if ctx.orch.prowl.cost_usd is not None:
-            checkpoint.counters["cost_usd"] = ctx.orch.prowl.cost_usd
+            # The client is seeded with the persisted cost on resume, so its
+            # total is run-cumulative; max() keeps the counter monotone even
+            # if a client was replaced mid-run without that seeding.
+            checkpoint.counters["cost_usd"] = max(
+                checkpoint.counters.get("cost_usd") or 0.0, ctx.orch.prowl.cost_usd
+            )
         else:
             # Server gave no billing data: accumulate the catalog price hint so
             # max_usd still means something and the report can say "estimated".
@@ -263,17 +278,32 @@ def _crash_summary(
     crash must never take the whole segment (and every other worker's
     evidence) down with it."""
     log.error("worker %d crashed outside its guard: %s", worker_id, exc)
-    ctx.checkpoint.partial = True
-    ctx.checkpoint.stop_reason = ctx.checkpoint.stop_reason or f"worker {worker_id} crashed: {exc}"
+    checkpoint = ctx.checkpoint
+    checkpoint.partial = True
+    checkpoint.stop_reason = checkpoint.stop_reason or f"worker {worker_id} crashed: {exc}"
+    # Every step the dead worker never reached is disclosed as skipped — the
+    # partial report must account for the whole plan. They are NOT marked
+    # completed: a resume re-executes them.
+    reason = f"worker crash: {str(exc)[:120]}"
+    already = {entry.get("index") for entry in checkpoint.skipped_steps}
+    uncompleted = [
+        (j, rest) for j, rest in chunk if j not in checkpoint.completed_steps
+    ]
+    checkpoint.skipped_steps.extend(
+        {"index": j, "step": rest.step, "tool": rest.tool, "reason": reason,
+         "kind": "runtime_skip"}
+        for j, rest in uncompleted
+        if j not in already
+    )
+    _safe_save(checkpoint, ctx.store)
     return WorkerSummary(
         worker_id=worker_id,
         outcomes=[
             StepOutcome(
                 index=j, step=rest.step, tool=rest.tool, status="failed",
-                note=f"worker crash: {str(exc)[:120]}",
+                note=reason,
             )
-            for j, rest in chunk
-            if j not in ctx.checkpoint.completed_steps
+            for j, rest in uncompleted
         ],
     )
 

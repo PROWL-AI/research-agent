@@ -65,6 +65,10 @@ class FakeProwl:
         self.list_tools_calls = 0
         self.cost_per_call: float | None = None
         self.fail_on: set[str] = set()
+        # tool name -> refusal envelope: simulates what ProwlClient._invoke
+        # raises when the server answers {success: false, error_class: ...}
+        # with MCP isError=false.
+        self.error_envelopes: dict[str, dict[str, Any]] = {}
 
     @property
     def calls_made(self) -> int:
@@ -87,9 +91,21 @@ class FakeProwl:
     async def tool_info(self, name: str) -> dict[str, Any]:
         return {"name": name, "input_schema": {"type": "object", "properties": {}}}
 
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
-        self.tool_calls.append({"name": name, "arguments": arguments})
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        idempotency_key: str | None = None,
+    ) -> Any:
+        self.tool_calls.append({"name": name, "arguments": arguments, "idempotency_key": idempotency_key})
         self.call_log.append(object())
+        if name in self.error_envelopes:
+            from research_agent.prowl_client import ToolCallError
+
+            envelope = self.error_envelopes[name]
+            error_class = envelope.get("error_class", "unknown_error")
+            detail = envelope.get("error", "")
+            raise ToolCallError(f"prowl_call_tool: {error_class}: {detail}")
         if name in self.fail_on:
             from research_agent.prowl_client import ToolCallError
 

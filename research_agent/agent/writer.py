@@ -35,6 +35,8 @@ _SOURCE_LOG_ROW_RE = re.compile(r"^\s*\|\s*C\d+\s*\|.*$", re.MULTILINE)
 _ASSUMPTION_MARKER = "(target, assumption — not data)"
 _UNVERIFIED_MARKER = "[UNVERIFIED"
 _MAX_REPAIR_PASSES = 3
+_DRAFT_MAX_TOKENS = 8000
+_DRAFT_ESCALATED_MAX_TOKENS = 12_000
 
 WRITER_SYSTEM_TEMPLATE = """\
 You are the writer for a research run. Write the final markdown report.
@@ -277,12 +279,36 @@ async def write_report(
             " use as context, cite the ledger for numbers)\n"
             + "\n\n---\n\n".join(transform_notes)
         )
-    return await llm.complete(
-        [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        tier="strong",
-        max_tokens=8000,
-        temperature=0.3,
-    )
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    try:
+        return await llm.complete(
+            messages, tier="strong", max_tokens=_DRAFT_MAX_TOKENS, temperature=0.3,
+        )
+    except LLMError as exc:
+        if exc.retryable or exc.finish_reason != "length":
+            raise
+        # A truncated first draft arrives after the run's entire tool spend —
+        # dying here loses the ledger and the money. Retry once with a larger
+        # output budget before giving up on the report.
+        log.warning(
+            "writer draft truncated at max_tokens=%d; retrying with max_tokens=%d",
+            _DRAFT_MAX_TOKENS, _DRAFT_ESCALATED_MAX_TOKENS,
+        )
+    try:
+        return await llm.complete(
+            messages, tier="strong", max_tokens=_DRAFT_ESCALATED_MAX_TOKENS, temperature=0.3,
+        )
+    except LLMError as exc:
+        truncated = (exc.content or "").strip()
+        if exc.retryable or exc.finish_reason != "length" or not truncated:
+            raise
+        # Still truncated at the ceiling: ship the partial draft (lint and
+        # repair can only improve it) rather than lose the run's evidence.
+        log.warning(
+            "writer draft still truncated at max_tokens=%d; shipping the partial draft",
+            _DRAFT_ESCALATED_MAX_TOKENS,
+        )
+        return truncated + "\n\n*(Report truncated at the model's output limit.)*"
 
 
 async def repair_report(
@@ -464,4 +490,10 @@ async def rewrite_report(
     checkpoint.stats["lint_issues"] = outcome.lint_after
     checkpoint.stats["citation_fidelity"] = fidelity.stats
     store.save_checkpoint(checkpoint)
+    try:
+        from research_agent.report.render import render_run
+
+        render_run(run_dir)
+    except Exception as exc:
+        log.warning("HTML export failed for %s: %s", run_dir, exc)
     return outcome

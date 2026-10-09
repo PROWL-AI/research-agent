@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 RUNBOOKS_DIR = Path(__file__).resolve().parent / "runbooks"
 
@@ -36,7 +36,9 @@ class RunbookInput(BaseModel):
 class Budget(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    max_tool_calls: int
+    # gt=0: a zero/negative call budget passes planning and then divides by
+    # zero downstream (judge usage_ratio) or stops the run before step one.
+    max_tool_calls: int = Field(gt=0)
     max_usd: float
     max_minutes: int
 

@@ -31,6 +31,9 @@ _MAX_CATALOG_PAGES = 50
 _DEFAULT_CALL_TIMEOUT_S = 180.0
 
 COST_META_KEYS = ("cost_usd", "cost", "price_usd", "price")
+#: Server-side notices piggybacked on a successful payload — billing warnings,
+#: deprecation notices. Dropping them silently hides a retiring tool.
+_WARNING_KEYS = ("billing_warning", "deprecation", "deprecation_warning", "warning")
 
 
 class ProwlError(Exception):
@@ -49,6 +52,7 @@ class ToolCallRecord:
     at: str
     error: str | None = None
     cost_usd: float | None = None
+    warning: str | None = None
 
 
 @dataclass
@@ -179,9 +183,35 @@ class ProwlClient:
         if record.cost_usd is not None:
             self.cost_usd = (self.cost_usd or 0.0) + record.cost_usd
 
+        # The server reports refusals (insufficient_funds, not_found,
+        # validation, tool_retired) as a JSON envelope with MCP isError=false —
+        # without this check the step would be marked done and the claim
+        # extractor would mine the error text as facts.
+        if isinstance(payload, dict) and (
+            payload.get("success") is False or "error_class" in payload
+        ):
+            error_class = str(payload.get("error_class") or "unknown_error")
+            detail = str(payload.get("error") or payload.get("message") or "")
+            record.error = f"{error_class}: {detail}" if detail else error_class
+            if error_class == "insufficient_funds":
+                # The wallet is empty: every further dispatch fails the same
+                # way. This is the Prowl wallet budget, not the run budget.
+                log.error(
+                    "prowl insufficient_funds on %s — top up the Prowl wallet; "
+                    "further billed calls will keep failing",
+                    prowl_tool,
+                )
+            else:
+                log.warning("prowl refused %s: %s", prowl_tool, record.error)
+            raise ToolCallError(f"{prowl_tool}: {record.error[:300]}")
+
         if result.isError:
             record.error = _content_text(result)
             raise ToolCallError(f"{prowl_tool}: tool returned error: {record.error[:300]}")
+
+        record.warning = _extract_warning(payload)
+        if record.warning is not None:
+            log.warning("prowl %s: %s", prowl_tool, record.warning)
 
         record.ok = True
         return payload
@@ -225,10 +255,19 @@ class ProwlClient:
             )
         return self._tool_info_cache[name]
 
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
-        return await self._invoke(
-            "prowl_call_tool", {"tool_name": name, "params": arguments}
-        )
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        idempotency_key: str | None = None,
+    ) -> Any:
+        request: dict[str, Any] = {"tool_name": name, "params": arguments}
+        if idempotency_key is not None:
+            # Server-side dedupe: a step retried after a transport failure
+            # re-sends its key so the server does not double-bill a dispatch
+            # it already executed.
+            request["idempotency_key"] = idempotency_key
+        return await self._invoke("prowl_call_tool", request)
 
     async def wallet(self) -> Any:
         return await self._invoke("prowl_get_wallet", {})
@@ -279,6 +318,13 @@ def _extract_billing_cost(prowl_tool: str, payload: Any) -> float | None:
         return None
     value = billing.get("actual_cost_usd")
     return float(value) if isinstance(value, (int, float)) else None
+
+
+def _extract_warning(payload: Any) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    parts = [str(payload[key]) for key in _WARNING_KEYS if payload.get(key)]
+    return "; ".join(parts) or None
 
 
 def _extract_cost(result: CallToolResult) -> float | None:

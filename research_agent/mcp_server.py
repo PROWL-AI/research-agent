@@ -180,17 +180,15 @@ async def research_run(
     # A finished run_id on disk must be rejected before scheduling: the
     # orchestrator would refuse it anyway, and letting the failure surface
     # mid-task risks clobbering the finished run's checkpoint.
-    existing = await asyncio.to_thread(
-        ArtifactStore(_runs_root() / run_id).load_checkpoint
-    )
+    try:
+        existing = await asyncio.to_thread(
+            ArtifactStore(_runs_root() / run_id).load_checkpoint
+        )
+    except ValueError as exc:
+        raise ValueError(f"run '{run_id}' checkpoint corrupt: {exc}") from exc
     if existing is not None and existing.runbook != runbook:
         raise ValueError(
             f"run '{run_id}' already belongs to runbook '{existing.runbook}'"
-        )
-    if existing is not None and existing.status != "running":
-        raise ValueError(
-            f"run '{run_id}' already finished with status '{existing.status}' — "
-            "choose a new run_id"
         )
     # Prune finished tasks so _TASKS does not grow for the server's lifetime.
     # From here to task registration there is no await: the duplicate check
@@ -199,6 +197,16 @@ async def research_run(
         _TASKS.pop(stale_id, None)
     if run_id in _TASKS and not _TASKS[run_id].done():
         raise ValueError(f"run '{run_id}' is already running in this server process")
+    if existing is not None and existing.status == "complete":
+        raise ValueError(
+            f"run '{run_id}' already finished with status 'complete' — "
+            "choose a new run_id"
+        )
+    # running-without-a-live-task / partial / failed / interrupted with a
+    # recorded plan: the orchestrator resumes from the checkpoint and
+    # re-executes only the steps that never completed. Without a plan the run
+    # died before planning finished — nothing was billed, so the orchestrator
+    # re-plans over the empty run dir.
 
     if wait:
         current = asyncio.current_task()
@@ -246,7 +254,11 @@ async def research_list_runbooks() -> list[dict[str, Any]]:
 
 def _status_dict(run_id: str) -> dict[str, Any]:
     validate_run_id(run_id)
-    checkpoint = ArtifactStore(_runs_root() / run_id).load_checkpoint()
+    try:
+        checkpoint = ArtifactStore(_runs_root() / run_id).load_checkpoint()
+    except ValueError as exc:
+        log.error("run %s checkpoint corrupt, quarantined: %s", run_id, exc)
+        raise ValueError(f"run '{run_id}' checkpoint corrupt: {exc}") from exc
     if checkpoint is None:
         raise ValueError(f"unknown run_id '{run_id}' (no checkpoint at runs/{run_id})")
     try:
@@ -301,15 +313,19 @@ async def research_get_report(run_id: str) -> dict[str, Any]:
         ),
         "status": status,
     }
-    if status["status"] == "running":
+    if status["status"] not in ("complete", "partial"):
         # report.md exists but the checkpoint never reached a terminal state —
         # the file may be mid-write (or the run orphaned mid-write).
-        result["checkpoint_status"] = "running (report may be mid-write)"
+        result["checkpoint_status"] = f"{status['status']} (report may be mid-write)"
     return result
 
 
 def _reconcile_orphaned_runs() -> None:
-    """Mark checkpoints left 'running' by a previous server process as partial."""
+    """Mark checkpoints left 'running' by a previous server process as interrupted.
+
+    'interrupted' is not terminal: research.run accepts the run_id again and
+    the orchestrator resumes from the recorded plan — a restart must not force
+    the caller to pay for a fresh run."""
     root = _runs_root()
     if not root.is_dir():
         return
@@ -317,14 +333,19 @@ def _reconcile_orphaned_runs() -> None:
         if not run_dir.is_dir():
             continue
         store = ArtifactStore(run_dir)
-        checkpoint = store.load_checkpoint()
+        try:
+            checkpoint = store.load_checkpoint()
+        except ValueError as exc:
+            # One corrupt checkpoint must not stop the server from starting.
+            log.error("run dir %s has a corrupt checkpoint, skipping: %s", run_dir.name, exc)
+            continue
         if checkpoint is not None and checkpoint.status == "running":
-            checkpoint.status = "partial"
+            checkpoint.status = "interrupted"
             checkpoint.partial = True
             checkpoint.stop_reason = "server restarted before completion"
             store.save_checkpoint(checkpoint)
             log.warning(
-                "run %s marked partial: server restarted before completion",
+                "run %s marked interrupted: server restarted before completion",
                 checkpoint.run_id,
             )
 

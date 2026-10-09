@@ -5,12 +5,17 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import re
+import shutil
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from research_agent.config import Config, ConfigError
 from research_agent.evidence.store import validate_run_id
 from research_agent.runbook import RunbookError, list_runbooks
+
+log = logging.getLogger(__name__)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -52,6 +57,29 @@ def main(argv: list[str] | None = None) -> int:
     export_p.add_argument("run_id")
     export_p.add_argument("--format", choices=["html", "md"], default="html")
 
+    prune_p = sub.add_parser(
+        "prune",
+        help="delete old runs/<id> directories (dry-run unless --yes is given)",
+    )
+    prune_p.add_argument(
+        "--older-than",
+        default="30d",
+        metavar="Nd",
+        help="minimum age by checkpoint created_at (default: 30d)",
+    )
+    prune_p.add_argument(
+        "--keep-last",
+        type=int,
+        default=0,
+        metavar="N",
+        help="never delete the N newest runs, however old",
+    )
+    prune_p.add_argument(
+        "--yes",
+        action="store_true",
+        help="actually delete; without it prune only lists candidates",
+    )
+
     args, extra = parser.parse_known_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -78,6 +106,8 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(_cmd_rewrite(args.run_id))
     if args.command == "export":
         return _cmd_export(args.run_id, args.format)
+    if args.command == "prune":
+        return _cmd_prune(args.older_than, args.keep_last, args.yes)
     return 2
 
 
@@ -98,6 +128,10 @@ def _cmd_list_runbooks() -> int:
         )
         description = rb.meta.description.strip().split("\n")[0]
         print(f"{rb.name:<{name_width}}  {budget_s:<28}  {description}")
+    print(
+        "\nbudgets cap tool calls only — LLM usage is metered separately "
+        "(see stats.llm_usage in run output)"
+    )
     return 0
 
 
@@ -109,14 +143,43 @@ def _parse_input_pairs(extra: list[str]) -> dict[str, object]:
         if not token.startswith("--"):
             print(f"error: unexpected argument '{token}' (expected --key value)", file=sys.stderr)
             raise SystemExit(2)
-        key = token[2:].replace("-", "_")
+        raw_key = token[2:]
+        if "=" in raw_key:
+            name, _, value = raw_key.partition("=")
+            inputs[name.replace("-", "_")] = value
+            index += 1
+            continue
+        key = raw_key.replace("-", "_")
         if index + 1 >= len(extra) or extra[index + 1].startswith("--"):
             print(f"error: --{key} needs a value", file=sys.stderr)
             raise SystemExit(2)
-        raw = extra[index + 1]
-        inputs[key] = [part.strip() for part in raw.split(",") if part.strip()] if "," in raw else raw
+        # Keep the raw string: comma-splitting happens in build_brief, which
+        # knows the runbook input type — a string input may contain commas.
+        inputs[key] = extra[index + 1]
         index += 2
     return inputs
+
+
+def _mark_run_failed(runbook_name: str, run_id: str, exc: Exception) -> None:
+    """Mirror the MCP contract: a crashed run's checkpoint becomes 'failed'
+    with a stop_reason — the CLI has no MCP wrapper doing this for it."""
+    from research_agent.evidence.store import ArtifactStore
+
+    try:
+        store = ArtifactStore(Path("runs") / run_id)
+        checkpoint = store.load_checkpoint()
+        # Only a checkpoint this run owns: a precondition failure must not
+        # rewrite another run's terminal state.
+        if (
+            checkpoint is not None
+            and checkpoint.status == "running"
+            and checkpoint.runbook == runbook_name
+        ):
+            checkpoint.status = "failed"
+            checkpoint.stop_reason = str(exc)[:300]
+            store.save_checkpoint(checkpoint)
+    except Exception as mark_exc:  # noqa: BLE001
+        log.warning("could not mark run %s as failed: %s", run_id, mark_exc)
 
 
 async def _cmd_run(runbook_name: str, inputs: dict[str, object], run_id: str | None) -> int:
@@ -136,6 +199,11 @@ async def _cmd_run(runbook_name: str, inputs: dict[str, object], run_id: str | N
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
+    # Generate the id up front (same shape as the orchestrator's) so a crash
+    # below can mark this run's checkpoint failed instead of leaving it
+    # 'running' forever.
+    run_id = run_id or Orchestrator._new_run_id(runbook_name)
+
     async with ProwlClient(
         api_key=config.prowl_api_key, mcp_url=config.prowl_mcp_url
     ) as prowl, LLMClient(
@@ -147,8 +215,17 @@ async def _cmd_run(runbook_name: str, inputs: dict[str, object], run_id: str | N
         orchestrator = Orchestrator(prowl, llm, runs_root=Path("runs"))
         try:
             result = await orchestrator.run(runbook_name, inputs, run_id=run_id)
+        except RunbookError as exc:
+            # Usage error (unknown/invalid runbook) — README promises exit 2.
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
         except (OrchestratorError, InputError) as exc:
             print(f"error: {exc}", file=sys.stderr)
+            _mark_run_failed(runbook_name, run_id, exc)
+            return 1
+        except Exception as exc:
+            print(f"error: run failed: {exc}", file=sys.stderr)
+            _mark_run_failed(runbook_name, run_id, exc)
             return 1
 
     print(f"run {result.run_id}: {result.status}")
@@ -182,7 +259,11 @@ def _cmd_status(run_id: str) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(f"run {status['run_id']} ({status['runbook']}): {status['status']}")
-    print(f"  steps:    {len(status['completed_steps'])}/{status['planned_steps']} completed, "
+    # Skipped steps are also recorded in completed_steps (their post-failure
+    # chunk-mates) — subtract them or the count overstates real progress.
+    skipped_idx = {entry.get("index") for entry in status["skipped_steps"]}
+    completed = sum(1 for i in status["completed_steps"] if i not in skipped_idx)
+    print(f"  steps:    {completed}/{status['planned_steps']} completed, "
           f"{len(status['skipped_steps'])} skipped")
     print(f"  counters: {status['counters']}")
     if status["duration_s"] is not None:
@@ -264,6 +345,90 @@ def _cmd_export(run_id: str, fmt: str) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(out_path)
+    return 0
+
+
+def _parse_days(text: str) -> timedelta:
+    match = re.fullmatch(r"(\d+)d", text.strip())
+    if not match:
+        raise ValueError(f"--older-than expects '<N>d' (e.g. 30d), got '{text}'")
+    return timedelta(days=int(match.group(1)))
+
+
+def _lock_held(lock_path: Path) -> bool:
+    """True when another process holds an flock on the run's .lock file."""
+    import fcntl
+
+    try:
+        fd = lock_path.open("r+b")
+    except OSError:
+        return False
+    with fd:
+        try:
+            fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return True
+        fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+    return False
+
+
+def _cmd_prune(older_than: str, keep_last: int, yes: bool) -> int:
+    try:
+        min_age = _parse_days(older_than)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if keep_last < 0:
+        print("error: --keep-last must be >= 0", file=sys.stderr)
+        return 2
+    from research_agent.evidence.store import ArtifactStore
+
+    runs_root = Path("runs")
+    if not runs_root.is_dir():
+        print("no runs/ directory — nothing to prune")
+        return 0
+
+    now = datetime.now(timezone.utc)
+    dated: list[tuple[Path, datetime, str]] = []
+    skipped: list[tuple[Path, str]] = []
+    for run_dir in sorted(p for p in runs_root.iterdir() if p.is_dir()):
+        try:
+            checkpoint = ArtifactStore(run_dir).load_checkpoint()
+        except Exception:
+            checkpoint = None
+        if checkpoint is None:
+            skipped.append((run_dir, "no readable checkpoint, age unknown"))
+            continue
+        created = datetime.fromisoformat(checkpoint.created_at)
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        dated.append((run_dir, created, checkpoint.status))
+
+    protected = {path for path, _, _ in sorted(dated, key=lambda row: row[1], reverse=True)[:keep_last]}
+    candidates: list[tuple[Path, timedelta, str]] = []
+    for run_dir, created, status in dated:
+        age = now - created
+        if run_dir in protected:
+            skipped.append((run_dir, "protected by --keep-last"))
+        elif age < min_age:
+            skipped.append((run_dir, f"only {age.days}d old"))
+        elif (run_dir / ".lock").exists() and _lock_held(run_dir / ".lock"):
+            # A live lock means a running/interrupted run is still active in
+            # another process — deleting its artifacts mid-write is corruption.
+            skipped.append((run_dir, f"lock held (status={status})"))
+        else:
+            candidates.append((run_dir, age, status))
+
+    for run_dir, reason in skipped:
+        print(f"skip    {run_dir.name}: {reason}")
+    for run_dir, age, status in candidates:
+        print(f"{'delete' if yes else 'would delete'}  {run_dir.name}: {age.days}d old, status={status}")
+        if yes:
+            shutil.rmtree(run_dir)
+    if not yes and candidates:
+        print(f"\ndry-run: {len(candidates)} run(s) would be deleted — re-run with --yes to delete")
+    else:
+        print(f"\n{len(candidates)} run(s) {'deleted' if yes else 'to prune'}")
     return 0
 
 

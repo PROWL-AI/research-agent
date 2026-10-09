@@ -150,7 +150,9 @@ def programmatic_signals(
         "budget": {
             "data_calls_used": used,
             "max_tool_calls": budget.max_tool_calls,
-            "usage_ratio": round(used / budget.max_tool_calls, 3),
+            "usage_ratio": (
+                round(used / budget.max_tool_calls, 3) if budget.max_tool_calls else None
+            ),
             "partial": checkpoint.partial,
             "stop_reason": checkpoint.stop_reason,
         },
@@ -189,7 +191,10 @@ def _parse_judge_json(text: str) -> dict[str, Any]:
         payload = json.loads(text)
     except json.JSONDecodeError:
         match = re.search(r"\{.*\}", text, re.DOTALL)
-        payload = json.loads(match.group(0)) if match else {}
+        try:
+            payload = json.loads(match.group(0)) if match else {}
+        except json.JSONDecodeError:
+            payload = {}
     if not isinstance(payload, dict):
         raise JudgeError("judge returned non-object JSON")
     return payload
@@ -219,7 +224,11 @@ async def judge_run(
         temperature=0.0,
     )
     payload = _parse_judge_json(text)
-    raw_scores = payload.get("scores") or {}
+    raw_scores = payload.get("scores")
+    if not isinstance(raw_scores, dict) or not raw_scores:
+        # An unparsable or score-less judge reply is a judge failure, not a
+        # 0.00 FAIL — the two must never look alike in eval output.
+        raise JudgeError(f"judge returned no usable scores object: {text[:200]!r}")
     raw_reasons = payload.get("reasons") or {}
 
     scores: dict[str, float] = {}
@@ -257,7 +266,7 @@ async def _amain(args: argparse.Namespace) -> int:
         base_url=config.llm_base_url,
         api_key=config.llm_api_key,
         model_cheap=config.llm_model,
-        model_strong=config.llm_model_strong,
+        model_strong=config.llm_model_judge or config.llm_model_strong,
     ) as llm:
         try:
             result = await judge_run(Path(args.run), llm, threshold=args.threshold)

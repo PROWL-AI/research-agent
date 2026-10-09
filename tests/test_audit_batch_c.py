@@ -109,7 +109,7 @@ class TestFinishedRunCheckpointIsUntouchable:
 
 
 class TestOrphanedRuns:
-    async def test_startup_reconciliation_marks_running_partial(
+    async def test_startup_reconciliation_marks_running_interrupted(
         self, wired, tmp_path: Path
     ):
         store = ArtifactStore(tmp_path / "runs" / "c2-orphan")
@@ -122,7 +122,7 @@ class TestOrphanedRuns:
         srv._reconcile_orphaned_runs()
 
         orphan = _checkpoint_on_disk(tmp_path, "c2-orphan")
-        assert orphan["status"] == "partial"
+        assert orphan["status"] == "interrupted"
         assert orphan["partial"] is True
         assert orphan["stop_reason"] == "server restarted before completion"
         assert _checkpoint_on_disk(tmp_path, "c2-done")["status"] == "complete"
@@ -134,7 +134,7 @@ class TestOrphanedRuns:
 
         srv.serve()
 
-        assert _checkpoint_on_disk(tmp_path, "c2-serve")["status"] == "partial"
+        assert _checkpoint_on_disk(tmp_path, "c2-serve")["status"] == "interrupted"
 
     async def test_get_status_flags_orphaned_running_checkpoint(
         self, wired, tmp_path: Path
