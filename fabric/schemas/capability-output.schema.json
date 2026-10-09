@@ -11,7 +11,8 @@
     },
     "status": {
       "type": "string",
-      "enum": ["running", "complete", "partial", "failed"]
+      "enum": ["running", "complete", "partial"],
+      "description": "wait=false returns \"running\" (job handle); wait=true returns \"complete\" or \"partial\". A failed run never produces this envelope — it surfaces as an MCP tool error and a failed checkpoint readable via research.get_status."
     },
     "report_path": {
       "type": "string"

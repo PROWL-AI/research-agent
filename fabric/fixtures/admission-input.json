@@ -3,6 +3,6 @@
   "inputs": {
     "competitors": ["example.com"]
   },
-  "wait": true,
+  "wait": false,
   "trace_id": "fabric-admission-probe"
 }
