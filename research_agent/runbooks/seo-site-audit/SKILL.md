@@ -14,11 +14,9 @@ inputs:
   - { name: focus, type: "string", required: false, doc: "Optional emphasis: technical | content | ai-visibility. Shifts depth, never skips the spine." }
 tools:
   - seo_growth_audit
-  - seo_growth_check_page
   - seo_growth_check_technical
   - firecrawl_scrape_page_seo
   - firecrawl_scrape_page_html
-  - firecrawl_scrape_website
   - firecrawl_map_domain
   - dataforseo_onpage_task_post
   - dataforseo_onpage_summary
@@ -99,7 +97,7 @@ effort/impact estimate; quick wins come first.
    the matching sections, it never removes a step.
 2. **Crawl kickoff + homepage scrape** — Parallel:
    `dataforseo_onpage_task_post` with `target="{domain}"`,
-   `max_crawl_pages=200` (async — retain the `task_id`; every step-8 read
+   `max_crawl_pages=200` (async — retain the `task_id`; every step-7 read
    depends on it) + `firecrawl_scrape_page_seo` on the homepage (raw HTML +
    `seo_data` in one call).
 3. **SpyFu baseline** — Parallel: `spyfu_get_domain_stats` with

@@ -37,14 +37,20 @@ Other environment knobs (all optional):
 - `PROWL_MCP_URL` — Prowl MCP endpoint (default `https://prowl.chat/mcp`).
 - `RESEARCH_LLM_MODEL_STRONG` — the strong-tier model (planning, writing,
   repair); `RESEARCH_LLM_MODEL` covers the cheap tier.
-- `RESEARCH_RUNS_DIR` — where runs are written (default `./runs` relative to
-  the server process; set it explicitly in MCP client configs).
+- `RESEARCH_RUNS_DIR` — where runs are written (MCP server only; the CLI
+  always uses `./runs`). Default `./runs` relative to the server process;
+  set it explicitly in MCP client configs.
 - `RESEARCH_NO_SUBAGENTS=1` — force sequential execution (no worker fan-out).
 
+CLI subcommands: `run <runbook> [--run-id <id>] [--key value …]`,
+`list-runbooks`, `status <run_id>`, `report <run_id>`, `rewrite <run_id>`,
+`export <run_id> [--format html|md]`, `validate [--online]`, `mcp`.
+
 Exit codes: `run` exits 1 when the run ends `partial` (budget or failure —
-the report says why); `rewrite` exits 1 when lint issues remain; input and
-usage errors exit 2. `list-runbooks`, `status`, `report`, `export` exit 0 on
-success.
+the report says why); `rewrite` exits 1 when lint issues remain; `validate`
+exits 1 when a runbook fails validation; input and usage errors exit 2.
+`list-runbooks`, `status`, `report`, `export` exit 0 on success; `mcp`
+serves on stdio until stopped.
 
 ### MCP
 
@@ -97,7 +103,7 @@ with a source log and confidence ladder.
 
 ```bash
 pytest                                  # unit tests + runbook validation (offline)
-python scripts/validate_runbooks.py     # frontmatter + tool names vs live Prowl catalog (needs PROWL_API_KEY)
+python scripts/validate_runbooks.py --online  # frontmatter + tool names vs live Prowl catalog (needs PROWL_API_KEY)
 python evals/judge.py --run runs/<id>   # 5-dimension quality rubric for a finished run
 ```
 

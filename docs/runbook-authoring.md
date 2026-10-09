@@ -44,10 +44,11 @@ Rules:
 - Input types: `domain`, `string`, `list[domain]`. Quote any type containing
   brackets (YAML flow-mapping pitfall).
 - Every tool name must exist in the live Prowl catalog —
-  `python scripts/validate_runbooks.py` (online) is authoritative,
-  `--offline` uses `evals/fixtures/live_catalog_snapshot.json`.
-- The allowlist is the tool-selection mechanism: 20-60 tools that cover the
-  scenario, nothing more. If you need a tool that doesn't exist, that's a
+  `python scripts/validate_runbooks.py --online` is authoritative; the
+  default `--offline` mode uses `evals/fixtures/live_catalog_snapshot.json`.
+- The allowlist is the tool-selection mechanism: ~20-60 tools that cover the
+  scenario, nothing more — lean lookup runbooks may go lower, broad audits a
+  few higher. If you need a tool that doesn't exist, that's a
   finding — report it, don't plan around it.
 - Budgets are enforced per step on `max_tool_calls` (every billed
   `prowl_call_tool` dispatch — failed ones included, the server charges them

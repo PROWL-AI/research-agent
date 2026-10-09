@@ -16,7 +16,6 @@ inputs:
 tools:
   - google_trends
   - youtube_search
-  - youtube_channel_videos
   - google_videos_light
   - google_shorts
   - foreplay_discovery_ads
@@ -56,8 +55,9 @@ out of that, one-page creative briefs that describe a testable bet. Depth on
 
 ## Principles (read first)
 
-- **Longevity is the quality signal.** An ad running 60-90+ days is almost
-  certainly profitable — advertisers kill losers fast. Weight every finding
+- **Longevity is the quality signal.** An ad running 60-90+ days is a proven
+  winner, likely profitable (creative-level) — advertisers kill losers fast.
+  Weight every finding
   by `running_days` / start date and by the advertiser's active-vs-paused
   ratio. An ACTIVE ad is not a WINNING ad; only duration earns that claim.
 - **Classify hooks as patterns, never as examples.** Every extracted hook

@@ -24,7 +24,6 @@ tools:
   - find_subdomains
   - perplexity_responses
   - spyfu_get_bulk_domain_stats
-  - spyfu_get_domain_stats
   - spyfu_get_combined_competitors
   - spyfu_get_top_pages
   - spyfu_get_most_valuable_keywords
@@ -90,9 +89,9 @@ is decaying, and is the math viable.
    `acv` omitted, note that pricing must be scraped in step 8. Run
    `find_subdomains` (on_error=skip) in parallel with step 2 to catch
    separate app/blog/docs properties whose traffic must not be conflated.
-2. **Niche media discovery (FIRST data call)** — `discover_niche_media` with
+2. **Niche media discovery (FIRST media call)** — `discover_niche_media` with
    the `market` (or the subject's category) + audience. This is mandatory
-   before any other data tool: it fans out across niche newsletters,
+   before any other media tool: it fans out across niche newsletters,
    podcasts, YouTube channels and communities and returns channel rows with
    `audience_estimate` + `audience_evidence`. Keep every verbatim evidence
    quote next to its claim. If the tool errors or returns nothing, fall back
@@ -136,7 +135,7 @@ is decaying, and is the math viable.
    `meta_ad_library_ad_details` on the longest-running creatives.
    Transform: platform mix, creative longevity, spend verdict (scaling /
    steady / retreating). Spend sustained 6+ months is almost certainly
-   profitable — say so when the evidence shows it.
+   profitable (advertiser-level) — say so when the evidence shows it.
 8. **Growth-mechanics crawl** — `firecrawl_map_domain` on the subject;
    grep the URL map for the free-tool taxonomy (`/tools/`, `/free-`,
    `-calculator`, `-generator`, `-checker`, `-grader`) and alternatives
@@ -244,7 +243,7 @@ Template `channel-economics`. Required sections:
   exists, without labeling it blended — paid search and content are
   different businesses.
 - Skipping the niche-media first call: if `discover_niche_media` was not the
-  first data call (or its failure/fallback was not logged), the media
+  first media call (or its failure/fallback was not logged), the media
   section is labeled incomplete.
 - Diagnosing a paid-growth loop from ad presence alone — no loop claim
   without traffic mix + ad longevity + referral evidence combined.

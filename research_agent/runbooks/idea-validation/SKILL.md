@@ -123,8 +123,9 @@ their evidence.
    `spyfu_get_paid_search` + `spyfu_get_ppc_keywords` for search-spend
    history, and `meta_ad_library_ad_details` on the longest-running creatives
    (on_error=skip). Transform: per incumbent — platforms, longest-running
-   creative, spend trajectory (scaling / steady / retreating). Sustained
-   spend 60-90+ days = someone is profitably paying to acquire this customer;
+   creative, spend trajectory (scaling / steady / retreating). A creative
+   running 60-90+ days is a proven winner, likely profitable
+   (creative-level) — someone is profitably paying to acquire this customer;
    the strongest behavioral demand signal in this runbook. An empty ad
    library is a finding (channel skipped or weak economics), never an error.
 7. **Offer & pricing scrape** — Fan-out `firecrawl_scrape_website` per top-3

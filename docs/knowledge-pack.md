@@ -1,16 +1,16 @@
 # Knowledge pack — inherited patterns and traps
 
 Distilled from the Prowl monorepo (`0xDEV`, PROWL-AI/prowl-app) before this
-agent's first commit, per the Fabric new-agent intake. Every trap below has a
-planted eval fixture in `evals/fixtures/` — knowledge transfers as a check,
-not as prose.
+agent's first commit, per the Fabric new-agent intake. Most traps below have a
+planted eval fixture in `evals/fixtures/` — rows without one say so
+explicitly; knowledge transfers as a check, not as prose.
 
 ## Sources
 
 - `research_guidelines/*.md` — 13 modules (00-core … 95-verification), the
   source of truth for research doctrine in the parent project.
 - `tools/manifest.yaml`, `tools/chains.yaml`, `tool_profiles/` — machine-readable
-  registry of 442 active tools across 17 providers.
+  registry of 444 active tools across 17 providers.
 - `mcp_server/tools.py`, `mcp_server/session_tools.py` — the remote MCP surface
   this agent consumes (`prowl_search_tools`, `prowl_tool_info`,
   `prowl_call_tool`, async session tools, `prowl_generate_artifact`).

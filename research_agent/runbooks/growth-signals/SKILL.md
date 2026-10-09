@@ -63,8 +63,8 @@ evidence stays mixed: conflicting classes are named, never averaged away.
 
 ## Principles (read first)
 
-- **Six independence classes, three minimum — deliberately stricter than the
-  source guideline's two.** Do not "harmonize" this back down: one strong
+- **Six independence classes, three minimum — a deliberately strict gate.**
+  Do not relax it: one strong
   class plus one weak one is exactly the false-positive this gate exists to
   kill. Signals inside one class share
   a root cause and do not corroborate each other. A verdict needs agreeing
@@ -81,7 +81,8 @@ evidence stays mixed: conflicting classes are named, never averaged away.
   first-of-function hire (first PMM, first data engineer, first enterprise
   AE, first country manager) out-signals a dozen backfills — call these out.
 - **Sustained ad spend is a profitability proxy.** 6+ months of continuous
-  spend is almost certainly funded by working unit economics; retreating
+  spend is almost certainly profitable (advertiser-level) — funded by working
+  unit economics; retreating
   spend plus a hiring freeze is a compounding negative. Ad count is not ad
   dollars — say trajectory, not budget.
 - **Velocity beats level.** Review-velocity trend matters more than rating

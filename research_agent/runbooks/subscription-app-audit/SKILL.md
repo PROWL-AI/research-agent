@@ -135,7 +135,8 @@ quartile and category. Depth on the subject app beats breadth across rivals.
 10. **Paid UA health signal** — Parallel per brand: `meta_ad_library` +
     `tiktok_ads_library` + `google_ads_advertiser_info` (on_error=skip).
     Transform: active creative count, longest-running creative, platform mix
-    per app. Creative sustained 60-90+ days is almost certainly profitable —
+    per app. Creative sustained 60-90+ days is a proven winner, likely
+    profitable (creative-level) —
     UA at scale implies LTV:CAC ≥ 3:1 is being met; say so explicitly when
     the evidence shows it, and say when it does not.
 11. **Demand trend** — `google_trends` brand terms, 12-month, one batched

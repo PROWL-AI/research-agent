@@ -115,7 +115,7 @@ engines actually cite today.
    mandatory ground for every fix recommendation.
 8. **Technical crawlability** — `firecrawl_scrape_page_html` on robots.txt
    (AI-bot blocks: GPTBot, ClaudeBot, PerplexityBot, Google-Extended) and on
-   the homepage; follow sitemap acquisition (§1.15: robots.txt `Sitemap:`
+   the homepage; follow sitemap acquisition (robots.txt `Sitemap:`
    lines → canonical probes) and pass `sitemap_xml`/`sitemap_urls` to
    `seo_growth_audit` on the target's key cited-page HTML, or
    `seo_growth_check_technical` when HTML is thin (on_error=skip). Report

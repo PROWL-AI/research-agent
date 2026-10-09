@@ -71,7 +71,6 @@ tools:
   - google_news
   - google_ai_mode
   - perplexity_responses
-  - gemini_analyze_website
   - gemini_keyword_report
   - gemini_reviews_report
 budget: { max_tool_calls: 60, max_usd: 2.00, max_minutes: 25 }
@@ -148,7 +147,7 @@ budget; steps 1-3 and 12 are never optional.
 10. **Backlink deep-dive** — `dataforseo_bl_referring_domains` +
     `dataforseo_bl_anchors` + `dataforseo_bl_domain_intersection` vs top-2
     (on_error=skip). Anchor-text profile: branded vs commercial vs spam.
-11. **Content footprint** — `firecrawl_map_domain` → Transform: filter
+11. **Content footprint** (optional) — `firecrawl_map_domain` → Transform: filter
     /blog, /resources, /learn paths → scrape 3 recent posts. `youtube_search`
     + `youtube_channel_videos` for the brand name (on_error=skip).
 12. **Ads presence** — Parallel: `foreplay_get_brands_by_domain` +
@@ -158,7 +157,8 @@ budget; steps 1-3 and 12 are never optional.
     `meta_ad_library_page_info` + `foreplay_ad_details` +
     `foreplay_brand_analytics` on the top creatives (on_error=skip).
     Transform: platforms, active ad count, longest-running creative (60-90+
-    days ≈ profitable), landing URLs for step 13. "Not advertising" is a
+    days = proven winner, likely profitable (creative-level)), landing
+    URLs for step 13. "Not advertising" is a
     finding — record it, don't omit the section.
 13. **Funnel crawl** — Transform: ad landing URLs + funnel subdomain URLs
     from $step1.funnel_urls → fan-out `crawl_funnel_path` (on_error=skip).
@@ -174,7 +174,7 @@ budget; steps 1-3 and 12 are never optional.
     `google_jobs` (hiring velocity and role mix; ghost-jobs caveat: ~40% of
     postings may never be filled) + `google_news` (funding, launches,
     layoffs).
-16. **Keyword synthesis** — `gemini_keyword_report` over the combined
+16. **Keyword synthesis** (optional) — `gemini_keyword_report` over the combined
     keyword data from steps 2, 8-9 (on_error=skip). LLM synthesis, never a
     primary source — every keyword it elevates must trace to a data tool.
 17. **AI search visibility** — Parallel for 3 product-category queries:
@@ -194,6 +194,17 @@ budget; steps 1-3 and 12 are never optional.
     AI visibility, tech — strong / average / weak each, with evidence), the
     per-section "what this means" paragraphs, and the follow-up register
     (unexplored subdomains, skipped optional steps, refresh candidates).
+
+## Budget degradation (drop order)
+
+A full fan-out is ~75 calls against the 60-call budget. When the budget
+tightens, drop in this order and name each dropped block in the partial
+report: (1) steps marked (optional), (2) tech-stack competitor fan-out
+(step 19 reduced to the target only), (3) competitor calibration reduced
+to top-1 (step 7), (4) backlink deep-dive reduced to
+`dataforseo_bl_summary` alone (step 10), (5) AI visibility reduced to
+`google_ai_mode` alone (step 17). Subdomain discovery, domain baseline,
+site scrape and ads presence (steps 1-3, 12) are never dropped.
 
 ## Verification (hard rules)
 

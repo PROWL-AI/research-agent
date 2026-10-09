@@ -77,9 +77,9 @@ breadth across ten.
 - **Ad copy reveals positioning better than the homepage.** Ads are
   conversion-optimized; homepages are compromise-optimized. Never write the
   positioning section from the homepage alone.
-- **Sustained ad spend is the most reliable health signal.** Ads running
-  60-90+ days are almost certainly profitable — advertisers kill losers fast.
-  Weight every ad finding by longevity. Every ad library here is active-only:
+- **Sustained ad spend is the most reliable health signal.** A creative
+  running 60-90+ days is a proven winner, likely profitable (creative-level)
+  — advertisers kill losers fast. Weight every ad finding by longevity. Every ad library here is active-only:
   longevity verdicts are survivorship-biased (killed ads are invisible), so
   phrase them "among currently active ads" and lean on Foreplay/SpyFu
   history for anything about the past.
@@ -138,16 +138,19 @@ breadth across ten.
    + `spyfu_get_paid_search` for search spend history. Transform: per
    competitor — active ad count, longest-running creative, platform mix,
    spend-trajectory verdict (scaling / steady / retreating). An advertiser
-   sustaining spend 6+ months is almost certainly profitable; say so
-   explicitly when the evidence shows it.
+   sustaining spend 6+ months is almost certainly profitable
+   (advertiser-level); say so explicitly when the evidence shows it.
 10. **Funnel crawl** — Transform: landing URLs from ads → fan-out
     `crawl_funnel_path` (on_error=skip). Note trial gate placement and
     onboarding friction where visible.
 11. **Reviews & voice of customer** — `scrape_review_platforms` per competitor
-    (Trustpilot/G2/Capterra composite) + `reddit_search` for quoted-price
-    testimonials and complaints (on_error=skip). Transform: recurring
-    complaints (= exploitable gaps), praised workflows (= their real moat),
-    customer vocabulary (= messaging input), any quoted prices.
+    (Trustpilot/G2/Capterra composite, filtered for churn and switching
+    themes) + `reddit_search` for quoted-price testimonials and complaints
+    plus churn variants `"{brand} cancelled"`, `"{brand} refund"`,
+    `"{brand} vs"` (on_error=skip). Transform: recurring complaints
+    (= exploitable gaps), praised workflows (= their real moat), customer
+    vocabulary (= messaging input), any quoted prices; capture switch-from/
+    switch-to mentions as churn-reason evidence.
 12. **Market pulse & trajectory** — Parallel: `google_trends` (brand terms,
     12-month), `google_jobs` (hiring velocity and role mix — many AEs =
     scaling GTM; first-of-function hires = new bets; ghost-jobs caveat: ~40%
@@ -164,9 +167,9 @@ breadth across ten.
     engagement metrics (on_error=skip). If two sources disagree >2x, report
     the range as `[CONFLICT]` — never average silently.
 16. **Synthesis** — Transform: per competitor — health scorecard (SEO
-    trajectory, ad spend trajectory, hiring, review velocity), win /
-    vulnerable / what-to-say, and one battlecard row. Verdicts come last and
-    must cite section evidence.
+    trajectory, ad spend trajectory, hiring, review velocity, churn signals),
+    win / vulnerable / what-to-say, and one battlecard row. Verdicts come last
+    and must cite section evidence.
 
 ## Verification (hard rules)
 
@@ -181,7 +184,7 @@ breadth across ten.
 
 A full fan-out at 5 competitors exceeds max_tool_calls. When the budget
 tightens, drop in this order and name each dropped block in the partial
-report: (1) enrichment scrapes (changelog, docs depth), (2) hiring/jobs
+report: (1) tech-stack scan (step 14), (2) hiring/jobs
 signals, (3) AI-visibility fan-out reduced to 2 competitors, (4) backlink
 cross-check reduced to one index, (5) competitor set reduced to the 3
 strongest named. Positioning, pricing archaeology, SEO baseline and the
@@ -202,11 +205,11 @@ Template `competitor-depth`. Required sections:
 5. **Pricing archaeology** — tiers table + mined quoted prices with sources;
    "offline pricing" marked, never guessed.
 6. **Reviews — voice of customer** — complaints→gaps table, praised workflows,
-   3-5 verbatim quotes with platform.
+   churn/switching reasons, 3-5 verbatim quotes with platform.
 7. **Trajectory signals** — trends/jobs/news, 12-month view, ghost-jobs caveat.
 8. **AI visibility** — mentions per engine per query.
 9. **Battlecard** — one row per competitor: where they win / where they're
-   vulnerable / what to say / traps to set.
+   vulnerable / churn signals / what to say / traps to set.
 10. **Source log** — every figure with tool + retrieval date; confidence
     ladder; `[CONFLICT]` register; refresh recommendation (quarterly).
 

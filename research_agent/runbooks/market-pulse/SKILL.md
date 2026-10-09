@@ -107,14 +107,14 @@ what does that mean for timing.
    threads are unmet-need evidence — quote verbatim with subreddit and date;
    recurring recommendation patterns = demand the market already routes
    somewhere.
-8. **Social presence stack (recipe 5.24)** — For the 2-3 brands/creators
+8. **Social presence stack** — For the 2-3 brands/creators
    that dominate the niche conversation (skip for unbranded niches):
    `facebook_business_page` + `dataforseo_biz_social_facebook`
    (cross-validation) + `instagram_profile` + `tiktok_profile` +
    `youtube_channel` (all on_error=skip). Transform: platform presence
    matrix and where the audience actually engages; high followers with low
    engagement = stale audience. Pinterest/Reddit metrics via DataForSEO are
-   deprecated (T365) — state that Pinterest has no current data source
+   deprecated — state that Pinterest has no current data source
    rather than planning around it.
 9. **LLM context pass (secondary only)** — ONE `perplexity_responses`
    query: "what changed in <market> in the last <window> months"
