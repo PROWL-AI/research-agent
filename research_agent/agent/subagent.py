@@ -253,13 +253,41 @@ async def run_worker(worker_id: int, items: list[tuple[int, PlanItem]], ctx: Wor
     return summary
 
 
+def _crash_summary(
+    worker_id: int,
+    chunk: list[tuple[int, PlanItem]],
+    exc: BaseException,
+    ctx: WorkerContext,
+) -> WorkerSummary:
+    """A worker that escaped its own guards becomes a failed summary — the
+    crash must never take the whole segment (and every other worker's
+    evidence) down with it."""
+    log.error("worker %d crashed outside its guard: %s", worker_id, exc)
+    ctx.checkpoint.partial = True
+    ctx.checkpoint.stop_reason = ctx.checkpoint.stop_reason or f"worker {worker_id} crashed: {exc}"
+    return WorkerSummary(
+        worker_id=worker_id,
+        outcomes=[
+            StepOutcome(
+                index=j, step=rest.step, tool=rest.tool, status="failed",
+                note=f"worker crash: {str(exc)[:120]}",
+            )
+            for j, rest in chunk
+            if j not in ctx.checkpoint.completed_steps
+        ],
+    )
+
+
 async def run_data_segment(items: list[tuple[int, PlanItem]], ctx: WorkerContext, n_workers: int) -> list[WorkerSummary]:
     """Fan a data segment out to workers and merge their summaries. A worker
     that somehow still raises becomes a failed summary — it must never take
     the whole segment (and every other worker's evidence) down with it."""
     chunks = partition_workers(items, n_workers)
     if len(chunks) == 1:
-        return [await run_worker(0, chunks[0], ctx)]
+        try:
+            return [await run_worker(0, chunks[0], ctx)]
+        except Exception as exc:  # noqa: BLE001 — same crash boundary as fan-out
+            return [_crash_summary(0, chunks[0], exc, ctx)]
     log.info("data segment: %d steps across %d workers", len(items), len(chunks))
     results = await asyncio.gather(
         *(run_worker(worker_id, chunk, ctx) for worker_id, chunk in enumerate(chunks)),
@@ -268,22 +296,7 @@ async def run_data_segment(items: list[tuple[int, PlanItem]], ctx: WorkerContext
     summaries: list[WorkerSummary] = []
     for worker_id, outcome in enumerate(results):
         if isinstance(outcome, BaseException):
-            log.error("worker %d crashed outside its guard: %s", worker_id, outcome)
-            ctx.checkpoint.partial = True
-            ctx.checkpoint.stop_reason = ctx.checkpoint.stop_reason or f"worker {worker_id} crashed: {outcome}"
-            summaries.append(
-                WorkerSummary(
-                    worker_id=worker_id,
-                    outcomes=[
-                        StepOutcome(
-                            index=j, step=rest.step, tool=rest.tool, status="failed",
-                            note=f"worker crash: {str(outcome)[:120]}",
-                        )
-                        for j, rest in chunks[worker_id]
-                        if j not in ctx.checkpoint.completed_steps
-                    ],
-                )
-            )
+            summaries.append(_crash_summary(worker_id, chunks[worker_id], outcome, ctx))
         else:
             summaries.append(outcome)
     return summaries

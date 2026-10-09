@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -56,6 +57,39 @@ def _escape_raw_html(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;")
 
 
+_ATTR_VALUE_RE = re.compile(
+    r"\b(href|src)\s*=\s*([\"'])(.*?)\2", re.IGNORECASE | re.DOTALL
+)
+_BLOCKED_SCHEMES = frozenset({"javascript", "data", "vbscript", "file"})
+
+
+def _sanitize_link_schemes(html: str) -> str:
+    """Neutralise unsafe URL schemes in href/src attributes.
+
+    ``_escape_raw_html`` disarms raw tags, but markdown links survive it:
+    ``[x](javascript:alert(1))`` converts to ``<a href="javascript:...">``.
+    The report is built from scraped content, so an indirect prompt injection
+    can plant such a link. Blocked schemes are rewritten to ``#``; schemeless
+    values (fragments, relative paths) and everything else pass through.
+    """
+    blocked = 0
+
+    def _replace(match: re.Match) -> str:
+        nonlocal blocked
+        attr, quote, value = match.group(1), match.group(2), match.group(3)
+        scheme = value.split(":", 1)[0] if ":" in value else ""
+        scheme = re.sub(r"\s+", "", scheme).lower()
+        if scheme and scheme in _BLOCKED_SCHEMES:
+            blocked += 1
+            return f"{attr}={quote}#{quote}"
+        return match.group(0)
+
+    sanitized = _ATTR_VALUE_RE.sub(_replace, html)
+    if blocked:
+        log.warning("render: neutralised %d unsafe href/src attribute(s)", blocked)
+    return sanitized
+
+
 def render_report_html(
     report_md: str,
     ledger: Ledger,
@@ -67,7 +101,7 @@ def render_report_html(
 ) -> str:
     with_charts = substitute_charts(_escape_raw_html(report_md), ledger)
     md = md_lib.Markdown(extensions=_MD_EXTENSIONS)
-    body = md.convert(with_charts)
+    body = _sanitize_link_schemes(md.convert(with_charts))
     subject_parts: list[str] = []
     for value in brief.values():
         if isinstance(value, list):

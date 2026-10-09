@@ -5,12 +5,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
+from anyio import BrokenResourceError, ClosedResourceError, EndOfStream
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.shared.exceptions import McpError
@@ -24,6 +26,9 @@ _BACKOFF_BASE_S = 1.0
 #: server regression grows offsets forever otherwise, and the page is a
 #: network call each iteration.
 _MAX_CATALOG_PAGES = 50
+#: One socket read deadline for meta calls and billed dispatches alike: a hung
+#: server must not park every worker on a call that never answers.
+_DEFAULT_CALL_TIMEOUT_S = 180.0
 
 COST_META_KEYS = ("cost_usd", "cost", "price_usd", "price")
 
@@ -109,13 +114,27 @@ class ProwlClient:
         last_error: Exception | None = None
         for attempt in range(1, attempts + 1):
             try:
-                if self._session is None:
+                session = self._session
+                if session is None:
                     await self._reconnect()
-                assert self._session is not None
-                return await self._session.call_tool(name, arguments or {})
+                    # Re-read after the lock wait: another worker may have
+                    # reconnected (or be mid-reconnect between aclose() and
+                    # _connect()) while this call was queued.
+                    session = self._session
+                if session is None:
+                    raise ProwlError("prowl reconnect produced no session")
+                return await session.call_tool(
+                    name, arguments or {}, read_timeout_seconds=_call_timeout()
+                )
             except McpError:
                 raise
-            except (httpx.HTTPError, ConnectionError, TimeoutError, OSError) as exc:
+            except (
+                httpx.HTTPError, ConnectionError, TimeoutError, OSError,
+                # A torn-down stream surfaces as anyio resource errors, not
+                # httpx ones — without them a fan-out reconnect strands every
+                # sibling call with an untrapped exception.
+                ClosedResourceError, BrokenResourceError, EndOfStream,
+            ) as exc:
                 last_error = exc
                 log.warning(
                     "prowl RPC %s failed (attempt %d/%d): %s",
@@ -213,6 +232,17 @@ class ProwlClient:
 
     async def wallet(self) -> Any:
         return await self._invoke("prowl_get_wallet", {})
+
+
+def _call_timeout() -> timedelta:
+    raw = os.environ.get("RESEARCH_PROWL_CALL_TIMEOUT_S")
+    if not raw:
+        return timedelta(seconds=_DEFAULT_CALL_TIMEOUT_S)
+    try:
+        return timedelta(seconds=float(raw))
+    except ValueError:
+        log.warning("invalid RESEARCH_PROWL_CALL_TIMEOUT_S=%r; using default", raw)
+        return timedelta(seconds=_DEFAULT_CALL_TIMEOUT_S)
 
 
 def _content_text(result: CallToolResult) -> str:

@@ -162,3 +162,114 @@ async def test_meta_cost_fallback_when_no_billing_block():
     client = MetaProwl([])
     await client.call_tool("spyfu_get_domain_stats", {})
     assert client.cost_usd == pytest.approx(0.01)
+
+
+class StubSession:
+    def __init__(self, result: CallToolResult | None = None) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self.result = result or CallToolResult(
+            content=[TextContent(type="text", text="{}")]
+        )
+
+    async def call_tool(self, name, arguments, read_timeout_seconds=None, **kwargs):
+        self.calls.append({
+            "name": name,
+            "arguments": arguments,
+            "read_timeout_seconds": read_timeout_seconds,
+        })
+        return self.result
+
+
+class TestCallTimeout:
+    async def test_default_read_timeout_is_passed(self):
+        from datetime import timedelta
+
+        client = ProwlClient(api_key="t", mcp_url="http://unused.invalid")
+        client._session = StubSession()
+
+        await client._rpc("prowl_get_wallet", {})
+
+        assert client._session.calls[0]["read_timeout_seconds"] == timedelta(seconds=180)
+
+    async def test_env_overrides_read_timeout(self, monkeypatch):
+        from datetime import timedelta
+
+        monkeypatch.setenv("RESEARCH_PROWL_CALL_TIMEOUT_S", "42")
+        client = ProwlClient(api_key="t", mcp_url="http://unused.invalid")
+        client._session = StubSession()
+
+        await client._rpc("prowl_get_wallet", {})
+
+        assert client._session.calls[0]["read_timeout_seconds"] == timedelta(seconds=42)
+
+    async def test_invalid_env_falls_back_to_default(self, monkeypatch):
+        from datetime import timedelta
+
+        monkeypatch.setenv("RESEARCH_PROWL_CALL_TIMEOUT_S", "soon")
+        client = ProwlClient(api_key="t", mcp_url="http://unused.invalid")
+        client._session = StubSession()
+
+        await client._rpc("prowl_get_wallet", {})
+
+        assert client._session.calls[0]["read_timeout_seconds"] == timedelta(seconds=180)
+
+
+class TestStreamClosureRetry:
+    async def test_unmetered_call_retries_closed_stream(self, monkeypatch):
+        from anyio import ClosedResourceError
+
+        monkeypatch.setattr("research_agent.prowl_client._BACKOFF_BASE_S", 0)
+        client = ProwlClient(api_key="t", mcp_url="http://unused.invalid")
+        attempts = 0
+
+        class FlakySession(StubSession):
+            async def call_tool(self, *args, **kwargs):
+                nonlocal attempts
+                attempts += 1
+                if attempts < 3:
+                    raise ClosedResourceError()
+                return await super().call_tool(*args, **kwargs)
+
+        async def fake_reconnect():
+            client._session = FlakySession()
+
+        monkeypatch.setattr(client, "_reconnect", fake_reconnect)
+        client._session = FlakySession()
+
+        result = await client._rpc("prowl_list_tools", {})
+
+        assert result is not None
+        assert attempts == 3
+
+    async def test_billed_call_tool_is_never_retried_on_closed_stream(self):
+        from anyio import ClosedResourceError
+
+        client = ProwlClient(api_key="t", mcp_url="http://unused.invalid")
+        attempts = 0
+
+        class DeadSession(StubSession):
+            async def call_tool(self, *args, **kwargs):
+                nonlocal attempts
+                attempts += 1
+                raise ClosedResourceError()
+
+        client._session = DeadSession()
+
+        with pytest.raises(ProwlError, match="prowl_call_tool"):
+            await client.call_tool("spyfu_get_domain_stats", {"domain": "x.com"})
+        assert attempts == 1
+
+    async def test_session_is_reread_after_reconnect(self, monkeypatch):
+        client = ProwlClient(api_key="t", mcp_url="http://unused.invalid")
+        client._session = None
+
+        async def fake_reconnect():
+            client._session = StubSession()
+
+        monkeypatch.setattr(client, "_reconnect", fake_reconnect)
+
+        result = await client._rpc("prowl_get_wallet", {})
+
+        assert result is not None
+        assert isinstance(client._session, StubSession)
+        assert client._session.calls[0]["name"] == "prowl_get_wallet"

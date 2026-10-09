@@ -138,14 +138,23 @@ class Ledger:
 
     def _apply_status(self, entry: Claim) -> None:
         peers = self._peers(entry.subject)
-        entry_pair = _norm_pair(entry.value, entry.unit)
 
-        contradictory = [p for p in peers if _norm_pair(p.value, p.unit) != entry_pair]
+        contradictory: list[Claim] = []
+        if entry.value is not None:
+            # A valueless claim (a verbatim quote) carries no number to
+            # contradict — ('' , '') vs ('5', '%') is an absent value, not a
+            # disagreement. Only valued claims can conflict.
+            entry_pair = _norm_pair(entry.value, entry.unit)
+            contradictory = [
+                p for p in peers
+                if p.value is not None and _norm_pair(p.value, p.unit) != entry_pair
+            ]
         if contradictory:
-            entry.status = ClaimStatus.conflict
+            # A verbatim quote keeps its verified status on BOTH sides of a
+            # conflict — it is what the source literally said; the conflict is
+            # recorded on the rest.
+            entry.status = ClaimStatus.verified if entry.verbatim else ClaimStatus.conflict
             for peer in peers:
-                # A verbatim quote keeps its verified status — it is what the
-                # source literally said; the conflict is recorded on the rest.
                 if not peer.verbatim:
                     peer.status = ClaimStatus.conflict
             log.info(

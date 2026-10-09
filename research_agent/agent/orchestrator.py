@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, Field
 
 from research_agent.agent.writer import produce_report
-from research_agent.evidence.ledger import Ledger
+from research_agent.evidence.ledger import Ledger, _atomic_write_text
 from research_agent.evidence.store import ArtifactStore, Checkpoint
 from research_agent.llm import LLMClient
 from research_agent.prowl_client import ProwlClient, ProwlError
@@ -209,7 +209,6 @@ class Orchestrator:
         run_id: str | None = None,
     ) -> RunResult:
         runbook = get_runbook(runbook_name)
-        brief = build_brief(runbook, inputs)
         run_id = run_id or self._new_run_id(runbook_name)
         store = ArtifactStore(self.runs_root / run_id)
         ledger = Ledger.load(store.run_dir / "ledger.json")
@@ -218,19 +217,42 @@ class Orchestrator:
             raise OrchestratorError(
                 f"run {run_id} already belongs to runbook '{checkpoint.runbook}'"
             )
-        if checkpoint is not None and checkpoint.status != "running":
+        if checkpoint is not None and checkpoint.status == "complete":
             raise OrchestratorError(
                 f"run {run_id} already finished with status '{checkpoint.status}' — "
                 "reusing the id would silently re-plan over its artifacts and mix "
                 "two runs' claims in one ledger; choose a new run-id"
             )
-        resuming = checkpoint is not None and checkpoint.status == "running" and checkpoint.plan
+        resuming = checkpoint is not None and bool(checkpoint.plan)
+        if resuming and checkpoint.brief:
+            # The plan was built against the checkpoint's brief — validating
+            # freshly passed inputs would either reject them (unknown keys) or
+            # silently ignore them; the checkpoint's brief wins either way.
+            if inputs and inputs != checkpoint.brief:
+                log.warning(
+                    "run %s: passed inputs %s differ from the checkpoint brief; "
+                    "resuming with the checkpoint's brief",
+                    run_id, sorted(inputs),
+                )
+            brief = checkpoint.brief
+        else:
+            brief = build_brief(runbook, inputs)
         if resuming:
             log.info("resuming run %s after step %s", run_id, checkpoint.completed_steps[-1] if checkpoint.completed_steps else -1)
-            # The plan was built against the checkpoint's brief — reporting
-            # against freshly passed inputs would mix two briefs' data.
-            if checkpoint.brief:
-                brief = checkpoint.brief
+            # A persisted stop_reason belongs to the attempt that crashed or
+            # finished partial: non-completed steps are re-executed now, so the
+            # stale reason and its skip disclosures must not skip them again.
+            # Completed steps keep their disclosures (on_error_skip) or stay
+            # untouched (post-failure chunk skips are never re-billed).
+            completed = set(checkpoint.completed_steps)
+            checkpoint.skipped_steps = [
+                entry for entry in checkpoint.skipped_steps
+                if entry.get("index") in completed
+            ]
+            checkpoint.stop_reason = None
+            checkpoint.status = "running"
+            checkpoint.partial = checkpoint.partial and bool(checkpoint.skipped_steps)
+            store.save_checkpoint(checkpoint)
         else:
             checkpoint = Checkpoint(run_id=run_id, runbook=runbook_name, brief=brief)
         started_monotonic = time.monotonic()
@@ -257,7 +279,7 @@ class Orchestrator:
         )
 
         report_path = store.run_dir / "report.md"
-        report_path.write_text(outcome.report_md, encoding="utf-8")
+        _atomic_write_text(report_path, outcome.report_md)
         ledger.save()
         checkpoint.status = "partial" if checkpoint.partial else "complete"
         stats = {

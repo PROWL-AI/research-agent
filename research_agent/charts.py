@@ -37,12 +37,28 @@ class ChartSpec:
     claim_refs: list[str]
 
 
+_SUFFIX_MULT = {"k": 1e3, "m": 1e6, "b": 1e9}
+_NUMBERISH_RE = re.compile(r"^(-?\d+(?:\.\d+)?)([kKmMbB])?\+?$")
+
+
 def _to_float(value: Any) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, str):
+        # Ledger values are str|float|int and arrive as written: "113K",
+        # "$4.2M", "42 000", "12%". Mirror the writer's _NUMBER_RE forms, or a
+        # correct chart is rejected as "values not in ledger".
+        text = value.strip().replace(",", "").replace(" ", "")
+        text = text.lstrip("$€£").rstrip("%")
+        match = _NUMBERISH_RE.match(text)
+        if match:
+            number = float(match.group(1))
+            suffix = match.group(2)
+            if suffix:
+                number *= _SUFFIX_MULT[suffix.lower()]
+            return number
         try:
-            return float(value.replace(",", "").replace(" ", ""))
+            return float(text)
         except ValueError:
             return None
     return None
@@ -79,6 +95,24 @@ def _parse_spec(raw: str) -> ChartSpec | str:
     )
 
 
+def _unit_kind(claim: Claim) -> str | None:
+    """Coarse unit category when one is unambiguous from the claim's own
+    fields: percent, currency, or plain count. None when nothing pins a
+    category — an unknown must not veto a chart."""
+    text = " ".join(
+        str(part) for part in (claim.unit, claim.value) if part is not None
+    )
+    if not text:
+        return None
+    if "%" in text or "percent" in text.lower():
+        return "percent"
+    if any(symbol in text for symbol in ("$", "€", "£")):
+        return "currency"
+    if claim.unit:
+        return "count"
+    return None
+
+
 def validate_against_ledger(spec: ChartSpec, ledger: Ledger) -> str | None:
     claims_by_id = {c.id: c for c in ledger.claims}
     claims: list[Claim] = []
@@ -95,6 +129,22 @@ def validate_against_ledger(spec: ChartSpec, ledger: Ledger) -> str | None:
     for value in spec.values:
         if round(value, 2) not in claim_values:
             return "values not in ledger"
+    kinds = {kind for kind in (_unit_kind(c) for c in claims) if kind}
+    if len(kinds) > 1 and kinds & {"percent", "currency"}:
+        return f"values mix incompatible units ({', '.join(sorted(kinds))})"
+    # Soft check only: labels matching no referenced subject hint at a
+    # label↔value misalignment, but never justify rejecting a valid chart.
+    subjects = [(c.subject or c.claim or "").lower() for c in claims]
+    subjects = [s for s in subjects if s]
+    if subjects and not any(
+        label.lower() in s or (len(s) >= 3 and s in label.lower())
+        for label in spec.labels
+        for s in subjects
+    ):
+        log.warning(
+            "chart %r: no label matches any referenced claim subject",
+            spec.title,
+        )
     return None
 
 

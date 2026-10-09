@@ -15,11 +15,21 @@ from pydantic import BaseModel, Field
 #: escape runs/ via separators or traversal.
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
+#: Directory-name budget: filesystems cap a name at 255 bytes, and a longer
+#: caller-supplied id would otherwise fail as an OSError deep in ArtifactStore.
+#: The regex above is ASCII-only, so len() == byte length.
+MAX_RUN_ID_LENGTH = 128
+
 
 def validate_run_id(run_id: str) -> str:
     if not RUN_ID_RE.match(run_id) or run_id in (".", ".."):
         raise ValueError(
             f"invalid run_id '{run_id}' — letters, digits, '.', '_', '-' only, no path separators"
+        )
+    if len(run_id) > MAX_RUN_ID_LENGTH:
+        raise ValueError(
+            f"invalid run_id — {MAX_RUN_ID_LENGTH} characters max "
+            f"(it is a directory name), got {len(run_id)}"
         )
     return run_id
 

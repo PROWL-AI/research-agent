@@ -84,7 +84,7 @@ def _claim_json(claim: Claim) -> dict[str, Any]:
     }
 
 
-def _cited_sentences(report_md: str) -> list[tuple[int, int, str]]:
+def _cited_sentences(report_md: str) -> tuple[list[tuple[int, int, str]], list[str]]:
     """Cited sentences as (start, end, text) spans — replacements must happen
     by position, not by text: the same sentence can legitimately appear twice
     (summary + body), and a text replace always lands on the first one.
@@ -92,6 +92,10 @@ def _cited_sentences(report_md: str) -> list[tuple[int, int, str]]:
     Splitting is by paragraph first: a line break inside a sentence is prose,
     not a boundary, and a fragment judged without its other half reads as
     unsupported.
+
+    Returns the kept spans plus the claim ids cited only in dropped sentences,
+    so the caller can count them as unchecked instead of silently amputating
+    the tail.
     """
     candidates: list[tuple[int, int, str]] = []
     offset = 0
@@ -110,7 +114,7 @@ def _cited_sentences(report_md: str) -> list[tuple[int, int, str]]:
             if _CITATION_BLOCK_RE.search(stripped):
                 candidates.append((idx, idx + len(sentence), stripped))
     if len(candidates) <= _MAX_SENTENCES:
-        return candidates
+        return candidates, []
     dropped = len(candidates) - _MAX_SENTENCES
     # Prefer digit-carrying sentences — but strip bracket blocks first, or the
     # citation's own id makes every sentence "numeric" and the priority is a
@@ -120,12 +124,18 @@ def _cited_sentences(report_md: str) -> list[tuple[int, int, str]]:
 
     with_numbers = [c for c in candidates if _has_real_number(c[2])]
     without = [c for c in candidates if not _has_real_number(c[2])]
+    kept = (with_numbers + without)[:_MAX_SENTENCES]
+    dropped_refs: list[str] = []
+    for candidate in candidates:
+        if candidate in kept:
+            continue
+        dropped_refs.extend(dict.fromkeys(citation_ids(candidate[2])))
     log.warning(
         "citation-fidelity: %d cited sentences exceed the %d-sentence budget; "
         "%d tail sentences unchecked",
         len(candidates), _MAX_SENTENCES, dropped,
     )
-    return (with_numbers + without)[:_MAX_SENTENCES]
+    return kept, dropped_refs
 
 
 def _rewrite_sentence(sentence: str, bad_refs: list[str], good_refs: list[str]) -> str:
@@ -150,7 +160,7 @@ async def verify_citations(
     llm: LLMClient, report_md: str, ledger: Ledger
 ) -> FidelityResult:
     claims_by_id = {c.id: c for c in ledger.claims}
-    spans = _cited_sentences(report_md)
+    spans, dropped_refs = _cited_sentences(report_md)
     work: list[tuple[int, int, str, list[str]]] = []
     for start, end, sentence in spans:
         refs = [ref for ref in dict.fromkeys(citation_ids(sentence)) if ref in claims_by_id]
@@ -158,6 +168,9 @@ async def verify_citations(
             work.append((start, end, sentence, refs))
 
     result = FidelityResult(report_md=report_md)
+    # Sentences the budget dropped never reach the LLM — their refs are
+    # unchecked, not clean.
+    result.unchecked += sum(1 for ref in dropped_refs if ref in claims_by_id)
     if not work:
         return result
 
@@ -195,12 +208,16 @@ async def verify_citations(
                 if verdicts.get((i, ref)) in ("unsupported", "subject-mismatch")
             ]
             returned = [ref for ref in refs if (i, ref) in verdicts]
-            good = [ref for ref in returned if ref not in bad]
             result.checked += len(returned)
-            result.supported += len(good)
+            result.supported += len(returned) - len(bad)
             result.unchecked += len(refs) - len(returned)
             if bad:
                 result.unverified += len(bad)
+                # For the rewrite, refs the LLM never ruled on count as good:
+                # they were never judged, and dropping them would silently
+                # delete a citation that may be perfectly good. In the stats
+                # they stay unchecked.
+                good = [ref for ref in refs if ref not in bad]
                 rewrites.append((start, end, _rewrite_sentence(sentence, bad, good)))
                 log.info(
                     "citation-fidelity: %d ref(s) unverified in %r", len(bad), sentence[:80]

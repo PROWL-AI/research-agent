@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
-from research_agent.evidence.ledger import Ledger
-from research_agent.llm import LLMClient
+from research_agent.evidence.ledger import Ledger, _atomic_write_text
+from research_agent.llm import LLMClient, LLMError
 from research_agent.runbook import Runbook
 
 if TYPE_CHECKING:
@@ -30,6 +30,7 @@ _NUMBER_RE = re.compile(
 )
 _YEAR_PREFIX_RE = re.compile(r"(?:^|\b(?:in|on|of|from|by|year)\s+)$", re.IGNORECASE)
 _BARE_ID_RE = re.compile(r"\bC(\d+)\b")
+_CONFLICT_REGISTER_RE = re.compile(r"^\s*-\s*C\d+\b|\bvs\s+C\d+\b")
 _SOURCE_LOG_ROW_RE = re.compile(r"^\s*\|\s*C\d+\s*\|.*$", re.MULTILINE)
 _ASSUMPTION_MARKER = "(target, assumption — not data)"
 _UNVERIFIED_MARKER = "[UNVERIFIED"
@@ -193,6 +194,11 @@ def lint_report(report_md: str, ledger: Ledger) -> LintResult:
 
     cited: list[str] = []
     for block in _CITATION_BLOCK_RE.findall(report_md):
+        # An [UNVERIFIED: ...] label can quote a bare C<n> from the sentence it
+        # replaced — it is a tombstone, not a citation, and must not raise a
+        # phantom missing_ref.
+        if block.startswith(_UNVERIFIED_MARKER):
+            continue
         cited.extend(f"C{n}" for n in _CITATION_ID_RE.findall(block))
     for ref in dict.fromkeys(cited):
         if ref not in known_ids:
@@ -211,13 +217,18 @@ def lint_report(report_md: str, ledger: Ledger) -> LintResult:
         sentence = _sentence_at(scan_text, match.start())
         # A bare claim id that exists in the ledger (the conflict register's
         # "C41 vs C126" style) is a traceable reference — unbracketed, but not
-        # uncited. Unknown bare ids stay prose and never cover a figure.
+        # uncited. Unknown bare ids stay prose and never cover a figure. The
+        # exemption is confined to conflict-register rows (a "- C…" bullet or a
+        # "… vs C…" pairing); a bare id in ordinary prose covers nothing.
         bare_refs = (f"C{n}" for n in _BARE_ID_RE.findall(sentence))
         if (
             _CITATION_BLOCK_RE.search(sentence)
             or _ASSUMPTION_MARKER in sentence
             or _UNVERIFIED_MARKER in sentence
-            or any(ref in known_ids for ref in bare_refs)
+            or (
+                _CONFLICT_REGISTER_RE.search(sentence)
+                and any(ref in known_ids for ref in bare_refs)
+            )
         ):
             continue
         result.issues.append(
@@ -319,8 +330,30 @@ async def write_and_repair(
     previous_keys = _issue_keys(lint_current)
     passes = 0
     for pass_no in range(1, _MAX_REPAIR_PASSES + 1):
-        report = await repair_report(llm, report, lint_current, ledger)
+        try:
+            repaired = await repair_report(llm, report, lint_current, ledger)
+        except LLMError as exc:
+            if exc.retryable:
+                raise
+            # A truncated repair (finish_reason='length') is no better than
+            # the draft it started from — keep the draft and the run's
+            # evidence instead of dying with both.
+            log.warning(
+                "repair pass %d failed non-retryably (%s); keeping the previous draft",
+                pass_no, exc,
+            )
+            break
         passes = pass_no
+        if _repair_collapsed(repaired, report):
+            # An empty or gutted repair lints trivially clean — shipping it
+            # would turn a failed pass into a silent success.
+            log.warning(
+                "repair pass %d returned a collapsed report (%d chars); "
+                "keeping the previous draft",
+                pass_no, len(repaired.strip()),
+            )
+            break
+        report = repaired
         lint_current = lint_report(report, ledger)
         keys = _issue_keys(lint_current)
         log.info("repair pass %d: %d -> %d lint issues", pass_no, len(previous_keys), len(keys))
@@ -352,6 +385,17 @@ async def write_and_repair(
 
 def _issue_keys(lint: LintResult) -> set[tuple[str, str]]:
     return {(issue.kind, issue.text) for issue in lint.issues}
+
+
+def _repair_collapsed(repaired: str, previous: str) -> bool:
+    # Both conditions: a repair that merely shrinks the report can be legit
+    # (deleting bare numbers is an allowed action), but an output that is at
+    # once tiny (<40 chars) and a major shrink (<50% of the draft) — or
+    # empty/whitespace outright — is a failed pass, not a clean report.
+    stripped = repaired.strip()
+    return not stripped or (
+        len(stripped) < 40 and len(stripped) < 0.5 * len(previous.strip())
+    )
 
 
 def sweep_missing_refs(report_md: str, missing_refs: list[str]) -> str:
@@ -414,7 +458,7 @@ async def rewrite_report(
         skipped_steps=checkpoint.skipped_steps,
         transform_notes=checkpoint.transform_notes,
     )
-    (run_dir / "report.md").write_text(outcome.report_md, encoding="utf-8")
+    _atomic_write_text(run_dir / "report.md", outcome.report_md)
     checkpoint.stats["lint_issues_before"] = outcome.lint_before
     checkpoint.stats["lint_issues_after"] = outcome.lint_after
     checkpoint.stats["lint_issues"] = outcome.lint_after

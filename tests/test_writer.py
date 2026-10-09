@@ -1,3 +1,5 @@
+import pytest
+
 from research_agent.agent.writer import lint_report
 from research_agent.evidence.ledger import Ledger
 
@@ -190,3 +192,63 @@ def test_lint_unknown_bare_id_never_covers_a_figure(tmp_path):
     report = "- C999 vs C998: views hit 365,608 and climbing"
     result = lint_report(report, ledger)
     assert any(i.kind == "uncited_number" for i in result.issues)
+
+
+async def test_repair_length_error_keeps_previous_draft(
+    tmp_path, fake_llm, mini_runbooks_dir, monkeypatch
+):
+    from research_agent.agent.writer import write_and_repair
+    from research_agent.llm import LLMError
+    from research_agent.runbook import get_runbook
+
+    monkeypatch.setattr("research_agent.runbook.RUNBOOKS_DIR", mini_runbooks_dir)
+    ledger = _outcome_ledger(tmp_path)
+    draft = "Numbers: 100,000 monthly visitors."
+    fake_llm.text_queue = [draft]
+    original_complete = fake_llm.complete
+
+    async def truncated_repair(messages, tier="cheap", json_mode=False, **kwargs):
+        if tier == "strong" and not json_mode and not fake_llm.text_queue:
+            raise LLMError(
+                "LLM output truncated at max_tokens (finish_reason='length')",
+                retryable=False,
+            )
+        return await original_complete(messages, tier=tier, json_mode=json_mode, **kwargs)
+
+    fake_llm.complete = truncated_repair
+
+    outcome = await write_and_repair(
+        fake_llm, get_runbook("mini-teardown"), ledger, {"competitors": ["a.com"]}
+    )
+
+    # The killed repair must not kill the run: the previous draft ships as-is.
+    assert outcome.report_md == draft
+    assert outcome.repair_passes == 0
+    assert outcome.lint_before == 1
+    assert outcome.lint_after == 1
+    assert outcome.revised is True
+
+
+async def test_repair_retryable_error_still_raises(
+    tmp_path, fake_llm, mini_runbooks_dir, monkeypatch
+):
+    from research_agent.agent.writer import write_and_repair
+    from research_agent.llm import LLMError
+    from research_agent.runbook import get_runbook
+
+    monkeypatch.setattr("research_agent.runbook.RUNBOOKS_DIR", mini_runbooks_dir)
+    ledger = _outcome_ledger(tmp_path)
+    fake_llm.text_queue = ["Numbers: 100,000 monthly visitors."]
+    original_complete = fake_llm.complete
+
+    async def flaky_repair(messages, tier="cheap", json_mode=False, **kwargs):
+        if tier == "strong" and not json_mode and not fake_llm.text_queue:
+            raise LLMError("transient blowup", retryable=True)
+        return await original_complete(messages, tier=tier, json_mode=json_mode, **kwargs)
+
+    fake_llm.complete = flaky_repair
+
+    with pytest.raises(LLMError, match="transient blowup"):
+        await write_and_repair(
+            fake_llm, get_runbook("mini-teardown"), ledger, {"competitors": ["a.com"]}
+        )
