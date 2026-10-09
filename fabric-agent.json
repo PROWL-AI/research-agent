@@ -2,8 +2,8 @@
   "contractVersion": "0.1.0",
   "provider": {
     "id": "https://prowl.chat/fabric/providers/research-agent",
-    "revision": 3,
-    "contentHash": "sha256:5195f0ce38e741179d28e317e61765073458701d55183462296ea82e2b5930d1",
+    "revision": 4,
+    "contentHash": "sha256:dda144f376b56fa2940f2c818d46d88554f1120becc6add9c8c2a979ec70d913",
     "createdAt": "2026-10-09T00:00:00Z",
     "createdBy": "urn:fabric:operator:prowl-ai",
     "name": "Prowl Research Agent",

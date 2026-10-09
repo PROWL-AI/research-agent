@@ -31,7 +31,7 @@
     },
     "run_id": {
       "type": "string",
-      "description": "Resume or reuse this run id; generated when omitted"
+      "description": "Resume or reuse this run id; generated when omitted. A checkpoint in status running/partial/failed/interrupted with a recorded plan resumes from its last completed step; 'complete' is terminal."
     },
     "wait": {
       "type": "boolean",

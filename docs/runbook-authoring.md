@@ -57,8 +57,12 @@ Rules:
   workers can overshoot by at most `workers − 1` calls before the stop
   lands. `max_usd` is enforced on the server's billing data, falling back to
   catalog price hints (marked "estimated" in stats) when the server returns
-  none. Size budgets for the scenario's real cost, not aspirationally, and
-  give the runbook a drop order for the day the fan-out outgrows them.
+  none. All three budgets cap **Prowl tool spend only** — the agent's own LLM
+  calls (planning, claim extraction, transforms, writing, citation repair)
+  are metered separately and reported under `stats.llm_usage`; `max_usd` does
+  not bound them. Size budgets for the scenario's real cost, not
+  aspirationally, and give the runbook a drop order for the day the fan-out
+  outgrows them.
 
 ## Body grammar
 

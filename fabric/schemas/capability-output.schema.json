@@ -11,8 +11,8 @@
     },
     "status": {
       "type": "string",
-      "enum": ["running", "complete", "partial"],
-      "description": "wait=false returns \"running\" (job handle); wait=true returns \"complete\" or \"partial\". A failed run never produces this envelope — it surfaces as an MCP tool error and a failed checkpoint readable via research.get_status."
+      "enum": ["running", "complete", "partial", "interrupted"],
+      "description": "wait=false returns \"running\" (job handle); wait=true returns \"complete\" or \"partial\". A failed run never produces this envelope — it surfaces as an MCP tool error and a failed checkpoint readable via research.get_status. \"interrupted\" is a checkpoint status (server restarted mid-run), readable via research.get_status; it is resumable — call research.run with the same run_id — and never appears in a wait=true envelope."
     },
     "report_path": {
       "type": "string"

@@ -41,16 +41,26 @@ Other environment knobs (all optional):
   always uses `./runs`). Default `./runs` relative to the server process;
   set it explicitly in MCP client configs.
 - `RESEARCH_NO_SUBAGENTS=1` — force sequential execution (no worker fan-out).
+- `RESEARCH_PROWL_CALL_TIMEOUT_S` — read timeout in seconds for each Prowl
+  MCP call (default 180; a hung server fails the call instead of parking it).
 
 CLI subcommands: `run <runbook> [--run-id <id>] [--key value …]`,
 `list-runbooks`, `status <run_id>`, `report <run_id>`, `rewrite <run_id>`,
-`export <run_id> [--format html|md]`, `validate [--online]`, `mcp`.
+`export <run_id> [--format html|md]`, `prune [--older-than 30d] [--keep-last N]
+[--yes]`, `validate [--online]`, `mcp`.
 
 Exit codes: `run` exits 1 when the run ends `partial` (budget or failure —
 the report says why); `rewrite` exits 1 when lint issues remain; `validate`
-exits 1 when a runbook fails validation; input and usage errors exit 2.
-`list-runbooks`, `status`, `report`, `export` exit 0 on success; `mcp`
+exits 0 when all runbooks are valid, 1 when a runbook fails validation, 2 on
+usage or network/config errors (CI can tell "runbook invalid" apart from
+"catalog unreachable"); other input and usage errors exit 2.
+`list-runbooks`, `status`, `report`, `export`, `prune` exit 0 on success; `mcp`
 serves on stdio until stopped.
+
+`runs/` grows forever unless you prune it: `prune` lists runs older than
+`--older-than` (by checkpoint `created_at`, default 30d) without deleting
+anything; pass `--yes` to actually delete. `--keep-last N` always spares the N
+newest runs, and any run whose `.lock` is held by a live process is skipped.
 
 ### MCP
 
@@ -124,6 +134,10 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
 - Runbooks declare their **tool allowlist** and **budget**
   (`max_tool_calls` / `max_usd` / `max_minutes`). On budget exhaustion the agent
   emits a partial report that marks what is missing — it never fails silently.
+  Budgets cap **Prowl tool calls only**: the agent's own LLM usage (planning,
+  claim extraction, transforms, writing, citation repair) is billed by your
+  LLM provider on top of `max_usd` — it is metered, not capped, and reported
+  under `stats.llm_usage` in every run's output.
 - Charts are rendered deterministically from ledger data, never described by
   the LLM.
 

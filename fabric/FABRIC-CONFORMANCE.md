@@ -38,6 +38,31 @@ Audit batch C aligned the declarations with what the server actually returns:
   still `running`; file I/O in async tools runs via `asyncio.to_thread`;
   `run_id` length is capped at 128 characters.
 
+## revision 4 (2026-10-09)
+
+Audit round 3 fixed the restart-resume deadlock the revision-3 reconcile
+created (orphaned runs were marked `partial`, which `research.run` then
+rejected as finished — the declared "Resume or reuse this run id" was
+unreachable after a server restart):
+
+- `mcp_server.py`: startup reconciliation now marks orphaned `running`
+  checkpoints `interrupted` (non-terminal) with
+  `stop_reason="server restarted before completion"`. `research.run` accepts a
+  run_id whose checkpoint holds a recorded plan in status `running` (no live
+  task) / `partial` / `failed` / `interrupted` and resumes it; `complete`
+  stays terminal, and a checkpoint without a plan (died before planning —
+  nothing billed) re-plans fresh over the empty run dir.
+  A corrupt `checkpoint.json` no longer stops `serve()` — the run is skipped
+  at reconcile and `get_status` answers "checkpoint corrupt".
+- `capability-output.schema.json`: `status` enum gains `interrupted`
+  (a checkpoint status via `research.get_status`, resumable, never in a
+  `wait=true` envelope). `capability-input.schema.json`: the `run_id`
+  description now states the resume contract above.
+
+Offline coverage: `tests/test_audit_r3_contract.py` exercises restart →
+resume with the same run_id, terminal `complete`, corrupt-checkpoint
+quarantine, and refusal-envelope handling.
+
 The live surface the bundle declares exists and is testable offline:
 `research.run` / `research.list_runbooks` / `research.get_status` /
 `research.get_report` in `research_agent/mcp_server.py` (stdio,
