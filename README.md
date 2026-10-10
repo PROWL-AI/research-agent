@@ -147,7 +147,11 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
 
 ## Current verification and resume limits
 
-The [2026-10-10 handoff](docs/HANDOFF.md) records the audited source revision,
+The [deep agent audit](docs/reports/2026-10-10-agent-deep-audit/README.md) adds
+seven open defects: lifecycle ownership, false evidence verification, hidden
+artifact/extraction failures and budget accounting across mixed receipts/resume.
+Its explicit probes reproduce nine contract violations; three controls pass.
+The [2026-10-10 handoff](docs/HANDOFF.md) links the remediation plan and records the audited source revision,
 checks and next repair tasks. The offline suite passed 304 tests at `1dced8e`;
 this does not establish live provider quality or Fabric host acceptance.
 

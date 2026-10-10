@@ -1,4 +1,4 @@
-# Research-agent handoff — Kimi audit, 2026-10-10
+# Research-agent handoff — Kimi and deep agent audits, 2026-10-10
 
 Objective: independently verify the Kimi session's deliverables and correct the
 documentation. This checkout belongs to `PROWL-AI/research-agent`; it is separate
@@ -21,7 +21,7 @@ Parent source: [`92f49d18dcd98df89a46448eac9818de74b8b7f6`](https://github.com/P
 Central report and exact reproduction commands (requires access to the parent
 repository): [RPT prowl.chat/2026-10-10-kimi-session-audit](https://github.com/PROWL-AI/prowl-app/blob/audit/kimi-20261010/docs/reports/2026-10-10-kimi-session-audit/README.md).
 The central handoff records both delivered branch SHAs and receipts. Runtime code
-and Fabric manifest were not changed in this audit; only documentation changed here.
+and Fabric manifest were not changed; documentation and explicit offline diagnostic probes are delivered.
 
 ## Confirmed resume defects and repair packets
 
@@ -31,12 +31,27 @@ and Fabric manifest were not changed in this audit; only documentation changed h
 | KA-04 | [`subagent.py:219`](https://github.com/PROWL-AI/research-agent/blob/1dced8e381e63db2b61dbcd854b44d41450ed455/research_agent/agent/subagent.py#L219) marks the unstarted chunk tail completed | Resume must execute never-started steps; distinguish them from intentionally skipped, completed and dispatch-uncertain steps. |
 | KA-05 | [`subagent.py:259`](https://github.com/PROWL-AI/research-agent/blob/1dced8e381e63db2b61dbcd854b44d41450ed455/research_agent/agent/subagent.py#L259) saves before completion is appended | Commit durable completion before returning; recover already-paid raw data after a crash without another dispatch. |
 
-**Exact next task:** establish immutable step identity and checkpoint-v1 migration
-(KA-03), tracing that identity through completion, raw evidence and caller idempotency
-keys. Coordinate with the parent execution/replay contract before changing those
-keys. Then repair skipped-tail and persistence ordering together, using the three
-red probes as acceptance tests. Add crash injection between raw, ledger and
-checkpoint writes; an ordering-only fix is not an atomic multi-file commit.
+## Deep audit and execution plan
+
+[Additional report](reports/2026-10-10-agent-deep-audit/README.md) adds seven open
+findings KA-06…KA-12: lifecycle ownership, evidence verification and cost persistence.
+It contains nine failing contract checks and three passing controls; all are
+synthetic offline trials, not live-provider acceptance. KA-03…KA-05 stay OPEN.
+
+[Canonical cross-repository plan](https://github.com/PROWL-AI/prowl-app/blob/audit/kimi-20261010/docs/superpowers/plans/2026-10-10-kimi-remediation.md)
+owns order, dependencies, module contracts and acceptance for all twelve defects.
+That link intentionally tracks the working branch; runtime source links above are immutable.
+
+**Exact next task in this repository: KA-06.** Move all lifecycle mutation behind
+run ownership, including MCP error/cancel handlers and startup reconciliation.
+Make both `test_ka06_non_owner_cannot_mutate_locked_checkpoint` cases pass, preserve
+the unlocked-orphan control, then verify with two real CLI/MCP processes sharing
+one runs directory. No provider key is needed for the offline tests.
+
+Next bounded packet: KA-03/04/05/10 together (step identity, resumable state,
+durable raw/claims/completion), coordinated with parent KA-01 execution replay.
+KA-07/08/09 cover evidence truth; KA-11/12 cover attempt costs. See the plan for
+acceptance rather than treating a green baseline suite as closure.
 
 Prerequisites: Python >=3.11, test dependencies, clone/access to the central audit
 probes. No provider key is needed for offline reproduction. Do not clone the

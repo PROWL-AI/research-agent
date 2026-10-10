@@ -1,0 +1,91 @@
+{
+  "as_of": "2026-10-10",
+  "source_commit": "1dced8e381e63db2b61dbcd854b44d41450ed455",
+  "provenance": "synthetic offline fault injection; no paid providers",
+  "findings": [
+    {
+      "id": "KA-06",
+      "severity": "high",
+      "status": "open",
+      "owner": "PROWL-AI/research-agent",
+      "title": "Чужой процесс меняет checkpoint активного владельца",
+      "source": "https://github.com/PROWL-AI/research-agent/blob/1dced8e381e63db2b61dbcd854b44d41450ed455/research_agent/mcp_server.py#L102",
+      "probe": "raw/probe_agent_contracts.py::test_ka06_non_owner_cannot_mutate_locked_checkpoint",
+      "observed": "run → failed; startup → interrupted при занятом flock",
+      "acceptance": "Все записи lifecycle и startup reconciliation требуют владения lock; отказ или чтение статуса не меняют checkpoint активного владельца.",
+      "receipt": "raw/contracts-validated.log"
+    },
+    {
+      "id": "KA-07",
+      "severity": "high",
+      "status": "open",
+      "owner": "PROWL-AI/research-agent",
+      "title": "Пустое значение снимает числовой конфликт",
+      "source": "https://github.com/PROWL-AI/research-agent/blob/1dced8e381e63db2b61dbcd854b44d41450ed455/research_agent/evidence/ledger.py#L184",
+      "probe": "raw/probe_agent_contracts.py::test_ka07_valueless_claim_cannot_erase_numeric_conflict",
+      "observed": "100 и 200: conflict → verified после третьего claim с value=None",
+      "acceptance": "Статус пересчитывается по всей группе доказательств; отсутствие значения не является подтверждением и не снимает противоречие.",
+      "receipt": "raw/contracts-validated.log"
+    },
+    {
+      "id": "KA-08",
+      "severity": "high",
+      "status": "open",
+      "owner": "PROWL-AI/research-agent",
+      "title": "Выдуманная цитата получает verified",
+      "source": "https://github.com/PROWL-AI/research-agent/blob/1dced8e381e63db2b61dbcd854b44d41450ed455/research_agent/agent/orchestrator.py#L684",
+      "probe": "raw/probe_agent_contracts.py::test_ka08_fabricated_verbatim_is_not_verified",
+      "observed": "Пустой raw; fabricated revenue 999 billion USD → verified",
+      "acceptance": "verbatim требует привязки цитаты к сохранённому raw, а значение — к фрагменту источника; bool от LLM не является проверкой.",
+      "receipt": "raw/contracts-validated.log"
+    },
+    {
+      "id": "KA-09",
+      "severity": "medium",
+      "status": "open",
+      "owner": "PROWL-AI/research-agent",
+      "title": "Два инструмента считаются независимыми источниками одного документа",
+      "source": "https://github.com/PROWL-AI/research-agent/blob/1dced8e381e63db2b61dbcd854b44d41450ed455/research_agent/evidence/ledger.py#L205",
+      "probe": "raw/probe_agent_contracts.py::test_ka09_same_document_is_not_two_independent_sources",
+      "observed": "web_search + page_scraper одного URL → оба verified",
+      "acceptance": "Разделить инструмент доставки и происхождение данных; один документ не даёт двух независимых подтверждений. Неизвестная независимость остаётся unknown/assumed.",
+      "receipt": "raw/contracts-validated.log"
+    },
+    {
+      "id": "KA-10",
+      "severity": "high",
+      "status": "open",
+      "owner": "PROWL-AI/research-agent",
+      "title": "Потеря raw или ошибка extraction заканчивается complete",
+      "source": "https://github.com/PROWL-AI/research-agent/blob/1dced8e381e63db2b61dbcd854b44d41450ed455/research_agent/agent/subagent.py#L249",
+      "probe": "raw/probe_agent_contracts.py::test_ka10_evidence_failure_cannot_report_complete",
+      "observed": "raw_write: complete, claim с отсутствующим raw_ref; extraction: complete, 0 claims",
+      "acceptance": "Ошибки evidence сохраняются в typed outcome; complete запрещён при несохранённом raw или незавершённой extraction. Resume использует уже оплаченный raw и не делает повторный paid dispatch.",
+      "receipt": "raw/contracts-validated.log"
+    },
+    {
+      "id": "KA-11",
+      "severity": "high",
+      "status": "open",
+      "owner": "PROWL-AI/research-agent",
+      "title": "Первый известный расход исключает прошлые оценки из budget check",
+      "source": "https://github.com/PROWL-AI/research-agent/blob/1dced8e381e63db2b61dbcd854b44d41450ed455/research_agent/agent/orchestrator.py#L640",
+      "probe": "raw/probe_agent_contracts.py::test_ka11_known_cost_does_not_discard_previous_estimates",
+      "observed": "При max_usd=.5: оценка .4 + известные .3; третий вызов всё равно исполняется",
+      "acceptance": "По каждой попытке хранить actual/estimate/unknown, заменять оценку фактом только для той же попытки, считать общий расход без потерь и двойного счёта.",
+      "receipt": "raw/contracts-validated.log"
+    },
+    {
+      "id": "KA-12",
+      "severity": "high",
+      "status": "open",
+      "owner": "PROWL-AI/research-agent",
+      "title": "Стоимость оплаченной ошибки теряется при resume",
+      "source": "https://github.com/PROWL-AI/research-agent/blob/1dced8e381e63db2b61dbcd854b44d41450ed455/research_agent/agent/subagent.py#L190",
+      "probe": "raw/probe_agent_contracts.py::test_ka12_billed_failure_cost_survives_resume",
+      "observed": "Клиент знает .6, stats.cost_usd=None; resume снова вызывает tool при max_usd=.5",
+      "acceptance": "В finally каждой отправленной попытки сохранять известный расход независимо от успеха; новый клиент восстанавливает расходы до проверки следующего dispatch.",
+      "receipt": "raw/contracts-validated.log"
+    }
+  ]
+}

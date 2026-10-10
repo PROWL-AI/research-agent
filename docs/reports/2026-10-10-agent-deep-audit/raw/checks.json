@@ -1,0 +1,53 @@
+{
+  "source_commit": "1dced8e381e63db2b61dbcd854b44d41450ed455",
+  "working_branch": "audit/kimi-20261010",
+  "runtime_diff_exit_code": 0,
+  "python": "Python 3.11.16",
+  "contracts": {
+    "command": "PYTHONPATH=tests:. .venv/bin/python -m pytest -q -s docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py",
+    "exit_code": 1,
+    "failed": 9,
+    "passed": 3,
+    "receipt": "contracts-validated.log"
+  },
+  "baseline": {
+    "command": ".venv/bin/python -m pytest tests/ -q",
+    "exit_code": 0,
+    "passed": 304,
+    "receipt": "baseline-suite.log"
+  },
+  "runbooks": {
+    "command": ".venv/bin/python -m research_agent validate",
+    "exit_code": 0,
+    "valid": 14
+  },
+  "lint": {
+    "command": "/opt/homebrew/bin/ruff check docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py",
+    "exit_code": 0
+  },
+  "report_header": {
+    "command": "uv run --script <wiki>/_meta/reports/reports.py check docs/reports/2026-10-10-agent-deep-audit",
+    "exit_code": 0,
+    "errors": 0
+  },
+  "local_links": {
+    "checked": 24,
+    "errors": [],
+    "exit_code": 0
+  },
+  "not_run": [
+    "paid providers",
+    "production changes",
+    "hosted CI",
+    "Fabric admission",
+    "PostgreSQL parent race"
+  ],
+  "artifacts": {
+    "contracts.log": "945f104035ecce7a64e89fb744a1377561285614ac2225591d054baa5dbb2b25",
+    ".gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-suite.log": "abdae531c31d1c477e2bd4799628537519dfa82652a9927ddda46bfd74a5d91e",
+    "runbook-validation.log": "0fcfff9f27137d15b31adad18d85aea7b70a95423249d0174f02ae5ff97856b9",
+    "contracts-validated.log": "676c3d6a01aa1b5dd5cad9f2e362542ffd5c86a478d82e1b491f48a96f84113a",
+    "probe_agent_contracts.py": "d06590862cd5be472ddba36891c363a78c96f60e25513e4db8b76661318d8467"
+  }
+}
