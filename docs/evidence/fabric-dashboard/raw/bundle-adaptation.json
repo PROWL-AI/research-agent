@@ -1,0 +1,36 @@
+{
+  "project": "~/DATA/0xDEV/research-agent",
+  "profile": "mcp",
+  "gates": {
+    "localStructure": {
+      "status": "PASS",
+      "receipts": []
+    },
+    "declarationShape": {
+      "status": "PASS",
+      "receipts": [
+        "manifest validated by selected contract schema at 623bf61358c339cb10297807b3f024b5d9f1f327"
+      ]
+    },
+    "protocolNegotiation": {
+      "status": "NOT_VERIFIED",
+      "receipts": [
+        "requires a live provider and Fabric host"
+      ]
+    },
+    "semanticProbes": {
+      "status": "NOT_VERIFIED",
+      "receipts": [
+        "requires bounded live probe execution"
+      ]
+    },
+    "bindingReadiness": {
+      "status": "NOT_VERIFIED",
+      "receipts": [
+        "requires admission and Fabric host runtime"
+      ]
+    }
+  },
+  "warnings": [],
+  "readyForAdmission": true
+}

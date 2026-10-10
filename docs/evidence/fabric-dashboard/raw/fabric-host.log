@@ -1,0 +1,4 @@
+fabric-dashboards-mcp 0.6.7: leaving (stdin closed)
+host_status [{"type": "text", "text": "{\n  \"observed_at\": \"2026-10-10T17:20:54.050Z\",\n  \"application\": {\n    \"path\": \"/Applications/Fabric Dashboards.app\",\n    \"id\": \"ai.passioncode.fabric-dashboards\",\n    \"version\": \"0.6.7\"\n  },\n  \"state\": \"available\"\n}", "annotations": null, "meta": null}]
+link [{"type": "text", "text": "{\n  \"service\": \"prowl-research.default\",\n  \"open_link\": \"fabric-dashboards://service/prowl-research.default\",\n  \"http_url\": \"http://127.0.0.1:18764/dashboard\"\n}", "annotations": null, "meta": null}]
+open [{"type": "text", "text": "{\n  \"open_link\": \"fabric-dashboards://service/prowl-research.default\",\n  \"http_url\": \"http://127.0.0.1:18764/dashboard\",\n  \"opened_in\": \"fabric-dashboards\",\n  \"status\": \"accepted_by_os\"\n}", "annotations": null, "meta": null}]

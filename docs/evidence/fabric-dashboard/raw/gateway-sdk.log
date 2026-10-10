@@ -1,0 +1,4 @@
+Session termination failed: 202
+anonymous 401
+wrong-role 401
+{"protocol": "2025-11-25", "tools": ["research.run", "research.tools.call", "research.tutorial", "research.list_runbooks", "research.artifact.get", "fabric.job.get", "fabric.job.cancel"], "runbooksResultError": false, "runbooks": 14}

@@ -9,74 +9,74 @@
 ## Index
 | ID | Screen | Status |
 |---|---|---|
-| SCR-01 | Обзор | designed |
-| SCR-02 | Запросы | designed |
-| SCR-03 | Детали | designed |
-| SCR-04 | Цепочки | designed |
-| SCR-05 | Расходы | designed |
-| SCR-06 | Настройки | designed |
-| SCR-07 | Обучение | designed |
+| SCR-01 | Обзор | built |
+| SCR-02 | Запросы | built |
+| SCR-03 | Детали | built |
+| SCR-04 | Цепочки | built |
+| SCR-05 | Расходы | built |
+| SCR-06 | Настройки | built |
+| SCR-07 | Обучение | built |
 
 ### SCR-01: Обзор
-**Status:** designed
+**Status:** built
 **Flow:** FLW-01
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — planned until verification recorded
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 
 ### SCR-02: Запросы
-**Status:** designed
+**Status:** built
 **Flow:** FLW-01
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — planned until verification recorded
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 
 ### SCR-03: Детали
-**Status:** designed
+**Status:** built
 **Flow:** FLW-01
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — planned until verification recorded
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 
 ### SCR-04: Цепочки
-**Status:** designed
+**Status:** built
 **Flow:** FLW-01
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — planned until verification recorded
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 
 ### SCR-05: Расходы
-**Status:** designed
+**Status:** built
 **Flow:** FLW-01
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — planned until verification recorded
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 
 ### SCR-06: Настройки
-**Status:** designed
+**Status:** built
 **Flow:** FLW-01
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — planned until verification recorded
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 
 ### SCR-07: Обучение
-**Status:** designed
+**Status:** built
 **Flow:** FLW-01
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — planned until verification recorded
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 

@@ -1,0 +1,2 @@
+Session termination failed: 202
+{"status": "PASS", "jobId": "pr-0521a710e49cd3721d3f", "transport": "gateway \u2192 service MCP", "decision": "synthetic tutorial approved via operator session", "tracePreserved": true, "rows": 3, "realUsageDays": 0, "providerCalls": 0}

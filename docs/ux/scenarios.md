@@ -6,17 +6,17 @@
 ## Index
 | ID | Title | Status |
 |---|---|---|
-| SCN-001 | Обзор и свежесть | draft |
-| SCN-002 | Найти запрос | draft |
-| SCN-003 | Прочитать результат | draft |
-| SCN-004 | Решение человека | draft |
-| SCN-005 | Отмена | draft |
-| SCN-006 | Учёт расходов | draft |
-| SCN-007 | Настройки | draft |
-| SCN-008 | Безопасное обучение | draft |
+| SCN-001 | Обзор и свежесть | implemented |
+| SCN-002 | Найти запрос | implemented |
+| SCN-003 | Прочитать результат | implemented |
+| SCN-004 | Решение человека | implemented |
+| SCN-005 | Отмена | implemented |
+| SCN-006 | Учёт расходов | implemented |
+| SCN-007 | Настройки | implemented |
+| SCN-008 | Безопасное обучение | implemented |
 
 ### SCN-001: Обзор и свежесть
-- **Status:** draft
+- **Status:** implemented
 - **Product:** unobserved
 - **Feature:** Fabric dashboard
 - **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
@@ -30,11 +30,11 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — verification pending
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Обзор
 
 ### SCN-002: Найти запрос
-- **Status:** draft
+- **Status:** implemented
 - **Product:** unobserved
 - **Feature:** Fabric dashboard
 - **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
@@ -48,11 +48,11 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — verification pending
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Запросы
 
 ### SCN-003: Прочитать результат
-- **Status:** draft
+- **Status:** implemented
 - **Product:** unobserved
 - **Feature:** Fabric dashboard
 - **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
@@ -66,11 +66,11 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — verification pending
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Детали
 
 ### SCN-004: Решение человека
-- **Status:** draft
+- **Status:** implemented
 - **Product:** unobserved
 - **Feature:** Fabric dashboard
 - **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
@@ -84,11 +84,11 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — verification pending
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Детали
 
 ### SCN-005: Отмена
-- **Status:** draft
+- **Status:** implemented
 - **Product:** unobserved
 - **Feature:** Fabric dashboard
 - **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
@@ -102,11 +102,11 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — verification pending
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Детали
 
 ### SCN-006: Учёт расходов
-- **Status:** draft
+- **Status:** implemented
 - **Product:** unobserved
 - **Feature:** Fabric dashboard
 - **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
@@ -120,11 +120,11 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — verification pending
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Расходы
 
 ### SCN-007: Настройки
-- **Status:** draft
+- **Status:** implemented
 - **Product:** unobserved
 - **Feature:** Fabric dashboard
 - **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
@@ -138,11 +138,11 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — verification pending
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Настройки
 
 ### SCN-008: Безопасное обучение
-- **Status:** draft
+- **Status:** implemented
 - **Product:** unobserved
 - **Feature:** Fabric dashboard
 - **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
@@ -156,5 +156,5 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — verification pending
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Обучение
