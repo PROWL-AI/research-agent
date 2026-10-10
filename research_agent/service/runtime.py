@@ -203,9 +203,10 @@ class Runtime:
             initial = self.store.job(job_id)
             async with asyncio.timeout(initial["config"]["timeout_minutes"] * 60):
                 while True:
-                    working = sorted([j for j in self.store.jobs() if j["status"] == "working"], key=lambda j: j["createdAt"])
-                    rank = next((i for i,j in enumerate(working) if j["id"] == job_id), 9999)
-                    if rank < self.store.config()["parallel_jobs"]:
+                    working = [j for j in self.store.jobs() if j["status"] == "working"]
+                    active = sum(j["phase"] == "executing" for j in working)
+                    queued = sorted([j for j in working if j["phase"] == "queued"], key=lambda j: j["createdAt"])
+                    if queued and queued[0]["id"] == job_id and active < self.store.config()["parallel_jobs"]:
                         break
                     await asyncio.sleep(.2)
                 job = self.store.transition(job_id, "working", "executing")

@@ -35,7 +35,7 @@ async def test_tokens_are_role_separated(client):
 
 async def test_login_single_use_and_csrf(client):
     url=await login(client)
-    assert (await client.get(url)).status_code==401
+    assert (await client.get(url)).status_code==403
     assert (await client.get('/api/state')).status_code==200
     assert (await client.post('/api/jobs',json={})).status_code==403
     assert (await client.get('/api/state',headers={'Origin':'https://evil.test'})).status_code==403
@@ -211,3 +211,20 @@ async def test_second_process_cannot_acquire_lock_or_create_tokens(tmp_path):
         r=subprocess.run([sys.executable,'-m','research_agent.service.cli','serve','--root',str(tmp_path),'--port','18766'],capture_output=True,timeout=5)
         assert r.returncode==75 and not (tmp_path/'host.token').exists()
     finally:__import__('os').close(fd)
+
+async def test_late_approval_cannot_overbook_active_slot(app,monkeypatch):
+    rt=app.state.runtime;release=asyncio.Event();started=[]
+    async def held(job):
+        started.append(job['id'])
+        await release.wait()
+        return {'quality':'synthetic'}
+    monkeypatch.setattr(rt,'tutorial',held)
+    older=rt.create({'kind':'tutorial'},'older');newer=rt.create({'kind':'tutorial'},'newer')
+    rt.decide(newer['id'],newer['proposal']['digest'],True)
+    await asyncio.sleep(.01)
+    rt.decide(older['id'],older['proposal']['digest'],True)
+    await asyncio.sleep(.05)
+    assert started==[newer['id']]
+    release.set()
+    await asyncio.gather(*list(rt.tasks.values()))
+    assert started==[newer['id'],older['id']]

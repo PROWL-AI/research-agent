@@ -9,9 +9,6 @@ import stat
 import sys
 from pathlib import Path
 
-import httpx
-import uvicorn
-from .app import create_app
 
 
 def default_root():
@@ -58,6 +55,7 @@ def main():
     if not 1024 <= args.port <= 65535:
         parser.error("port must be between 1024 and 65535")
     if args.command == "doctor":
+        import httpx
         try:
             response = httpx.get(f"http://127.0.0.1:{args.port}/.well-known/fabric-service", timeout=3)
             response.raise_for_status()
@@ -71,6 +69,8 @@ def main():
     fd = lock(args.root)
     os.umask(0o077)
     try:
+        import uvicorn
+        from .app import create_app
         build = json.loads(args.build.read_text()) if args.build else None
         app = create_app(args.root, token(args.root, "host.token"), token(args.root, "agent.token"), args.port, build)
         # Never log request URLs: the host's one-use login code is in its URL.

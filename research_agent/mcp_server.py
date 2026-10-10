@@ -177,6 +177,10 @@ async def research_run(
         raise ValueError(f"research.run requires server-side keys: {exc}") from exc
 
     run_id = validate_run_id(run_id) if run_id else _new_run_id(runbook)
+    # Reject a live duplicate before disk I/O can yield and let its task finish.
+    # The second check below still protects two concurrent new submissions.
+    if run_id in _TASKS and not _TASKS[run_id].done():
+        raise ValueError(f"run '{run_id}' is already running in this server process")
     # A finished run_id on disk must be rejected before scheduling: the
     # orchestrator would refuse it anyway, and letting the failure surface
     # mid-task risks clobbering the finished run's checkpoint.

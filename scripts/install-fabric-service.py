@@ -93,7 +93,7 @@ def main():
         atomic(target,(json.dumps(descriptor,indent=2)+'\n').encode())
         if not disabled:
             subprocess.run(['launchctl','bootstrap',domain,str(plist)],check=True)
-            for _ in range(80):
+            for _ in range(480):
                 try:
                     with urllib.request.urlopen(descriptor['origin']+'/.well-known/fabric-service',timeout=1) as r: health=json.load(r)
                     if health['service']['build'].get('commit')==sha:break

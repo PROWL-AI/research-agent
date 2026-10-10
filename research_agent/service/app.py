@@ -95,9 +95,9 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
             return JSONResponse({"url": "/fabric/v1/login?code=" + code, "expiresAt": expires})
         if path == "/fabric/v1/login":
             if not store.auth_valid("code", request.query_params.get("code", ""), consume=True):
-                return HTMLResponse("<p>Ссылка истекла или уже использована. Откройте Prowl Research в Fabric Dashboards заново.</p>", 401)
+                return HTMLResponse("<p>Ссылка истекла или уже использована. Откройте Prowl Research в Fabric Dashboards заново.</p>", 403)
             response = RedirectResponse("/dashboard", 302)
-            response.set_cookie(cookie, store.auth_create("session", 28800), max_age=28800, httponly=True, samesite="strict", path="/")
+            response.set_cookie(cookie, store.auth_create("session", 28800), max_age=28800, httponly=True, samesite="Strict", path="/")
             return response
         if path in {"/fabric/v1/events", "/fabric/v1/usage"}:
             if not token_matches(request, host_token):
