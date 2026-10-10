@@ -246,10 +246,12 @@ class Orchestrator:
         prowl: ProwlClient,
         llm: LLMClient,
         runs_root: Path | str = "runs",
+        *, max_workers: int | None = None,
     ) -> None:
         self.prowl = prowl
         self.llm = llm
         self.runs_root = Path(runs_root)
+        self.max_workers = max_workers
 
     async def run(
         self,
@@ -477,7 +479,7 @@ class Orchestrator:
         budget = runbook.meta.budget
         completed = set(checkpoint.completed_steps)
         effort = effort_for(budget.max_tool_calls, runbook.meta.effort)
-        n_workers = 1 if os.environ.get("RESEARCH_NO_SUBAGENTS") else EFFORT_WORKERS[effort]
+        n_workers = self.max_workers if self.max_workers is not None else (1 if os.environ.get("RESEARCH_NO_SUBAGENTS") else EFFORT_WORKERS[effort])
         ctx = WorkerContext(
             orch=self,
             checkpoint=checkpoint,

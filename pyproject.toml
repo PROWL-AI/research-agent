@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prowl-research-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "Runbook-driven research agent that calls the Prowl MCP tool bank and produces evidence-backed reports"
 readme = "README.md"
 license = { text = "MIT" }
@@ -19,6 +19,9 @@ dependencies = [
     "jinja2>=3.1",
     "markdown>=3.5",
     "matplotlib>=3.8",
+    "starlette>=0.40",
+    "uvicorn>=0.30",
+    "jsonschema>=4.23",
 ]
 
 [project.optional-dependencies]
@@ -26,12 +29,13 @@ dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 
 [project.scripts]
 prowl-research = "research_agent.__main__:main"
+prowl-research-service = "research_agent.service.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["research_agent*"]
 
 [tool.setuptools.package-data]
-research_agent = ["runbooks/**/*", "report/templates/**/*"]
+research_agent = ["runbooks/**/*", "report/templates/**/*", "service/static/*", "service/manifest.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,4 @@
+{
+  "$id": "https://prowl.chat/fabric/schemas/research.run.output.json",
+  "type": "object"
+}

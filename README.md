@@ -170,3 +170,7 @@ it; it is not a cap on the separate LLM provider spend.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Fabric service and operator dashboard
+
+The separate `prowl-research-service` entry point adds durable jobs, observed tool/LLM receipts, human decisions and a service-owned dashboard for Fabric Dashboards. It reuses the existing research core. See [Fabric setup and architecture](docs/FABRIC.md), [dashboard design](docs/design/fabric-dashboard.md), and [current verification/handoff](docs/evidence/fabric-dashboard/HANDOFF.md). Legacy CLI/stdio and their existing run directories remain separate entry points.

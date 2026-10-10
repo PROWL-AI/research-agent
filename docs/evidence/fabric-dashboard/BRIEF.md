@@ -9,8 +9,7 @@ Implementation, local reversible service installation, focused verification and
 branch delivery are in scope. No paid provider trials, publication, source merge
 or changes to unrelated Fabric/Research Agent installations are assumed.
 Model: current session model, inherited; no model switch. Execution: autonomous,
-one implementation agent. Optional Figma copy asked asynchronously; working UI
-remains the primary artifact. The selected pipeline profile is inspect → design
+one implementation agent. Operator explicitly selected working UI in Fabric; no Figma copy. The selected pipeline profile is inspect → design
 and contracts → implement → local verification → durable handoff. Every stage
 carries scope, evidence, dependencies and resume. User request supplies the brief;
 no further approval is needed for reversible implementation.

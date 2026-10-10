@@ -1,0 +1,23 @@
+{
+  "$id": "https://prowl.chat/fabric/schemas/research.artifact.get.output.json",
+  "type": "object",
+  "required": [
+    "id",
+    "contractVersion",
+    "outcome",
+    "done",
+    "proof",
+    "scope",
+    "notVerified",
+    "artifacts",
+    "createdAt",
+    "producer",
+    "output",
+    "usage"
+  ],
+  "properties": {
+    "output": {
+      "type": "object"
+    }
+  }
+}

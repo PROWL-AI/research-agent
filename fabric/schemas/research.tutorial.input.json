@@ -1,0 +1,42 @@
+{
+  "$id": "https://prowl.chat/fabric/schemas/research.tutorial.input.json",
+  "type": "object",
+  "properties": {
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "requester": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "chain": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "project": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "node": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "parent": {
+          "type": "string",
+          "maxLength": 256
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "idempotencyKey"
+  ],
+  "additionalProperties": false
+}

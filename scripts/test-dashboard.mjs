@@ -1,0 +1,74 @@
+import {webkit} from 'playwright';
+import {spawn} from 'node:child_process';
+import {mkdtemp,readFile,mkdir,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import assert from 'node:assert/strict';
+const root=await mkdtemp(join(tmpdir(),'prowl-ui-'));
+const origin='http://127.0.0.1:18765';
+const env={...process.env};for(const key of ['PROWL_API_KEY','RESEARCH_LLM_API_KEY','OPENROUTER_API_KEY'])delete env[key];
+const child=spawn('.venv/bin/python',['-m','research_agent.service.cli','serve','--root',root,'--port','18765'],{env,stdio:['ignore','ignore','pipe']});
+let error='';child.stderr.on('data',d=>error+=d.toString());
+const evidence='docs/evidence/fabric-dashboard/raw';await mkdir(evidence,{recursive:true});
+let browser;
+try{
+ for(let i=0;i<80;i++){try{if((await fetch(origin+'/.well-known/fabric-service')).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
+ const token=(await readFile(join(root,'host.token'),'utf8')).trim();
+ const r=await fetch(origin+'/fabric/v1/login-code',{method:'POST',headers:{Authorization:'Bearer '+token}});
+ assert.equal(r.status,200);const login=await r.json();
+ browser=await webkit.launch({headless:true});
+ const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(origin+login.url);await page.getByRole('heading',{name:'Исследования, на виду.'}).waitFor();
+ await page.screenshot({path:evidence+'/overview-desktop.png',fullPage:true});
+ await page.getByRole('button',{name:'Открыть учебный пример',exact:true}).click();
+ await page.getByRole('heading',{name:'Разрешить этот запрос?'}).waitFor();
+ await page.screenshot({path:evidence+'/approval-desktop.png',fullPage:true});
+ await page.getByRole('button',{name:'Разрешить запуск',exact:true}).click();
+ await page.locator('.badge.completed').waitFor({timeout:15000});
+ await page.getByRole('tab',{name:'Данные',exact:true}).click();
+ await page.getByRole('cell',{name:'example.org',exact:true}).waitFor();
+ await page.screenshot({path:evidence+'/data-desktop.png',fullPage:true});
+ await page.getByRole('tab',{name:'Шаги',exact:true}).click();
+ assert.equal(await page.locator('.timeline li').count(),3);
+ await page.getByRole('tab',{name:'Отчёт',exact:true}).click();
+ await page.getByText('Учебный отчёт',{exact:false}).waitFor();
+ await page.locator('[data-nav="costs"]').click();
+ await page.getByRole('heading',{name:'Расходов пока нет'}).waitFor();
+ await page.locator('[data-nav="chains"]').click();
+ await page.getByRole('heading',{name:'Учебная цепочка'}).waitFor();
+ await page.locator('[data-nav="settings"]').click();
+ await page.locator('[name="cheap_model"]').fill('test/model');
+ await page.waitForTimeout(5200);
+ assert.equal(await page.locator('[name="cheap_model"]').inputValue(),'test/model');
+ await page.getByRole('button',{name:'Проверить изменения'}).click();
+ await page.getByRole('button',{name:'Применить',exact:true}).click();
+ await page.getByText('Версия 2',{exact:true}).waitFor();
+ await page.locator('[data-nav="requests"]').click();
+ await page.locator('#search').fill('not-a-request');
+ await page.getByRole('heading',{name:'Ничего не найдено'}).waitFor();
+ await page.locator('#search').fill('');
+ await page.locator('[data-nav="learn"]').click();
+ await page.getByRole('heading',{name:'От запроса к данным.'}).waitFor();
+ await page.setViewportSize({width:390,height:844});
+ await page.screenshot({path:evidence+'/learn-mobile.png',fullPage:true});
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile overflow');
+ await page.locator('[data-nav="overview"]').click();
+ await page.getByRole('heading',{name:'Исследования, на виду.'}).waitFor();
+ await page.screenshot({path:evidence+'/overview-mobile.png',fullPage:true});
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'overview mobile overflow');
+ // Offline preserves the last snapshot and reports its age.
+ await page.route('**/api/state',r=>r.abort());
+ await page.getByRole('button',{name:'Обновить',exact:true}).click();
+ await page.getByText('Нет свежих данных',{exact:true}).waitFor();
+ assert(await page.getByRole('heading',{name:'Исследования, на виду.'}).isVisible());
+ assert.deepEqual(errors,[]);
+ console.log(JSON.stringify({browser:'Playwright WebKit',viewports:['1440x1000','390x844'],checks:['empty','approval','tutorial','steps','table','report','fixture-spend-exclusion','chains','dirty-settings','settings-diff','search-empty','mobile-no-overflow','offline-keeps-snapshot'],pageErrors:errors,status:'PASS'}));
+}catch(e){console.error(e);throw e;}finally{
+ if(browser)await browser.close();
+ child.kill('SIGTERM');
+ await new Promise(resolve=>{child.once('exit',resolve);setTimeout(resolve,11000).unref();});
+ if(child.exitCode==null && child.signalCode==null){child.kill('SIGKILL');throw new Error('Shutdown deadline exceeded');}
+ await rm(root,{recursive:true,force:true});
+ if(error)process.stderr.write(error);
+}
