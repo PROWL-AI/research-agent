@@ -1,0 +1,642 @@
+{
+  "schema": "task-pipeline/waves-inventory/1",
+  "topic": "research-agent — close every open item in its final form",
+  "measured_at": "2026-10-11",
+  "measured_on": "c0dfb6e8be132c961f50c030c8b352f1d1d27dc3",
+  "measurement": {
+    "suite": ".venv/bin/python -m pytest tests/ -q → 328 passed",
+    "deep_probes": "PYTHONPATH=tests:. .venv/bin/python -m pytest -q docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py → 9 failed, 3 passed",
+    "resume_probes": "prowl-app origin/audit/kimi-20261010 docs/reports/2026-10-10-kimi-session-audit/raw/probe_research_resume.py → 3 failed",
+    "runbooks": ".venv/bin/python -m research_agent validate → all runbooks valid"
+  },
+  "canvas": "docs/specs/2026-10-11-waves-canvas.md",
+  "items": [
+    {
+      "id": "KA-06",
+      "title": "A non-owner process rewrites the active owner's checkpoint (MCP exception/cancel handlers, startup reconciliation, CLI _mark_run_failed)",
+      "source": "research_agent/mcp_server.py:119-148,327-354; research_agent/__main__.py:163-182",
+      "status": "open — probe red at c0dfb6e",
+      "area": "lifecycle",
+      "node": "N-OWN",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-009",
+      "title": "Orphans: a crashed CLI run stays running until a stdio server starts; service run dirs are never reconciled; service cancel/timeout leaves runs/<job>/checkpoint.json at running",
+      "source": "research_agent/service/runtime.py:186-190,221-226; research_agent/__main__.py",
+      "status": "open",
+      "area": "lifecycle",
+      "node": "N-OWN",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-010",
+      "title": "rewrite_report writes report.md and the checkpoint without the run lock",
+      "source": "research_agent/agent/writer.py:463-492",
+      "status": "open",
+      "area": "lifecycle",
+      "node": "N-OWN",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-011",
+      "title": "README stale: 304 tests at 1dced8e, stdio tool count only (service has 7), Fabric section after License",
+      "source": "README.md:155,10-12,81,174-176",
+      "status": "open",
+      "area": "docs",
+      "node": "N-DOCS",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-012",
+      "title": "mcp_server.py module docstring says the Fabric bundle declares stdio; the manifest points at the HTTP service",
+      "source": "research_agent/mcp_server.py:1-9; fabric-agent.json",
+      "status": "open",
+      "area": "docs",
+      "node": "N-DOCS",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-013",
+      "title": "FABRIC.md says register MCP in ~/.config/agentgateway/servers.yaml — retired route (machine-03: new servers go in each agent's own config; scoped dev.agentgateway.prowl runs)",
+      "source": "docs/FABRIC.md:81",
+      "status": "open",
+      "area": "docs",
+      "node": "N-DOCS",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-015",
+      "title": "UX scenarios cover only the dashboard; core journeys (CLI/MCP run, resume, terminal states, verified semantics, budget stop, judge) have none",
+      "source": "docs/ux/scenarios.md:9-16",
+      "status": "open",
+      "area": "ux",
+      "node": "N-DOCS",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-016",
+      "title": "BRIEF stops at FD-11; FD-12…FD-14 and every FD status live only in the parent plan and HANDOFF",
+      "source": "docs/evidence/fabric-dashboard/BRIEF.md:37-47",
+      "status": "open",
+      "area": "docs",
+      "node": "N-DOCS",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-018",
+      "title": "No wiki project card and no agent-estate entry for prowl-research (global rule: read/update before agent planning)",
+      "source": "sshlg-projects-vault synthesis/agent-estate.md (absent); projects/prowl.chat/references only",
+      "status": "open",
+      "area": "knowledge",
+      "node": "N-DOCS",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-024",
+      "title": "Contract probes live outside tests/ (deep probes in docs/reports, resume probes only in prowl-app); move each into tests/ as its fix lands, keep the diagnostic cut",
+      "source": "docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py; prowl-app probe_research_resume.py",
+      "status": "open",
+      "area": "tests",
+      "node": "N-DOCS",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-030",
+      "title": "research.* tool namespace shared with the private ssheleg/research-agent (research.run vs research.runs.get); document the owner-qualified names, no rename (provider contentHash binds names)",
+      "source": "fabric/ capability declarations; private agent research.* tools",
+      "status": "open",
+      "area": "docs",
+      "node": "N-DOCS",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-031",
+      "title": "No hosted CI workflow in this repository; VERIFICATION 'Hosted CI NOT_RUN' has no workflow behind it. Add a nightly-only workflow (estate policy 23:00 Europe/Warsaw, no push/PR triggers)",
+      "source": ".github/workflows absent; docs/evidence/fabric-dashboard/VERIFICATION.md:20",
+      "status": "open",
+      "area": "ci",
+      "node": "N-DOCS",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "KA-03",
+      "title": "Step identity is a position in a re-filtered plan; a catalog/allowlist change makes an unexecuted step look complete",
+      "source": "research_agent/agent/orchestrator.py:340; subagent.py:126-128,188; evidence/store.py:72,89",
+      "status": "open — probe red at c0dfb6e",
+      "area": "state",
+      "node": "N-STATE",
+      "blocked_by": [
+        "KA-06"
+      ],
+      "closable_in_one_pass": true,
+      "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "KA-04",
+      "title": "Never-started tail after a hard failure (and budget-stopped steps) are appended to completed_steps",
+      "source": "research_agent/agent/subagent.py:166-171,194-205,219-227",
+      "status": "open — probe red at c0dfb6e",
+      "area": "state",
+      "node": "N-STATE",
+      "blocked_by": [
+        "KA-03"
+      ],
+      "closable_in_one_pass": true,
+      "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "KA-05",
+      "title": "Completion is appended after the save; a crash leaves raw+claims on disk with the step not completed and resume re-dispatches",
+      "source": "research_agent/agent/subagent.py:250-261; orchestrator.py:586-594",
+      "status": "open — probe red at c0dfb6e",
+      "area": "state",
+      "node": "N-STATE",
+      "blocked_by": [
+        "KA-03",
+        "KA-04"
+      ],
+      "closable_in_one_pass": true,
+      "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "KA-10",
+      "title": "Raw-save or extraction failure still ends complete (invented raw_path, swallowed extraction error)",
+      "source": "research_agent/agent/subagent.py:249-267; orchestrator.py:363,588-591",
+      "status": "open — probe red at c0dfb6e",
+      "area": "state",
+      "node": "N-STATE",
+      "blocked_by": [
+        "KA-03",
+        "KA-05"
+      ],
+      "closable_in_one_pass": true,
+      "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "B-006",
+      "title": "save_markdown is non-atomic and an OSError escapes _execute_transform, failing the whole run",
+      "source": "research_agent/evidence/store.py:87-96",
+      "status": "open",
+      "area": "state",
+      "node": "N-STATE",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "B-008",
+      "title": "A failed transform is not persisted until the next segment saves",
+      "source": "research_agent/agent/orchestrator.py:579-585",
+      "status": "open",
+      "area": "state",
+      "node": "N-STATE",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "B-025",
+      "title": "raw_ref is absolute under the service and CWD-relative under CLI/MCP — not portable, blocks quote-to-raw checks",
+      "source": "research_agent/agent/orchestrator.py:684-697; evidence/store.py",
+      "status": "open",
+      "area": "state",
+      "node": "N-STATE",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "KA-11",
+      "title": "The first known server cost drops all earlier estimates from the budget check",
+      "source": "research_agent/agent/orchestrator.py:642-648; subagent.py:234-248",
+      "status": "open — probe red at c0dfb6e",
+      "area": "cost",
+      "node": "N-COST",
+      "blocked_by": [
+        "KA-12"
+      ],
+      "closable_in_one_pass": true,
+      "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "KA-12",
+      "title": "A billed failure's cost is never persisted; resume re-dispatches past the limit",
+      "source": "research_agent/prowl_client.py:180-206; agent/subagent.py:190-230; orchestrator.py:306-310,370",
+      "status": "open — probe red at c0dfb6e",
+      "area": "cost",
+      "node": "N-COST",
+      "blocked_by": [
+        "KA-03"
+      ],
+      "closable_in_one_pass": true,
+      "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "KA-07",
+      "title": "A valueless claim erases a numeric conflict (incremental status, last writer wins)",
+      "source": "research_agent/evidence/ledger.py:169-209",
+      "status": "open — probe red at c0dfb6e",
+      "area": "evidence",
+      "node": "N-EVID",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 3,
+      "release": "this"
+    },
+    {
+      "id": "KA-08",
+      "title": "An LLM-asserted verbatim flag makes a fabricated quote verified; Claim has no quote/span",
+      "source": "research_agent/agent/orchestrator.py:684-697; evidence/ledger.py:34-45,183-199",
+      "status": "open — probe red at c0dfb6e",
+      "area": "evidence",
+      "node": "N-EVID",
+      "blocked_by": [
+        "KA-10",
+        "B-025"
+      ],
+      "closable_in_one_pass": true,
+      "wave": 3,
+      "release": "this"
+    },
+    {
+      "id": "KA-09",
+      "title": "Two delivery tools reading one document count as two independent sources",
+      "source": "research_agent/evidence/ledger.py:201-207",
+      "status": "open — probe red at c0dfb6e",
+      "area": "evidence",
+      "node": "N-EVID",
+      "blocked_by": [
+        "KA-08"
+      ],
+      "closable_in_one_pass": true,
+      "wave": 3,
+      "release": "this"
+    },
+    {
+      "id": "B-007",
+      "title": "Transform claims (an LLM summary of tool X) corroborate X itself",
+      "source": "research_agent/evidence/ledger.py:201-203; orchestrator.py:586-589",
+      "status": "open",
+      "area": "evidence",
+      "node": "N-EVID",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 3,
+      "release": "this"
+    },
+    {
+      "id": "KA-G01",
+      "title": "No LLM budget: Budget has tool calls/USD/minutes only; LLM usage is in-memory tokens without USD; transforms uncapped in money",
+      "source": "research_agent/runbook.py:36-43; llm.py:58-99; orchestrator.py:388-390",
+      "status": "implementation gap",
+      "area": "cost",
+      "node": "N-LLMB",
+      "blocked_by": [
+        "KA-11",
+        "KA-12"
+      ],
+      "closable_in_one_pass": true,
+      "notes": "Operator approved a max_llm mechanism (kimi export 2026-10-09 :7310). Designed so B-001 later swaps the key route, not the limit.",
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-003",
+      "title": "ObservedLLM duplicates LLMClient without retries, max_tokens-scaled timeout or LLMError mapping; one 429 fails a paid service run",
+      "source": "research_agent/service/runtime.py:91-122; llm.py:144-149",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-004",
+      "title": "ObservedProwl._rpc never reconnects; meta calls lose the client's retry under the service",
+      "source": "research_agent/service/runtime.py:51-58",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-005",
+      "title": "Runtime.envelope hard-codes outcome partial; research status is buried in output.research.status",
+      "source": "research_agent/service/runtime.py:278",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-029",
+      "title": "validate_runbooks does not warn when a runbook's allowlist misses its declared failover alternatives",
+      "source": "scripts/validate_runbooks.py:14",
+      "status": "open",
+      "area": "runbooks",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-014",
+      "title": "HUB-PACKET and HANDOFF describe a hub-forwarding route ADR-0144 retired; hub.json now exists (Fabric 0.3.4). Rewrite around DEC-0039 direct calls with delegation tokens",
+      "source": "docs/evidence/fabric-dashboard/HUB-PACKET.md; passioncode-ai/fabric docs/adr/0144; fabric-agent-contract DECISIONS.md:1364",
+      "status": "open",
+      "area": "fabric",
+      "node": "N-FAB",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 5,
+      "release": "this"
+    },
+    {
+      "id": "B-021",
+      "title": "Contract pin 623bf613 → fabric-agent-contract 8e49fbd (DEC-0036…0040 additive, contractVersion stays 0.1.0)",
+      "source": "fabric-contract.lock.json",
+      "status": "open",
+      "area": "fabric",
+      "node": "N-FAB",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 5,
+      "release": "this"
+    },
+    {
+      "id": "FD-12",
+      "title": "Callee side of DEC-0039: the service MCP accepts and verifies delegation tokens offline (audience, actor chain, expiry), maps refusals to DL codes, keeps own agent tokens for outside callers. Same as KA-G03's admission half",
+      "source": "docs/evidence/fabric-dashboard/HANDOFF.md:19; fabric-agent-contract src/delegation.ts:292",
+      "status": "open — host issuer not built (Fabric 0.4.0 wave 4, REQ-37/CO-258)",
+      "area": "fabric",
+      "node": "N-FAB",
+      "blocked_by": [
+        "B-021"
+      ],
+      "closable_in_one_pass": true,
+      "notes": "Callee code and offline tests close here; synthetic chain acceptance waits for the issuer (KA-G03).",
+      "wave": 5,
+      "release": "this"
+    },
+    {
+      "id": "B-019",
+      "title": "Installer launches the service without an Observatory consumer (vault-only serve)",
+      "source": "scripts/install-fabric-service.py:71; ~/Library/LaunchAgents/chat.prowl.research.plist",
+      "status": "open",
+      "area": "fabric",
+      "node": "N-FAB",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 5,
+      "release": "this"
+    },
+    {
+      "id": "FD-13",
+      "title": "Provider wiring: PROWL_API_KEY and an LLM key through an Observatory consumer; none exist in any vault slot for prowl-research",
+      "source": "research_agent/service/app.py:55-57; observatory names (prowl-research: none)",
+      "status": "needs-operator",
+      "area": "fabric",
+      "node": "N-ACC",
+      "blocked_by": [
+        "B-019"
+      ],
+      "closable_in_one_pass": false,
+      "needs_operator": "create a dedicated prowl_ key (prowl.chat sign-in, wallet) and a capped LLM key; store both in a new Observatory slot prowl-research/prod",
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-002",
+      "title": "Dashboard has no fabric-dashboard-kit (1.0.0, DEC-0036): legacy 480px; nav 208/160px and horizontal mobile nav break ED-3",
+      "source": "SessionStart notice; dashboard_kit.py status → no kit copy; docs/design/fabric-dashboard.md:19",
+      "status": "needs-operator",
+      "area": "fabric",
+      "node": "N-FAB",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "needs_operator": "go-ahead for the kit upgrade and the launchd restart it implies (dashboard-kit.md:111-113)",
+      "wave": 5,
+      "release": "this"
+    },
+    {
+      "id": "B-017",
+      "title": "Judge uncalibrated: FakeLLM fixed scores, no planted-bad control, no labelled agreement; KA-G02 requires the judge to reject planted bad output first",
+      "source": "evals/judge.py:35-49,206; tests/test_judge.py:72-94",
+      "status": "open",
+      "area": "evals",
+      "node": "N-ACC",
+      "blocked_by": [
+        "KA-07",
+        "KA-08",
+        "KA-09"
+      ],
+      "closable_in_one_pass": false,
+      "notes": "Offline harness + planted-bad fixtures in wave 3/4 scope; the live calibration pass spends money.",
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "KA-G02",
+      "title": "Finance and subscription live acceptance: separate run and judge exit codes, artifacts, exact SHA, actual tool+LLM cost, human review",
+      "source": "prowl-app plan :55; runs/ has no finance/subscription run",
+      "status": "NOT_RUN",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [
+        "FD-13",
+        "B-017",
+        "KA-G01"
+      ],
+      "closable_in_one_pass": false,
+      "needs_operator": "keys (FD-13); spend cites the 2026-10-09 approval (~$2-3 per run) plus one durable budget row B-027",
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-027",
+      "title": "No spend policy for prowl-research; one durable budget request with a concrete amount for wave 6 live acceptance",
+      "source": "fabric-workspace knowledge/authority.md (L1 asked once at first paid run)",
+      "status": "needs-operator",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "FD-14",
+      "title": "Native dashboard panel rendering NOT_VERIFIED (cua.getApp timed out); host is 0.6.7, latest 0.7.1",
+      "source": "docs/evidence/fabric-dashboard/VERIFICATION.md:16; fabric-dashboards host_status",
+      "status": "needs-operator",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [
+        "B-002"
+      ],
+      "closable_in_one_pass": false,
+      "needs_operator": "host update 0.6.7→0.7.1 is operator administration; a visible native-panel look",
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "KA-G03",
+      "title": "Real Fabric host chain: delegation-token admission, run, status/report, errors, resume, bundle SHA and host receipt",
+      "source": "prowl-app plan :56",
+      "status": "NOT_RUN — waits for the Fabric issuer",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [
+        "FD-12",
+        "KA-G02"
+      ],
+      "closable_in_one_pass": false,
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-023",
+      "title": "audit/kimi-20261010 and feat/fabric-dashboard-20261010 are unmerged; origin/main is still 1dced8e",
+      "source": "git log main..HEAD",
+      "status": "needs-operator",
+      "area": "integration",
+      "node": "N-DOCS",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "needs_operator": "integration policy: PR to main per wave, merged after the wave closes (recommended)",
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-020",
+      "title": "prowl-research has no row in the Fabric delegation-model adoption plan (step 4: callee adopts)",
+      "source": "fabric-workspace docs/evidence/plans/2026-10-11-delegation-model/README.md:53-58",
+      "status": "open — external ask",
+      "area": "fabric",
+      "node": "N-EXT",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "notes": "Asked of the plan owner by cross-session message; not this repository's file.",
+      "wave": null,
+      "release": "external"
+    },
+    {
+      "id": "B-026",
+      "title": "Observatory use_secret.py names prints its ambiguity message one character per line",
+      "source": "project-observatory tools/use_secret.py names prowl.chat",
+      "status": "open — external defect",
+      "area": "external",
+      "node": "N-EXT",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": null,
+      "release": "external"
+    },
+    {
+      "id": "KA-01",
+      "title": "Parent durable execution/result replay for prowl_call_tool",
+      "source": "prowl-app plan :39",
+      "status": "open — owned by prowl-app",
+      "area": "external",
+      "node": "N-EXT",
+      "blocked_by": [],
+      "closable_in_one_pass": false,
+      "notes": "Our side sends stable step_id+attempt keys (wave 2); replay is server-side.",
+      "wave": null,
+      "release": "external"
+    },
+    {
+      "id": "KA-02",
+      "title": "Parent atomic settle/recovery",
+      "source": "prowl-app plan :40",
+      "status": "open — owned by prowl-app",
+      "area": "external",
+      "node": "N-EXT",
+      "blocked_by": [],
+      "closable_in_one_pass": false,
+      "wave": null,
+      "release": "external"
+    },
+    {
+      "id": "KA-G04",
+      "title": "Parent queued-cancellation refund claim",
+      "source": "prowl-app plan :57",
+      "status": "needs targeted reproduction — owned by prowl-app",
+      "area": "external",
+      "node": "N-EXT",
+      "blocked_by": [],
+      "closable_in_one_pass": false,
+      "wave": null,
+      "release": "external"
+    },
+    {
+      "id": "B-001",
+      "title": "LLM model slots → named estate model profiles resolved by the fabric kit; KA-G01 becomes the profile's key route",
+      "source": "docs/evidence/backlog.md B-001; frame-agent proposal @ 9f05a3f",
+      "status": "waived — revisit: Fabric ADR, DEC CT-05, kit resolver T1–T3",
+      "area": "cost",
+      "node": "N-PROG",
+      "blocked_by": [
+        "KA-G01"
+      ],
+      "closable_in_one_pass": false,
+      "wave": null,
+      "release": "program"
+    }
+  ]
+}
