@@ -706,7 +706,7 @@ class Orchestrator:
             "attempted_calls", checkpoint.counters.get("data_calls", 0)
         )
         if attempted >= budget.max_tool_calls:
-            return f"max_tool_calls={budget.max_tool_calls}"
+            return terminal.budget_stop_text(terminal.BUDGET_TOOLS, budget.max_tool_calls)
         # Elapsed is measured from the checkpoint's creation, not from this
         # process start — otherwise every resume resets the clock and a
         # crashing run outlives max_minutes forever.
@@ -715,14 +715,16 @@ class Orchestrator:
             created = created.replace(tzinfo=timezone.utc)
         elapsed_minutes = (datetime.now(timezone.utc) - created).total_seconds() / 60
         if elapsed_minutes >= budget.max_minutes:
-            return f"max_minutes={budget.max_minutes}"
+            return terminal.budget_stop_text(terminal.BUDGET_MINUTES, budget.max_minutes)
         cost = self.prowl.cost_usd
         if cost is None:
             cost = checkpoint.counters.get("cost_estimate_usd")
             if cost is not None and cost >= budget.max_usd:
-                return f"max_usd={budget.max_usd} (estimated from catalog prices)"
+                return terminal.budget_stop_text(
+                    terminal.BUDGET_USD, budget.max_usd, note="estimated from catalog prices"
+                )
         elif cost >= budget.max_usd:
-            return f"max_usd={budget.max_usd}"
+            return terminal.budget_stop_text(terminal.BUDGET_USD, budget.max_usd)
         return None
 
     async def _extract_claims(

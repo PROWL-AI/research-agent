@@ -22,7 +22,7 @@ Runtime source and installed build: **891fbc995cb382ec6ccaed5f1b91611918b931c7**
 ## Corrections discovered during verification
 
 - Browser navigation initially rendered a form before its pending refresh completed, which erased a typed model. Navigation now presents a loading state until that refresh finishes; the WebKit dirty-settings regression passes.
-- The old stdio duplicate-run check followed awaited checkpoint I/O; a live task could finish during that await and admit another submission from stale checkpoint state. It now also rejects live duplicates before yielding. Broader KA-06 ownership hazards remain open.
+- The old stdio duplicate-run check followed awaited checkpoint I/O; a live task could finish during that await and admit another submission from stale checkpoint state. It now also rejects live duplicates before yielding. KA-06 (run-lock ownership) is addressed in wave 1; certification pending.
 - Queue rank alone could overbook a slot when an older request was approved after a newer one started. Admission now counts executing jobs and admits only the next queued job into an available slot; regression passes.
 - Cold install on this busy machine exceeded the original 20-second readiness poll. The installer now allows a bounded 120-second warm-up. Duplicate process locking happens before heavy imports.
 - Initial service probe had a 150.1ms health median and a case-sensitive cookie spelling failure; final installed probe has no failures. The cookie is HttpOnly; SameSite=Strict, and a reused code is refused.

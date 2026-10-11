@@ -44,10 +44,9 @@ Other environment knobs (all optional):
 - `PROWL_MCP_URL` — Prowl MCP endpoint (default `https://prowl.chat/mcp`).
 - `RESEARCH_LLM_MODEL_STRONG` — the strong-tier model (planning, writing,
   repair); `RESEARCH_LLM_MODEL` covers the cheap tier.
-- `RESEARCH_RUNS_DIR` — where runs are written (MCP server only; the CLI
-  uses `./runs` for `run`, `report`, `rewrite`, `export` and `prune`, but
-  `status` reads this variable through the stdio server's status helper).
-  Default `./runs` relative to the server process; set it explicitly in MCP
+- `RESEARCH_RUNS_DIR` — where runs are written, for the stdio MCP server and
+  every CLI command alike (`run`, `status`, `report`, `rewrite`, `export`,
+  `prune`). Default `./runs` relative to the process; set it explicitly in MCP
   client configs.
 - `RESEARCH_NO_SUBAGENTS=1` — force sequential execution (no worker fan-out).
 - `RESEARCH_PROWL_CALL_TIMEOUT_S` — read timeout in seconds for each Prowl
@@ -123,19 +122,23 @@ the run stopped (`null` while it is live). The set is closed:
 | `budget_llm` | `partial` | LLM-spend budget (reserved; not set yet) |
 | `step_failed` | `partial` | a step failed hard or a worker crashed |
 | `evidence_incomplete` | — | evidence could not be persisted (reserved; not set yet) |
-| `cancelled` | `partial` | the caller, the service cancel or its timeout cancelled the run |
+| `cancelled` | `partial` | any cancellation of the owning task: a caller or service cancel, the service timeout (job error `timeout`), Ctrl-C, a client closing its session or a graceful service shutdown |
 | `error` | `failed` | an exception escaped the run; `stop_reason` carries it |
-| `interrupted` | `interrupted` | the owning process exited without finishing; resumable |
+| `interrupted` | `interrupted` | the owning process died without a terminal write (a hard kill or crash); written by reconciliation, resumable |
 
 Run state has exactly one writer: the process holding the run's lock
 (`runs/<id>/.lock`). The orchestrator records `cancelled`/`error` itself before
 releasing the lock; a second process on the same run is refused
-(`run … is locked by another process`) and writes nothing. `interrupted` is
+(`run … is locked by another process`) and writes nothing — on stdio MCP the
+refusal is returned synchronously, also for `wait=false`. `get_status` reports
+`active` (some process holds the run lock) and `orphaned` (`running`, no
+live owner anywhere). `interrupted` is
 written by reconciliation — at stdio server start, at CLI `run`/`status`, and
 at Fabric service start — and only for a `running` checkpoint whose lock is
-free. `get_status` also reports `has_checkpoint`: `false` when a run accepted
-by this server failed before its checkpoint existed (the status then comes from
-the in-process job and disappears with it).
+free. `get_status` also reports `has_checkpoint`: `false` while a run accepted
+by this server is still starting, or when it failed or was cancelled before it
+took the run lock (the status then comes from the in-process job and
+disappears with it).
 
 First real run (makes billed Prowl calls; see budget limits below):
 
@@ -183,10 +186,10 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
 ## Current verification and resume limits
 
 The [deep agent audit](docs/reports/2026-10-10-agent-deep-audit/README.md) adds
-seven defects: lifecycle ownership (KA-06, fixed by the run-lock ownership
-above), false evidence verification, hidden artifact/extraction failures and
+seven defects: lifecycle ownership (KA-06 — addressed in wave 1 by the
+run-lock ownership above; certification pending), false evidence verification, hidden artifact/extraction failures and
 budget accounting across mixed receipts/resume.
-Its explicit probes reproduce nine contract violations; three controls pass.
+Its explicit probes (`PYTHONPATH=tests:. .venv/bin/python -m pytest -q docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py`) are expected to fail until waves 2–3 close KA-07…KA-12; the KA-06 cases and the three controls pass.
 The [2026-10-10 handoff](docs/HANDOFF.md) links the remediation plan and records the audited source revision,
 checks and next repair tasks. The offline suite is `.venv/bin/python -m pytest
 tests/ -q` (network-free); its pass count is a fact about one revision, so it is

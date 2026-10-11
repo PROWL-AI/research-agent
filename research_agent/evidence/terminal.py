@@ -8,6 +8,8 @@ consumer may switch on it exhaustively.
 
 from __future__ import annotations
 
+from typing import Any
+
 #: Every planned step ran (on_error_skip disclosures included).
 COMPLETED = "completed"
 #: Budget stops — the run ended partial because a runbook budget ran out.
@@ -33,11 +35,20 @@ TERMINAL_CODES = frozenset({
     STEP_FAILED, EVIDENCE_INCOMPLETE, CANCELLED, ERROR, INTERRUPTED,
 })
 
-_BUDGET_PREFIXES = (
-    ("max_tool_calls=", BUDGET_TOOLS),
-    ("max_usd=", BUDGET_USD),
-    ("max_minutes=", BUDGET_MINUTES),
-)
+#: The one vocabulary for budget stop texts: `budget_stop_text` writes them and
+#: `code_for_stop_reason` reads them, so the two cannot drift apart.
+_BUDGET_FIELD = {
+    BUDGET_TOOLS: "max_tool_calls",
+    BUDGET_USD: "max_usd",
+    BUDGET_MINUTES: "max_minutes",
+}
+_BUDGET_PREFIXES = tuple((f"{field}=", code) for code, field in _BUDGET_FIELD.items())
+
+
+def budget_stop_text(code: str, limit: Any, note: str | None = None) -> str:
+    """The stop_reason recorded for a budget stop, e.g. `max_usd=0.5`."""
+    text = f"{_BUDGET_FIELD[code]}={limit}"
+    return f"{text} ({note})" if note else text
 
 
 def code_for_stop_reason(stop_reason: str | None) -> str:

@@ -171,9 +171,9 @@
 
 | ID | Title | Wave | Status |
 |---|---|---|---|
-| CORE-01 | Запуск до терминального состояния (CLI, stdio MCP) | 1 | UNVERIFIED |
+| CORE-01 | Запуск до терминального состояния (CLI, stdio MCP) | 1 | PASS@W1F1 |
 | CORE-02 | Запуск через Fabric `research.run`: исход совпадает с ядром | 4 | UNVERIFIED |
-| CORE-03 | Второй процесс не меняет живой прогон | 1 | UNVERIFIED |
+| CORE-03 | Второй процесс не меняет живой прогон | 1 | PASS@W1F1 |
 | CORE-04 | Осиротевший прогон → `interrupted` → продолжение | 1, 2 | UNVERIFIED |
 | CORE-05 | Продолжение после сбоя не платит дважды | 2 | UNVERIFIED |
 | CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | UNVERIFIED |
@@ -182,11 +182,11 @@
 | CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | UNVERIFIED |
 | CORE-10 | Конфликт остаётся конфликтом | 3 | UNVERIFIED |
 | CORE-11 | Потеря доказательств → `partial`, не `complete` | 2 | UNVERIFIED |
-| CORE-12 | Переписать отчёт активного прогона нельзя | 1 | UNVERIFIED |
+| CORE-12 | Переписать отчёт активного прогона нельзя | 1 | PASS@W1F1 |
 | CORE-13 | Судья отвергает заведомо плохой отчёт | 6 | UNVERIFIED |
 
 ### CORE-01: Запуск до терминального состояния (CLI, stdio MCP)
-- **Status:** UNVERIFIED
+- **Status:** PASS@W1F1
 - **Actor:** оператор (P-01) в терминале; вызывающий агент через stdio MCP
 - **Trigger:** `prowl-research run <runbook>` или вызов stdio MCP `research.run`
 - **Preconditions:** runbook проходит `prowl-research validate`; ключи заданы.
@@ -196,7 +196,7 @@
 - **Expected result:** checkpoint содержит терминальный `status` и `terminal_code` из закрытого набора; CLI и stdio MCP сообщают одну и ту же пару; переходы жизненного цикла записаны структурными событиями через `research_agent/events.py`, без секретов.
 - **Failure outcome:** исключение внутри прогона записывается самим `Orchestrator.run` под блокировкой как `failed` + `terminal_code=error`, отмена — как `partial` + `cancelled`; обработчики MCP и CLI только сообщают и ничего не пишут.
 - **Wave:** 1 (N-OWN)
-- **Coverage:** —
+- **Coverage:** `tests/test_ka_contracts.py`: `test_clean_finish_is_completed_everywhere`, `test_owner_writes_failed_on_exception`, `test_cancel_mid_run_is_written_by_the_owner_and_non_owners_write_nothing`, `test_budget_stop_maps_to_budget_code`, `test_usd_budget_stop_maps_to_budget_usd_end_to_end`, `test_minutes_budget_stop_maps_to_budget_minutes_end_to_end`, `test_emit_*`
 
 ### CORE-02: Запуск через Fabric `research.run`: исход совпадает с ядром
 - **Status:** UNVERIFIED
@@ -207,34 +207,34 @@
   1. Создать задание; оператор одобряет.
   2. Опрашивать `fabric.job.get` до терминального состояния.
 - **Expected result:** `outcome` в результате задания выводится из `status`/`terminal_code` ядра по таблице соответствия в `docs/FABRIC.md`; `research.artifact.get` возвращает тот же checkpoint, что видит CLI.
-- **Failure outcome:** отмена или таймаут сервиса оставляет checkpoint прогона в терминальном состоянии (`partial` + `cancelled`), а не `running`; уже списанные расходы сохраняются (SCN-005).
+- **Failure outcome:** отмена, таймаут (ошибка задания `timeout`) или остановка сервиса оставляют checkpoint прогона в терминальном состоянии (`partial` + `cancelled`), а не `running`, и ошибка задания несёт тот же `terminalCode`; уже списанные расходы сохраняются (SCN-005).
 - **Wave:** 4 (N-SVC, B-005); терминальная запись при отмене — 1 (N-OWN)
-- **Coverage:** —
+- **Coverage:** волна 1 (терминальная запись при отмене, таймауте и остановке сервиса): `test_service_cancel_reaches_the_orchestrator`, `test_service_timeout_has_its_own_code_and_carries_terminal_code`, `test_service_shutdown_marks_job_interrupted_and_checkpoint_cancelled`; соответствие `outcome` — волна 4
 
 ### CORE-03: Второй процесс не меняет живой прогон
-- **Status:** UNVERIFIED
+- **Status:** PASS@W1F1
 - **Actor:** оператор (P-01) или вызывающий агент, случайно запустивший второй процесс
 - **Trigger:** второй `prowl-research run <runbook> --run-id <id>` (или stdio MCP `research.run` с тем же `run_id`) при живом первом процессе
 - **Preconditions:** первый процесс держит блокировку прогона (`RunLock`).
 - **Steps:**
   1. Запустить второй процесс на тот же каталог прогона.
-- **Expected result:** второй процесс получает отказ блокировки, сообщает `active` и **не пишет ничего**: checkpoint, ledger и raw первого процесса не изменены; первый завершается штатно.
+- **Expected result:** второй процесс получает отказ `run … is locked by another process` (в stdio MCP — сразу, и при `wait=false`), `research.get_status` показывает `active=true`, `orphaned=false`, и **никто не пишет ничего**: checkpoint, ledger и raw первого процесса не изменены; первый завершается штатно.
 - **Failure outcome:** если отказ всё же переписывает checkpoint живого владельца (например, в `failed`), это дефект KA-06; сценарий `FAIL`.
 - **Wave:** 1 (N-OWN, KA-06; двухпроцессный smoke — критерий выхода волны 1)
-- **Coverage:** —
+- **Coverage:** `test_ka06_non_owner_cannot_mutate_locked_checkpoint[run|startup]`, `test_research_run_wait_false_refuses_a_run_locked_elsewhere`, `tests/test_two_process_lock.py::test_second_process_cannot_write_a_locked_run`
 
 ### CORE-04: Осиротевший прогон → `interrupted` → продолжение
 - **Status:** UNVERIFIED
 - **Actor:** оператор (P-01)
 - **Trigger:** процесс прогона убит (сбой, перезагрузка); затем `prowl-research status <run_id>`, старт stdio MCP или восстановление сервиса (`Store.recover`)
-- **Preconditions:** checkpoint в `running`, блокировку никто не держит.
+- **Preconditions:** checkpoint в `running`, блокировку никто не держит. Каталог прогонов один для всех команд CLI и stdio MCP: `RESEARCH_RUNS_DIR`, иначе `./runs`; у сервиса — свой `runs/` в корне сервиса.
 - **Steps:**
   1. Открыть статус или запустить вход, выполняющий сверку.
   2. Продолжить прогон: `prowl-research run <runbook> --run-id <id>`.
 - **Expected result:** сверка берёт `RunLock` без ожидания, помечает прогон `interrupted` под блокировкой; продолжение выполняет только шаги в состояниях `pending`, `outcome_unknown`, `raw_saved` (только извлечение) и `failed` без `on_error_skip`.
-- **Failure outcome:** если блокировка занята — сверка ничего не пишет и сообщает `active`. Чтение статуса само по себе никогда не пишет, кроме этой сверки под блокировкой.
+- **Failure outcome:** если блокировка занята — сверка ничего не пишет (событие `run.reconcile.skipped_active`), а статус показывает `active=true`; недоступный для записи каталог не мешает сверке остальных (`run.reconcile.failed`). Чтение статуса само по себе никогда не пишет, кроме этой сверки под блокировкой.
 - **Wave:** 1 (сверка в `interrupted`, N-OWN); 2 (продолжение по сохранённым состояниям шагов, N-STATE)
-- **Coverage:** —
+- **Coverage:** волна 1 (сверка): `test_control_unlocked_orphan_is_reconciled`, `test_reconcile_orphans_reports_what_it_marked_and_skips_active`, `test_reconcile_survives_an_unwritable_run_dir`, `test_cli_status_reconciles_an_orphan_and_prints_terminal`, `test_service_recover_reconciles_its_run_dirs`; продолжение по состояниям шагов — волна 2
 
 ### CORE-05: Продолжение после сбоя не платит дважды
 - **Status:** UNVERIFIED
@@ -321,16 +321,16 @@
 - **Coverage:** —
 
 ### CORE-12: Переписать отчёт активного прогона нельзя
-- **Status:** UNVERIFIED
+- **Status:** PASS@W1F1
 - **Actor:** оператор (P-01)
 - **Trigger:** `prowl-research rewrite <run_id>` при живом прогоне
 - **Preconditions:** прогон держит `RunLock`.
 - **Steps:**
   1. Запустить переписывание.
-- **Expected result:** команда отказывает, сообщает `active` и ничего не пишет — ни `report.md`, ни checkpoint.
+- **Expected result:** команда отказывает (`run … is active; rewrite refused`) и ничего не пишет — ни `report.md`, ни checkpoint.
 - **Failure outcome:** после завершения прогона переписывание берёт блокировку и работает (только писатель, без расходов Prowl).
 - **Wave:** 1 (N-OWN)
-- **Coverage:** —
+- **Coverage:** `test_rewrite_report_refused_while_locked`
 
 ### CORE-13: Судья отвергает заведомо плохой отчёт
 - **Status:** UNVERIFIED

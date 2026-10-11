@@ -502,3 +502,287 @@ def test_runlock_api(tmp_path):
     assert again.acquire() is True
     again.release()
     again.release()  # idempotent
+
+
+# ── Wave-1 fix round (W1-F1): seam/product certification findings ───────────
+
+async def test_research_run_wait_false_refuses_a_run_locked_elsewhere(wired):
+    store = ArtifactStore(wired / "live-elsewhere")
+    store.save_checkpoint(Checkpoint(run_id="live-elsewhere", runbook="mini-teardown"))
+    before = store.checkpoint_path.read_bytes()
+    with hold_run_lock(store.run_dir):
+        with pytest.raises(OrchestratorError, match="locked by another process"):
+            await srv.research_run("mini-teardown", BRIEF, "live-elsewhere", wait=False)
+        assert "live-elsewhere" not in srv._TASKS
+        status = srv._status_dict("live-elsewhere")
+    assert status["orphaned"] is False
+    assert status["active"] is True
+    assert store.checkpoint_path.read_bytes() == before
+
+
+def test_status_reports_a_true_orphan_as_orphaned_and_inactive(wired):
+    store = ArtifactStore(wired / "dead")
+    store.save_checkpoint(Checkpoint(run_id="dead", runbook="mini-teardown"))
+    status = srv._status_dict("dead")
+    assert status["orphaned"] is True
+    assert status["active"] is False
+
+
+async def test_wait_true_envelope_validates_against_the_published_schema(wired, monkeypatch):
+    import jsonschema
+    from pathlib import Path
+
+    schema = json.loads(
+        (Path(__file__).resolve().parent.parent / "fabric/schemas/capability-output.schema.json").read_text()
+    )
+    llm = FakeLLM()
+    llm.plan_payload = steps(1)
+    monkeypatch.setattr(srv, "_make_llm", lambda config: llm)
+    envelope = await srv.research_run("mini-teardown", BRIEF, "schema-env", wait=True)
+    errors = [e.message for e in jsonschema.Draft202012Validator(schema).iter_errors(envelope)]
+    assert errors == []
+    assert envelope["terminal_code"] == "completed"
+
+
+def test_reconcile_survives_an_unwritable_run_dir(wired):
+    import os
+    from research_agent.evidence.runlock import reconcile_orphans
+
+    stuck = ArtifactStore(wired / "a-stuck")
+    stuck.save_checkpoint(Checkpoint(run_id="a-stuck", runbook="mini-teardown"))
+    orphan = ArtifactStore(wired / "b-orphan")
+    orphan.save_checkpoint(Checkpoint(run_id="b-orphan", runbook="mini-teardown"))
+    os.chmod(stuck.run_dir, 0o500)
+    try:
+        marked = reconcile_orphans(wired)
+    finally:
+        os.chmod(stuck.run_dir, 0o755)
+    assert "b-orphan" in marked
+    assert orphan.load_checkpoint().status == "interrupted"
+
+
+def test_emit_allows_ordinary_names_that_contain_credential_words(caplog):
+    from research_agent.events import emit
+
+    with caplog.at_level(logging.INFO):
+        line = emit(logging.getLogger("t"), "x", keyword="a", keywords="b", input_tokens=3,
+                    output_tokens=4, tokens_in=1, tokens_out=2)
+    for field in ("keyword=a", "keywords=b", "input_tokens=3", "output_tokens=4", "tokens_in=1", "tokens_out=2"):
+        assert field in line
+    for bad in ("api_key", "key", "token", "access_token", "secret", "authorization", "password", "cookie"):
+        with pytest.raises(ValueError):
+            emit(logging.getLogger("t"), "x", **{bad: "v"})
+
+
+def test_emit_redacts_credentials_inside_error_values():
+    from research_agent.events import emit
+
+    line = emit(logging.getLogger("t"), "x",
+                error="401 Bearer abc.def from sk-or-v1-123456 and prowl_ABCDEF123")
+    assert "abc.def" not in line and "sk-or-v1-123456" not in line and "prowl_ABCDEF123" not in line
+    assert line.count("[redacted]") == 3
+
+
+async def test_usd_budget_stop_maps_to_budget_usd_end_to_end(wired):
+    prowl = FakeProwl()
+    prowl.cost_per_call = 0.30  # mini-usd allows $0.50
+    llm = FakeLLM()
+    llm.plan_payload = steps(4)
+    result = await Orchestrator(prowl, llm, runs_root=wired).run("mini-usd", BRIEF, run_id="usd")
+    assert result.status == "partial"
+    assert result.terminal_code == "budget_usd"
+
+
+async def test_minutes_budget_stop_maps_to_budget_minutes_end_to_end(wired, monkeypatch):
+    import research_agent.agent.orchestrator as orch_mod
+    from datetime import datetime as real_dt, timedelta, timezone
+
+    class Later(real_dt):
+        @classmethod
+        def now(cls, tz=None):
+            return real_dt.now(tz) + timedelta(minutes=31)
+
+    llm = FakeLLM()
+    llm.plan_payload = steps(2)
+    orchestrator = Orchestrator(FakeProwl(), llm, runs_root=wired)
+    real_plan = orchestrator._plan
+
+    async def plan_then_age(*args, **kwargs):
+        out = await real_plan(*args, **kwargs)
+        monkeypatch.setattr(orch_mod, "datetime", Later)
+        return out
+
+    monkeypatch.setattr(orchestrator, "_plan", plan_then_age)
+    result = await orchestrator.run("mini-teardown", BRIEF, run_id="minutes")
+    assert result.terminal_code == "budget_minutes"
+
+
+def test_budget_stop_texts_share_one_vocabulary():
+    from research_agent.evidence import terminal
+
+    for code in (terminal.BUDGET_TOOLS, terminal.BUDGET_USD, terminal.BUDGET_MINUTES):
+        assert terminal.code_for_stop_reason(terminal.budget_stop_text(code, 1)) == code
+    assert terminal.code_for_stop_reason(
+        terminal.budget_stop_text(terminal.BUDGET_USD, 0.5, note="estimated from catalog prices")
+    ) == terminal.BUDGET_USD
+
+
+def test_cli_commands_share_one_runs_root(wired, capsys, monkeypatch, tmp_path):
+    from research_agent.__main__ import main
+
+    elsewhere = tmp_path / "cwd"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)  # ./runs would be cwd/runs, RESEARCH_RUNS_DIR is wired
+    store = ArtifactStore(wired / "rooted")
+    store.save_checkpoint(Checkpoint(run_id="rooted", runbook="mini-teardown", status="complete"))
+    (store.run_dir / "report.md").write_text("# R\n", encoding="utf-8")
+    assert main(["report", "rooted"]) == 0
+    assert not (elsewhere / "runs").exists()
+
+
+def test_prune_deletes_through_a_tombstone_and_skips_os_errors(wired, capsys, monkeypatch):
+    import os
+    import shutil
+    from datetime import datetime, timedelta, timezone
+    from research_agent.__main__ import main
+
+    old = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat()
+    for rid in ("old-a", "old-b"):
+        s = ArtifactStore(wired / rid)
+        s.save_checkpoint(Checkpoint(run_id=rid, runbook="mini-teardown", status="complete", created_at=old))
+        cp = s.load_checkpoint(); cp.created_at = old
+        s.checkpoint_path.write_text(cp.model_dump_json(), encoding="utf-8")
+    real_rmtree = shutil.rmtree
+    seen = []
+
+    def rmtree(path, *a, **k):
+        seen.append(os.path.basename(str(path)))
+        if "old-b" in str(path):
+            raise OSError("synthetic busy")
+        return real_rmtree(path, *a, **k)
+
+    monkeypatch.setattr(shutil, "rmtree", rmtree)
+    assert main(["prune", "--older-than", "30d", "--yes"]) == 0
+    out = capsys.readouterr().out
+    assert all(name.startswith(".pruning-") for name in seen)
+    assert not (wired / "old-a").exists()
+    assert "skip" in out and "old-b" in out
+
+
+def _service_with_blocking_prowl(tmp_path, monkeypatch):
+    import research_agent.service.runtime as runtime_mod
+    from research_agent.service.runtime import Runtime
+    from research_agent.service.store import Store
+
+    monkeypatch.setenv("PROWL_API_KEY", "test-not-a-key")
+    monkeypatch.setenv("RESEARCH_LLM_API_KEY", "test-not-a-key")
+    monkeypatch.setenv("RESEARCH_NO_SUBAGENTS", "1")
+    prowl = BlockingProwl()
+    llm = FakeLLM()
+    llm.plan_payload = steps()
+
+    class FakeObservedProwl:
+        def __init__(self, *a, **k): pass
+        def observe(self, store, job): return prowl
+
+    class FakeObservedLLM:
+        def __init__(self, *a, **k): pass
+        def observe(self, store, job): return llm
+
+    monkeypatch.setattr(runtime_mod, "ObservedProwl", FakeObservedProwl)
+    monkeypatch.setattr(runtime_mod, "ObservedLLM", FakeObservedLLM)
+    store = Store(tmp_path)
+    return store, Runtime(store), prowl
+
+
+async def test_service_timeout_has_its_own_code_and_carries_terminal_code(tmp_path, monkeypatch, patched_runbooks):
+    from research_agent.service.store import Store
+
+    store, rt, prowl = _service_with_blocking_prowl(tmp_path, monkeypatch)
+    real_job = Store.job
+
+    def short_timeout(self, job_id):
+        job = real_job(self, job_id)
+        if job is not None and job.get("config"):
+            job["config"] = {**job["config"], "timeout_minutes": 0.02}
+        return job
+
+    monkeypatch.setattr(Store, "job", short_timeout)
+    try:
+        job = rt.create({"kind": "research", "runbook": "mini-teardown", "inputs": BRIEF}, "timeout-live")
+        rt.decide(job["id"], job["proposal"]["digest"], True)
+        await asyncio.gather(*list(rt.tasks.values()), return_exceptions=True)
+        record = store.job(job["id"])
+        assert record["status"] == "failed"
+        assert record["error"]["code"] == "timeout"
+        assert record["error"]["terminalCode"] == "cancelled"
+        assert ArtifactStore(tmp_path / "runs" / job["id"]).load_checkpoint().terminal_code == "cancelled"
+    finally:
+        await rt.close()
+        store.db.close()
+
+
+async def test_service_shutdown_marks_job_interrupted_and_checkpoint_cancelled(tmp_path, monkeypatch, patched_runbooks):
+    store, rt, prowl = _service_with_blocking_prowl(tmp_path, monkeypatch)
+    try:
+        job = rt.create({"kind": "research", "runbook": "mini-teardown", "inputs": BRIEF}, "close-live")
+        rt.decide(job["id"], job["proposal"]["digest"], True)
+        await asyncio.wait_for(prowl.entered.wait(), timeout=10)
+        await rt.close()
+        record = store.job(job["id"])
+        assert record["phase"] == "interrupted"
+        assert record["error"]["terminalCode"] == "cancelled"
+        assert ArtifactStore(tmp_path / "runs" / job["id"]).load_checkpoint().terminal_code == "cancelled"
+    finally:
+        store.db.close()
+
+
+async def test_pre_checkpoint_status_cancelled_and_running_arms():
+    async def forever():
+        await asyncio.sleep(3600)
+
+    running = asyncio.create_task(forever())
+    await asyncio.sleep(0)
+    live = srv._pre_checkpoint_status("starting", running)
+    assert live["status"] == "running" and live["active"] is True and live["has_checkpoint"] is False
+    running.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await running
+    gone = srv._pre_checkpoint_status("starting", running)
+    assert gone["status"] == "partial" and gone["terminal_code"] == "cancelled" and gone["active"] is False
+
+
+def test_prune_refuses_at_delete_time_when_a_run_took_the_lock(wired, capsys, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    import research_agent.__main__ as cli
+
+    old = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat()
+    s = ArtifactStore(wired / "late-start")
+    cp = Checkpoint(run_id="late-start", runbook="mini-teardown", status="complete", created_at=old)
+    s.save_checkpoint(cp)
+    cp.created_at = old
+    s.checkpoint_path.write_text(cp.model_dump_json(), encoding="utf-8")
+    monkeypatch.setattr("research_agent.evidence.runlock.is_locked_elsewhere", lambda run_dir: False)  # the scan saw it free
+    with hold_run_lock(s.run_dir):
+        assert cli.main(["prune", "--older-than", "30d", "--yes"]) == 0
+    assert s.run_dir.exists()
+    assert "lock held" in capsys.readouterr().out
+
+
+def test_write_terminal_leaves_a_foreign_runbook_alone_and_never_raises(tmp_path, monkeypatch):
+    store = ArtifactStore(tmp_path / "foreign")
+    store.save_checkpoint(Checkpoint(run_id="foreign", runbook="other-runbook"))
+    before = store.checkpoint_path.read_bytes()
+    Orchestrator._write_terminal(store, "mini-teardown", status="failed", partial=None,
+                                 stop_reason="boom", code="error")
+    assert store.checkpoint_path.read_bytes() == before
+
+    mine = ArtifactStore(tmp_path / "mine")
+    mine.save_checkpoint(Checkpoint(run_id="mine", runbook="mini-teardown"))
+
+    def broken(checkpoint):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(mine, "save_checkpoint", broken)
+    Orchestrator._write_terminal(mine, "mini-teardown", status="failed", partial=None,
+                                 stop_reason="boom", code="error")  # must not raise

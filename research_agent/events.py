@@ -17,7 +17,18 @@ from typing import Any
 
 MAX_VALUE_CHARS = 200
 
-_CREDENTIAL_KEY = re.compile(r"(?i)key|token|secret|authorization|password|cookie")
+#: A key is credential-like when one of its `_`-separated segments is a credential
+#: word (optionally plural): `api_key`, `access_token`, `secret` are refused;
+#: `keyword`, `input_tokens`, `tokens_in` are ordinary usage fields and pass.
+_CREDENTIAL_KEY = re.compile(
+    r"(?i)(?:^|_)(?:api_?key|key|token|secret|authorization|auth|password|passwd|cookie|credential)s?(?:_|$)"
+)
+_USAGE_KEYS = frozenset({"input_tokens", "output_tokens", "tokens_in", "tokens_out", "total_tokens"})
+#: Credential-shaped substrings scrubbed from free-text values (exception text can
+#: carry a provider response or a header).
+_CREDENTIAL_VALUE = re.compile(
+    r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+|\bsk-[A-Za-z0-9_-]{6,}|\bprowl_[A-Za-z0-9_-]{6,}"
+)
 _NEEDS_QUOTES = re.compile(r"[\s=]")
 
 
@@ -28,7 +39,7 @@ def _strict() -> bool:
 def _format_value(value: Any) -> str:
     if value is None or isinstance(value, (bool, int, float)):
         return str(value)
-    text = str(value)[:MAX_VALUE_CHARS]
+    text = _CREDENTIAL_VALUE.sub("[redacted]", str(value))[:MAX_VALUE_CHARS]
     if not text or _NEEDS_QUOTES.search(text):
         return repr(text)
     return text
@@ -38,7 +49,7 @@ def emit(logger: logging.Logger, event: str, level: int = logging.INFO, **fields
     """Log one `event=<name> k=v …` line and return it."""
     parts = [f"event={event}"]
     for key, value in fields.items():
-        if _CREDENTIAL_KEY.search(key):
+        if key not in _USAGE_KEYS and _CREDENTIAL_KEY.search(key):
             if _strict():
                 raise ValueError(
                     f"event {event!r}: field {key!r} looks like a credential and is never logged"

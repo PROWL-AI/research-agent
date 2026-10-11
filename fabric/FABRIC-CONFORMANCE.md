@@ -79,6 +79,16 @@ The live surface the bundle declares exists and is testable offline:
 surfaces; `python scripts/validate_runbooks.py --offline` passes. These
 receipts assert behavior, not host interop.
 
+## 2026-10-11 — wave 1 (run ownership)
+
+- `capability-output.schema.json`: gains `terminal_code` (closed enum, null while
+  running); `interrupted` now means the owning process exited with its run lock
+  free — a graceful shutdown writes `partial` + `cancelled`.
+  `capability-input.schema.json`: `run_id` states that a run locked by another
+  process is refused. Neither file is referenced by `fabric-agent.json`, so the
+  provider `contentHash` is unchanged. Coverage:
+  `tests/test_ka_contracts.py::test_wait_true_envelope_validates_against_the_published_schema`.
+
 ## Canary binding expectation
 
 When a Fabric host admits this provider, it enters under a canary binding — a

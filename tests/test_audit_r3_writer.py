@@ -503,11 +503,9 @@ class TestCliHonesty:
         done.status = "complete"
         ArtifactStore(tmp_path / "runs" / "r3-done1").save_checkpoint(done)
 
-        async def boom(self, runbook_name, inputs, run_id=None):
-            raise OrchestratorError(f"run r3-done1 already finished with status 'complete'")
-
-        monkeypatch.setattr("research_agent.agent.orchestrator.Orchestrator.run", boom)
-
+        monkeypatch.delenv("RESEARCH_RUNS_DIR", raising=False)
+        # The real orchestrator refuses the finished run before planning; the
+        # guard under test is its precondition check, not a stub's.
         assert main(["run", "mini-teardown", "--run-id", "r3-done1",
                      "--competitors", "a.com"]) == 1
         checkpoint = json.loads((tmp_path / "runs" / "r3-done1" / "checkpoint.json").read_text())

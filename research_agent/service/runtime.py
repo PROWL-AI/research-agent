@@ -11,6 +11,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from research_agent.evidence.store import ArtifactStore
 from research_agent.agent.orchestrator import Orchestrator, build_brief
 from research_agent.config import Config, ConfigError
 from research_agent.llm import LLMClient, LLMError
@@ -220,10 +221,24 @@ class Runtime:
                 self.store.transition(job_id, "completed", "completed", result=envelope)
         except asyncio.CancelledError:
             if self.store.job(job_id)["status"] == "working":
-                self.store.transition(job_id, "failed", "interrupted", error={"code": "interrupted", "message": "Execution interrupted; upstream outcome may be unknown. No automatic retry."})
+                self.store.transition(job_id, "failed", "interrupted", error=self._with_terminal(job_id, {"code": "interrupted", "message": "Execution interrupted; upstream outcome may be unknown. No automatic retry."}))
             raise
+        except TimeoutError:
+            self.store.transition(job_id, "failed", "failed", error=self._with_terminal(job_id, {"code": "timeout", "message": "Wall-clock timeout reached; gathered evidence stays in the run checkpoint. No automatic retry."}))
         except Exception as exc:
-            self.store.transition(job_id, "failed", "failed", error={"code": "execution-failed", "message": type(exc).__name__ + ": inspect call receipts and provider health; no automatic retry."})
+            self.store.transition(job_id, "failed", "failed", error=self._with_terminal(job_id, {"code": "execution-failed", "message": type(exc).__name__ + ": inspect call receipts and provider health; no automatic retry."}))
+
+    def _with_terminal(self, job_id, error):
+        """A research job's error carries the run checkpoint's terminal_code, so the
+        job view and research.artifact.get name the same outcome (docs/FABRIC.md,
+        "Job phase and run terminal state")."""
+        try:
+            checkpoint = ArtifactStore(self.store.root / "runs" / job_id).load_checkpoint()
+        except (ValueError, OSError):
+            checkpoint = None
+        if checkpoint is not None and checkpoint.terminal_code:
+            error = {**error, "terminalCode": checkpoint.terminal_code}
+        return error
 
     async def tutorial(self, job):
         rows = [{"domain": "example.org", "visits": 12800, "change_pct": 8.4},

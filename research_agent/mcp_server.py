@@ -33,13 +33,14 @@ from mcp.server.fastmcp import FastMCP
 from research_agent.agent.orchestrator import (
     InputError,
     Orchestrator,
+    OrchestratorError,
     RunResult,
     build_brief,
 )
 from research_agent.config import Config, ConfigError
 from research_agent.events import emit
 from research_agent.evidence import terminal
-from research_agent.evidence.runlock import reconcile_orphans
+from research_agent.evidence.runlock import is_locked_elsewhere, reconcile_orphans
 from research_agent.evidence.store import ArtifactStore, validate_run_id
 from research_agent.llm import LLMClient
 from research_agent.prowl_client import ProwlClient
@@ -198,6 +199,12 @@ async def research_run(
             f"run '{run_id}' already finished with status 'complete' — "
             "choose a new run_id"
         )
+    # A run another process owns (a CLI run, another server) must be refused
+    # here, synchronously: with wait=false the orchestrator's own refusal would
+    # only reach this server's log, and the caller would be told "running".
+    if await asyncio.to_thread(is_locked_elsewhere, _runs_root() / run_id):
+        emit(log, "run.lock.refused", level=logging.WARNING, run_id=run_id, surface="mcp")
+        raise OrchestratorError(f"run {run_id} is locked by another process")
     # running-without-a-live-task / partial / failed / interrupted with a
     # recorded plan: the orchestrator resumes from the checkpoint and
     # re-executes only the steps that never completed. Without a plan the run
@@ -269,6 +276,7 @@ def _pre_checkpoint_status(run_id: str, task: asyncio.Task) -> dict[str, Any]:
         "stop_reason": stop_reason,
         "terminal_code": code,
         "orphaned": False,
+        "active": not task.done(),
         "has_checkpoint": False,
         "planned_steps": 0,
         "completed_steps": [],
@@ -299,8 +307,12 @@ def _status_dict(run_id: str) -> dict[str, Any]:
         duration_s = None
     # A checkpoint left 'running' with no live task behind it (e.g. the server
     # restarted mid-run) is orphaned, not in progress.
+    # Liveness is the run lock, not this process's task table: a run another
+    # process is executing is active, never orphaned.
     task = _TASKS.get(run_id)
-    orphaned = checkpoint.status == "running" and (task is None or task.done())
+    live_here = task is not None and not task.done()
+    active = live_here or is_locked_elsewhere(_runs_root() / run_id)
+    orphaned = checkpoint.status == "running" and not active
     return {
         "run_id": run_id,
         "runbook": checkpoint.runbook,
@@ -309,6 +321,7 @@ def _status_dict(run_id: str) -> dict[str, Any]:
         "stop_reason": checkpoint.stop_reason,
         "terminal_code": checkpoint.terminal_code,
         "orphaned": orphaned,
+        "active": active,
         "has_checkpoint": True,
         "planned_steps": len(checkpoint.plan),
         "completed_steps": checkpoint.completed_steps,
@@ -320,7 +333,10 @@ def _status_dict(run_id: str) -> dict[str, Any]:
 
 @mcp.tool(name="research.get_status")
 async def research_get_status(run_id: str) -> dict[str, Any]:
-    """Status of a run from its checkpoint: steps, counters, duration."""
+    """Status of a run: from its checkpoint (steps, counters, duration, terminal_code,
+    active = some process holds the run lock), or — before a checkpoint exists — from
+    this server's in-process job (has_checkpoint=false: still starting, or failed /
+    cancelled before it took the run lock)."""
     return await asyncio.to_thread(_status_dict, run_id)
 
 

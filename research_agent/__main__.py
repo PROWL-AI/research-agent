@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import re
 import shutil
 import sys
@@ -14,6 +15,12 @@ from pathlib import Path
 from research_agent.config import Config, ConfigError
 from research_agent.evidence.store import validate_run_id
 from research_agent.runbook import RunbookError, list_runbooks
+
+
+def _runs_root() -> Path:
+    """One runs root for every command, the same one the stdio server uses:
+    RESEARCH_RUNS_DIR, else ./runs."""
+    return Path(os.environ.get("RESEARCH_RUNS_DIR", "runs"))
 
 log = logging.getLogger(__name__)
 
@@ -189,7 +196,7 @@ async def _cmd_run(runbook_name: str, inputs: dict[str, object], run_id: str | N
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    _reconcile(Path("runs"))
+    _reconcile(_runs_root())
     # Generate the id up front (same shape as the orchestrator's) so every
     # error message below names the run. The orchestrator itself records a
     # crashed run's terminal state under the run lock; the CLI only reports.
@@ -203,7 +210,7 @@ async def _cmd_run(runbook_name: str, inputs: dict[str, object], run_id: str | N
         model_cheap=config.llm_model,
         model_strong=config.llm_model_strong,
     ) as llm:
-        orchestrator = Orchestrator(prowl, llm, runs_root=Path("runs"))
+        orchestrator = Orchestrator(prowl, llm, runs_root=_runs_root())
         try:
             result = await orchestrator.run(runbook_name, inputs, run_id=run_id)
         except RunbookError as exc:
@@ -240,7 +247,7 @@ def _cmd_status(run_id: str) -> int:
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    from research_agent.mcp_server import _runs_root, _status_dict
+    from research_agent.mcp_server import _status_dict
 
     _reconcile(_runs_root())
     try:
@@ -271,7 +278,7 @@ def _cmd_report(run_id: str) -> int:
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    report_path = Path("runs") / run_id / "report.md"
+    report_path = _runs_root() / run_id / "report.md"
     if not report_path.is_file():
         print(f"error: no report at {report_path}", file=sys.stderr)
         return 1
@@ -303,7 +310,7 @@ async def _cmd_rewrite(run_id: str) -> int:
         model_strong=config.llm_model_strong,
     ) as llm:
         try:
-            outcome = await rewrite_report(llm, Path("runs"), run_id)
+            outcome = await rewrite_report(llm, _runs_root(), run_id)
         except (RewriteError, RunbookError, OrchestratorError) as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 1
@@ -322,7 +329,7 @@ def _cmd_export(run_id: str, fmt: str) -> int:
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    run_dir = Path("runs") / run_id
+    run_dir = _runs_root() / run_id
     if fmt == "md":
         report_path = run_dir / "report.md"
         if not report_path.is_file():
@@ -360,7 +367,7 @@ def _cmd_prune(older_than: str, keep_last: int, yes: bool) -> int:
     from research_agent.evidence.runlock import RunLock, is_locked_elsewhere
     from research_agent.evidence.store import ArtifactStore
 
-    runs_root = Path("runs")
+    runs_root = _runs_root()
     if not runs_root.is_dir():
         print("no runs/ directory — nothing to prune")
         return 0
@@ -410,8 +417,22 @@ def _cmd_prune(older_than: str, keep_last: int, yes: bool) -> int:
             print(f"skip    {run_dir.name}: lock held (status={status})")
             continue
         try:
+            # Rename first, under the lock: a run that reuses this id after the
+            # rename gets a fresh dir and a lock of its own, never our rmtree.
+            tombstone = run_dir.with_name(
+                f".pruning-{run_dir.name}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}"
+            )
+            try:
+                run_dir.rename(tombstone)
+            except OSError as exc:
+                print(f"skip    {run_dir.name}: {exc}")
+                continue
             print(f"delete  {run_dir.name}: {age.days}d old, status={status}")
-            shutil.rmtree(run_dir)
+            try:
+                shutil.rmtree(tombstone)
+            except OSError as exc:
+                print(f"skip    {run_dir.name}: tombstone {tombstone.name} not removed: {exc}")
+                continue
             deleted += 1
         finally:
             lock.release()

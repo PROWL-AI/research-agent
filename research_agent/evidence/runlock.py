@@ -135,7 +135,14 @@ def reconcile_orphans(runs_root: Path | str) -> list[str]:
         if checkpoint is None or checkpoint.status != "running":
             continue
         lock = RunLock(run_dir)
-        if not lock.acquire(blocking=False):
+        try:
+            acquired = lock.acquire(blocking=False)
+        except OSError as exc:
+            # An unwritable or foreign-owned run dir must not stop a server from
+            # starting: report it and reconcile the rest.
+            emit(log, "run.reconcile.failed", logging.WARNING, run_id=checkpoint.run_id, error=exc)
+            continue
+        if not acquired:
             emit(log, "run.reconcile.skipped_active", run_id=checkpoint.run_id)
             continue
         try:
@@ -150,7 +157,11 @@ def reconcile_orphans(runs_root: Path | str) -> list[str]:
             checkpoint.partial = True
             checkpoint.stop_reason = ORPHAN_STOP_REASON
             checkpoint.terminal_code = terminal.INTERRUPTED
-            store.save_checkpoint(checkpoint)
+            try:
+                store.save_checkpoint(checkpoint)
+            except OSError as exc:
+                emit(log, "run.reconcile.failed", logging.WARNING, run_id=checkpoint.run_id, error=exc)
+                continue
             emit(
                 log, "run.reconcile.interrupted", logging.WARNING,
                 run_id=checkpoint.run_id, status=checkpoint.status,
