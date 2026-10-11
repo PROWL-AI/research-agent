@@ -1,7 +1,7 @@
 {
   "schema": "task-pipeline/waves-inventory/1",
   "topic": "research-agent — close every open item in its final form",
-  "measured_at": "2026-10-11",
+  "measured_at": "2026-10-11 (re-measured after wave 1)",
   "measured_on": "c0dfb6e8be132c961f50c030c8b352f1d1d27dc3",
   "measurement": {
     "suite": ".venv/bin/python -m pytest tests/ -q → 328 passed",
@@ -15,103 +15,111 @@
       "id": "KA-06",
       "title": "A non-owner process rewrites the active owner's checkpoint (MCP exception/cancel handlers, startup reconciliation, CLI _mark_run_failed)",
       "source": "research_agent/mcp_server.py:119-148,327-354; research_agent/__main__.py:163-182",
-      "status": "open — probe red at c0dfb6e",
+      "status": "closed",
       "area": "lifecycle",
       "node": "N-OWN",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — 675e769 (build) + 583f1d1 (fix round); probe KA-06 ×2 green"
     },
     {
       "id": "B-009",
       "title": "Orphans: a crashed CLI run stays running until a stdio server starts; service run dirs are never reconciled; service cancel/timeout leaves runs/<job>/checkpoint.json at running",
       "source": "research_agent/service/runtime.py:186-190,221-226; research_agent/__main__.py",
-      "status": "open",
+      "status": "closed",
       "area": "lifecycle",
       "node": "N-OWN",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — 675e769 + 583f1d1"
     },
     {
       "id": "B-010",
       "title": "rewrite_report writes report.md and the checkpoint without the run lock",
       "source": "research_agent/agent/writer.py:463-492",
-      "status": "open",
+      "status": "closed",
       "area": "lifecycle",
       "node": "N-OWN",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — 675e769"
     },
     {
       "id": "B-011",
       "title": "README stale: 304 tests at 1dced8e, stdio tool count only (service has 7), Fabric section after License",
       "source": "README.md:155,10-12,81,174-176",
-      "status": "open",
+      "status": "closed",
       "area": "docs",
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — 675e769 + 583f1d1"
     },
     {
       "id": "B-012",
       "title": "mcp_server.py module docstring says the Fabric bundle declares stdio; the manifest points at the HTTP service",
       "source": "research_agent/mcp_server.py:1-9; fabric-agent.json",
-      "status": "open",
+      "status": "closed",
       "area": "docs",
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — 675e769"
     },
     {
       "id": "B-013",
       "title": "FABRIC.md says register MCP in ~/.config/agentgateway/servers.yaml — retired route (machine-03: new servers go in each agent's own config; scoped dev.agentgateway.prowl runs)",
       "source": "docs/FABRIC.md:81",
-      "status": "open",
+      "status": "closed",
       "area": "docs",
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — 675e769"
     },
     {
       "id": "B-015",
       "title": "UX scenarios cover only the dashboard; core journeys (CLI/MCP run, resume, terminal states, verified semantics, budget stop, judge) have none",
       "source": "docs/ux/scenarios.md:9-16",
-      "status": "open",
+      "status": "closed",
       "area": "ux",
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — 675e769 (CORE-01..13); CORE-01/03/12 PASS@583f1d1"
     },
     {
       "id": "B-016",
       "title": "BRIEF stops at FD-11; FD-12…FD-14 and every FD status live only in the parent plan and HANDOFF",
       "source": "docs/evidence/fabric-dashboard/BRIEF.md:37-47",
-      "status": "open",
+      "status": "closed",
       "area": "docs",
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — 675e769"
     },
     {
       "id": "B-018",
       "title": "No wiki project card and no agent-estate entry for prowl-research (global rule: read/update before agent planning)",
       "source": "operator's projects wiki (private): no card for this agent",
-      "status": "open",
+      "status": "in-flight — wiki card committed locally in the projects vault; push blocked by unrelated vault divergence (vault owner)",
       "area": "knowledge",
       "node": "N-DOCS",
       "blocked_by": [],
@@ -123,7 +131,7 @@
       "id": "B-024",
       "title": "Contract probes live outside tests/ (deep probes in docs/reports, resume probes only in prowl-app); move each into tests/ as its fix lands, keep the diagnostic cut",
       "source": "docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py; prowl-app probe_research_resume.py",
-      "status": "open",
+      "status": "in-flight — KA-06 contracts in tests/ (675e769); remaining probes move with waves 2–3",
       "area": "tests",
       "node": "N-DOCS",
       "blocked_by": [],
@@ -135,25 +143,27 @@
       "id": "B-030",
       "title": "Bare research.* tool names are ambiguous across the estate; document addressing by service id prowl-research.default / PROWL-AI/research-agent; no rename (provider contentHash binds names)",
       "source": "fabric/ capability declarations",
-      "status": "open",
+      "status": "closed",
       "area": "docs",
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — 675e769 + 12df501 (no private names)"
     },
     {
       "id": "B-031",
       "title": "No hosted CI workflow in this repository; VERIFICATION 'Hosted CI NOT_RUN' has no workflow behind it. Add a nightly-only workflow (estate policy 23:00 Europe/Warsaw, no push/PR triggers)",
       "source": ".github/workflows absent; docs/evidence/fabric-dashboard/VERIFICATION.md:20",
-      "status": "open",
+      "status": "closed",
       "area": "ci",
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — 675e769 (workflow file); hosted run NOT_RUN until it reaches main"
     },
     {
       "id": "KA-03",

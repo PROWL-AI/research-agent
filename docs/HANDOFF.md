@@ -6,21 +6,21 @@ Objective: close every open item of this agent in its final form, in waves
 (`/task-pipeline waves`), each followed by independent verification.
 
 - Plan: [`specs/2026-10-11-waves-canvas.md`](specs/2026-10-11-waves-canvas.md) — target state, seams,
-  six waves with exit criteria, operator questions Q1–Q5.
+  waves with exit criteria, §7a wave status, operator questions (§8).
 - Inventory: [`specs/2026-10-11-waves-inventory.json`](specs/2026-10-11-waves-inventory.json)
-  (48 items, `python3 scripts/plan/assign_waves.py --check`). Board: [`evidence/backlog.md`](evidence/backlog.md).
-- Measured at `c0dfb6e`: suite 328 passed; contract probes 9 + 3 red (KA-03…KA-12 all open).
-- Done: wave 0 (survey, inventory, canvas, board) at `ba62421`; task packets for wave 1
-  ([`specs/waves/`](specs/waves/)).
-- Not done: wave 1 build. Both developer agents stopped before their first edit
-  (API session limit, resets 22:00 Europe/Warsaw); the machine disk was at 132 MiB free
-  (swap 23.4 of 25 GB) — free space before building.
-- **Exact next task:** run [`specs/waves/W1-T1-run-ownership.md`](specs/waves/W1-T1-run-ownership.md)
-  and [`specs/waves/W1-T2-docs-scenarios-ci.md`](specs/waves/W1-T2-docs-scenarios-ci.md) in parallel
-  (disjoint files), then the wave-1 close pass from the canvas §7.
-- Operator decisions pending: Q1 merge policy, Q2 dashboard kit, Q3 keys, Q4 USD 15, Q5 host update.
-- Cross-agent: B-001 (model profiles, waits on Fabric T1–T3), B-020 (forwarded to fabric-b4),
-  B-026 (fixed upstream in Observatory, awaiting its release).
+  (`python3 scripts/plan/assign_waves.py --check`; 38 of 48 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
+- **Wave 1 closed** at `583f1d1` (build `675e769`): run-lock ownership (KA-06, B-009, B-010),
+  terminal_code, structured events, honest docs, CORE scenarios, nightly CI file.
+  Suite 370 passed; deep probes 7 failed / 5 passed (KA-07…KA-12 open).
+- Installed service still runs `891fbc9`: reinstall after the next wave so reconciliation
+  under the lock applies there; client sessions started before wave 1 run old stdio code.
+- **Exact next task:** [`specs/waves/W2-T1-checkpoint-v2-attempt-ledger.md`](specs/waves/W2-T1-checkpoint-v2-attempt-ledger.md)
+  (KA-03/04/05/10/11/12), then the wave-2 close pass (three blind tiers; the seam tier also
+  re-reads wave 1's fix round).
+- Operator decisions pending (canvas §8): Q1 merge policy, Q2 dashboard kit, Q4 USD 15,
+  Q5 host update, Q6 history rewrite. Q3 closed from sources (agents issue keys via Observatory).
+- Cross-agent: B-001 (model profiles, waits on Fabric T1–T3), B-020 (with the Fabric plan
+  owner), B-026 (fixed upstream in Observatory, awaiting its release).
 
 ---
 

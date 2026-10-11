@@ -339,6 +339,13 @@ The final close (stages 9–10): docs + wiki + code graph, the ladder walk per R
 plan's KA rows updated with SHAs and receipts, and an **independent observer** agent that reads
 only the REQ table, this canvas and the repository and rules whether the system meets the goal.
 
+## 7a. Wave status (marked at each close pass)
+
+| Wave | State | Commits | Certification | Measured after |
+|---|---|---|---|---|
+| 1 | **closed** | `675e769` build, `583f1d1` fix round, `12df501` privacy fix | unit pass; seam fail → 2 breaks fixed; product fail → 7 findings fixed (fix round re-tested by its own tests; blind re-reading folded into wave 2's seam tier) | suite 370 passed; deep probes 7 failed / 5 passed; inventory 38 of 48 open |
+| 2 | next | — | — | — |
+
 ## 8. Operator decisions (one batch)
 
 Recorded in [`docs/evidence/backlog.md`](../evidence/backlog.md); a go that leaves one unanswered takes
@@ -350,6 +357,7 @@ the recommendation as **assumed**, and the waves that depend on it name it.
 | Q2 | Dashboard kit 1.0.0 upgrade + the launchd restart it implies | yes, in wave 5 | dashboard stays legacy 480 px, B-002 waived | 5 |
 | Q3 | ~~Keys for FD-13~~ — **resolved from the sources**: agents issue keys through Observatory doors (operator rule 2026-10-11); no operator action | — | — | 5 |
 | Q4 | Wave-6 budget: USD 15 total (2 live runs × ~$3.5 tool+LLM, judge calibration ~$3, one re-run) | yes | name another amount | 6 |
+| Q6 | Rewrite the pushed public history of this repository to drop private estate names and home paths found in `ba62421`…`675e769` (force-push) — or keep the forward fix only | forward fix only (history rewrite breaks every clone and needs your explicit go) | names stay readable in old commits | — |
 | Q5 | Fabric Dashboards host 0.6.7 → 0.7.1 (your administration) and one look at the native panel | yes, at wave 6 | FD-14 stays NOT_VERIFIED | 6 |
 
 ## 9. Revisions
@@ -357,5 +365,6 @@ the recommendation as **assumed**, and the waves that depend on it name it.
 | Date | Change | Why |
 |---|---|---|
 | 2026-10-11 | canvas created from the wave-0 survey at `c0dfb6e` | first cut |
+| 2026-10-11 | Wave 1 closed (`583f1d1`); W2 packet is next; one runs root for CLI and stdio (W1-F1 item 9) | close pass |
 | 2026-10-11 | Wave-1 certification: private estate names and home paths removed from public docs (forward fix; pushed history keeps them — operator decision); non-loopback callers treated as T2 until T1 enrollment is provable | product tier finding on `675e769` |
 | 2026-10-11 | FD-12 scoped by trust tier (token optional on loopback, required beyond it); FD-13 moved to wave 5 as agent work; Q3 closed | ADR-0144 amendment 4 (`19ad05ca`); operator rule on key issuing (global instructions, 2026-10-11) |

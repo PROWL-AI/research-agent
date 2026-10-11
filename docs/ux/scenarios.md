@@ -171,9 +171,9 @@
 
 | ID | Title | Wave | Status |
 |---|---|---|---|
-| CORE-01 | Запуск до терминального состояния (CLI, stdio MCP) | 1 | PASS@W1F1 |
+| CORE-01 | Запуск до терминального состояния (CLI, stdio MCP) | 1 | PASS@583f1d1 |
 | CORE-02 | Запуск через Fabric `research.run`: исход совпадает с ядром | 4 | UNVERIFIED |
-| CORE-03 | Второй процесс не меняет живой прогон | 1 | PASS@W1F1 |
+| CORE-03 | Второй процесс не меняет живой прогон | 1 | PASS@583f1d1 |
 | CORE-04 | Осиротевший прогон → `interrupted` → продолжение | 1, 2 | UNVERIFIED |
 | CORE-05 | Продолжение после сбоя не платит дважды | 2 | UNVERIFIED |
 | CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | UNVERIFIED |
@@ -182,11 +182,11 @@
 | CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | UNVERIFIED |
 | CORE-10 | Конфликт остаётся конфликтом | 3 | UNVERIFIED |
 | CORE-11 | Потеря доказательств → `partial`, не `complete` | 2 | UNVERIFIED |
-| CORE-12 | Переписать отчёт активного прогона нельзя | 1 | PASS@W1F1 |
+| CORE-12 | Переписать отчёт активного прогона нельзя | 1 | PASS@583f1d1 |
 | CORE-13 | Судья отвергает заведомо плохой отчёт | 6 | UNVERIFIED |
 
 ### CORE-01: Запуск до терминального состояния (CLI, stdio MCP)
-- **Status:** PASS@W1F1
+- **Status:** PASS@583f1d1
 - **Actor:** оператор (P-01) в терминале; вызывающий агент через stdio MCP
 - **Trigger:** `prowl-research run <runbook>` или вызов stdio MCP `research.run`
 - **Preconditions:** runbook проходит `prowl-research validate`; ключи заданы.
@@ -212,7 +212,7 @@
 - **Coverage:** волна 1 (терминальная запись при отмене, таймауте и остановке сервиса): `test_service_cancel_reaches_the_orchestrator`, `test_service_timeout_has_its_own_code_and_carries_terminal_code`, `test_service_shutdown_marks_job_interrupted_and_checkpoint_cancelled`; соответствие `outcome` — волна 4
 
 ### CORE-03: Второй процесс не меняет живой прогон
-- **Status:** PASS@W1F1
+- **Status:** PASS@583f1d1
 - **Actor:** оператор (P-01) или вызывающий агент, случайно запустивший второй процесс
 - **Trigger:** второй `prowl-research run <runbook> --run-id <id>` (или stdio MCP `research.run` с тем же `run_id`) при живом первом процессе
 - **Preconditions:** первый процесс держит блокировку прогона (`RunLock`).
@@ -321,7 +321,7 @@
 - **Coverage:** —
 
 ### CORE-12: Переписать отчёт активного прогона нельзя
-- **Status:** PASS@W1F1
+- **Status:** PASS@583f1d1
 - **Actor:** оператор (P-01)
 - **Trigger:** `prowl-research rewrite <run_id>` при живом прогоне
 - **Preconditions:** прогон держит `RunLock`.

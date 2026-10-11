@@ -11,17 +11,8 @@
 | id | What | Source | Size | Sev | Blast | Age | Prio | State | Home |
 |---|---|---|---|---|---|---|---|---|---|
 | B-001 | LLM model slots move from env-configured role models to named estate model profiles resolved by the fabric kit; the LLM limit (KA-G01) becomes the profile's key route with an Observatory key and its model allow-list | cross-session request from an estate agent, 2026-10-11 (operator's request); runner and model-profile proposal (private estate document) | M | 2 | 3 | 0 | 6 | waived — revisit: Fabric's ADR, contract DEC CT-05 and the kit resolver (T1–T3) land | — |
-| B-009 | Orphans: a crashed CLI run stays running until a stdio server starts; service run dirs are never reconciled; service cancel/timeout leaves runs/<job>/checkpoint.json at running | wave-0 survey 2026-10-11 · `research_agent/service/runtime.py:186-190,221-226; research_agent/__main__.py` | M | 2 | 3 | 0 | 6 | open | wave 1 |
-| B-010 | rewrite_report writes report.md and the checkpoint without the run lock | wave-0 survey 2026-10-11 · `research_agent/agent/writer.py:463-492` | S | 2 | 2 | 0 | 4 | open | wave 1 |
-| B-011 | README stale: 304 tests at 1dced8e, stdio tool count only (service has 7), Fabric section after License | wave-0 survey 2026-10-11 · `README.md:155,10-12,81,174-176` | S | 1 | 1 | 0 | 1 | open | wave 1 |
-| B-012 | mcp_server.py module docstring says the Fabric bundle declares stdio; the manifest points at the HTTP service | wave-0 survey 2026-10-11 · `research_agent/mcp_server.py:1-9; fabric-agent.json` | S | 1 | 1 | 0 | 1 | open | wave 1 |
-| B-013 | FABRIC.md says register MCP in ~/.config/agentgateway/servers.yaml — retired route (machine-03: new servers go in each agent's own config; scoped dev.agentgateway.prowl runs) | wave-0 survey 2026-10-11 · `docs/FABRIC.md:81` | S | 1 | 1 | 0 | 1 | open | wave 1 |
-| B-015 | UX scenarios cover only the dashboard; core journeys (CLI/MCP run, resume, terminal states, verified semantics, budget stop, judge) have none | wave-0 survey 2026-10-11 · `docs/ux/scenarios.md:9-16` | M | 2 | 2 | 0 | 4 | open | wave 1 |
-| B-016 | BRIEF stops at FD-11; FD-12…FD-14 and every FD status live only in the parent plan and HANDOFF | wave-0 survey 2026-10-11 · `docs/evidence/fabric-dashboard/BRIEF.md:37-47` | S | 1 | 1 | 0 | 1 | open | wave 1 |
-| B-018 | No wiki project card and no agent-estate entry for prowl-research (global rule: read/update before agent planning) | wave-0 survey 2026-10-11 · `operator's projects wiki (private): no card for this agent` | S | 1 | 3 | 0 | 3 | open | wave 1 |
-| B-024 | Contract probes live outside tests/ (deep probes in docs/reports, resume probes only in prowl-app); move each into tests/ as its fix lands, keep the diagnostic cut | wave-0 survey 2026-10-11 · `docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py; prowl-app probe_research_resume.py` | S | 1 | 2 | 0 | 2 | open | wave 1 |
-| B-030 | Bare research.* tool names are ambiguous across the estate; document addressing by service id prowl-research.default / PROWL-AI/research-agent; no rename (provider contentHash binds names) | wave-0 survey 2026-10-11 · `fabric/ capability declarations` | S | 1 | 3 | 0 | 3 | open | wave 1 |
-| B-031 | No hosted CI workflow in this repository; VERIFICATION 'Hosted CI NOT_RUN' has no workflow behind it. Add a nightly-only workflow (estate policy 23:00 Europe/Warsaw, no push/PR triggers) | wave-0 survey 2026-10-11 · `.github/workflows absent; docs/evidence/fabric-dashboard/VERIFICATION.md:20` | S | 2 | 2 | 0 | 4 | open | wave 1 |
+| B-018 | No wiki project card and no agent-estate entry for prowl-research (global rule: read/update before agent planning) | wave-0 survey 2026-10-11 · `operator's projects wiki (private): no card for this agent` | S | 1 | 3 | 0 | 3 | in-flight — wiki card committed locally in the projects vault; push blocked by unrelated vault divergence (vault owner) | wave 1 |
+| B-024 | Contract probes live outside tests/ (deep probes in docs/reports, resume probes only in prowl-app); move each into tests/ as its fix lands, keep the diagnostic cut | wave-0 survey 2026-10-11 · `docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py; prowl-app probe_research_resume.py` | S | 1 | 2 | 0 | 2 | in-flight — KA-06 contracts in tests/ (675e769); remaining probes move with waves 2–3 | wave 1 |
 | B-006 | save_markdown is non-atomic and an OSError escapes _execute_transform, failing the whole run | wave-0 survey 2026-10-11 · `research_agent/evidence/store.py:87-96` | S | 2 | 1 | 0 | 2 | open | wave 2 |
 | B-008 | A failed transform is not persisted until the next segment saves | wave-0 survey 2026-10-11 · `research_agent/agent/orchestrator.py:579-585` | S | 2 | 1 | 0 | 2 | open | wave 2 |
 | B-025 | raw_ref is absolute under the service and CWD-relative under CLI/MCP — not portable, blocks quote-to-raw checks | wave-0 survey 2026-10-11 · `research_agent/agent/orchestrator.py:684-697; evidence/store.py` | S | 2 | 2 | 0 | 4 | open | wave 2 |
@@ -44,4 +35,14 @@ Prio = `Sev × Blast + age_bonus` (`age_bonus` 1 past 14 days, 2 past 30).
 
 ## Closed
 
-*None yet.*
+- **B-009 · Orphans: a crashed CLI run stays running until a stdio server starts; service run dirs are never reconciled; service cancel/timeout leaves runs/<job>/checkpoint.json at running** — closed — 675e769 + 583f1d1, 2026-10-11
+- **B-010 · rewrite_report writes report.md and the checkpoint without the run lock** — closed — 675e769, 2026-10-11
+- **B-011 · README stale: 304 tests at 1dced8e, stdio tool count only (service has 7), Fabric section after License** — closed — 675e769 + 583f1d1, 2026-10-11
+- **B-012 · mcp_server.py module docstring says the Fabric bundle declares stdio; the manifest points at the HTTP service** — closed — 675e769, 2026-10-11
+- **B-013 · FABRIC.md says register MCP in ~/.config/agentgateway/servers.yaml — retired route (machine-03: new servers go in each agent's own config; scoped dev.agentgateway.prowl runs)** — closed — 675e769, 2026-10-11
+- **B-015 · UX scenarios cover only the dashboard; core journeys (CLI/MCP run, resume, terminal states, verified semantics, budget stop, judge) have none** — closed — 675e769 (CORE-01..13); CORE-01/03/12 PASS@583f1d1, 2026-10-11
+- **B-016 · BRIEF stops at FD-11; FD-12…FD-14 and every FD status live only in the parent plan and HANDOFF** — closed — 675e769, 2026-10-11
+- **B-030 · Bare research.* tool names are ambiguous across the estate; document addressing by service id prowl-research.default / PROWL-AI/research-agent; no rename (provider contentHash binds names)** — closed — 675e769 + 12df501 (no private names), 2026-10-11
+- **B-031 · No hosted CI workflow in this repository; VERIFICATION 'Hosted CI NOT_RUN' has no workflow behind it. Add a nightly-only workflow (estate policy 23:00 Europe/Warsaw, no push/PR triggers)** — closed — 675e769 (workflow file); hosted run NOT_RUN until it reaches main, 2026-10-11
+
+KA-06 closes in the canonical KA plan (prowl-app) with the same commits.
