@@ -229,13 +229,22 @@ Claim v2 (+ fields)
 ### N-FAB — Fabric contract (wave 5)
 
 - Contract pin `623bf613` → `8e49fbd` (B-021); re-derive `contentHash`, keep provider ids.
-- **Callee side of DEC-0039** (FD-12): service MCP accepts `Authorization: Bearer <delegation
-  JWT>` (EdDSA, audience = this provider, actor chain, ≤10 min expiry) verified offline against
-  the issuer's published key; refusals map to the contract's DL codes; the existing own agent
-  token stays for callers outside the estate. Tests mint tokens with a test key. Synthetic chain
+- **Callee side of DEC-0039, by trust tier** (FD-12; ADR-0144 amendment 4, Fabric `19ad05ca`,
+  fabric-workspace `knowledge/authority.md` "Trust by machine"): the service binds loopback only,
+  so every caller is T0 (this machine) — the operator's instruction is the authority and a
+  delegation token is **optional, used for attribution only**: when present it is verified
+  offline (EdDSA, audience = this provider, actor chain, ≤10 min expiry) and its actor chain is
+  recorded on the job; a bad token is refused with the contract's DL code; absence is fine. Binding
+  beyond loopback (T1/T2) **requires** delegation verification and is refused at startup without
+  it. The own agent token stays for outside callers. Tests mint tokens with a test key. Host-chain
   acceptance waits for the Fabric issuer (Fabric 0.4.0 wave 4) — KA-G03.
 - Installer launches the service through an Observatory consumer, vault-only (B-019); the
   required slots are named in FABRIC.md (`PROWL_API_KEY`, `RESEARCH_LLM_API_KEY`).
+- **Provider wiring (FD-13) is agent work** (operator rule 2026-10-11: agents create every provider
+  key through Observatory's doors): the LLM key is issued with
+  `openrouter.py issue --name prowl-research --limit <USD> --to vault:<project>/prod/RESEARCH_LLM_API_KEY`;
+  the `prowl_` key has no Observatory door yet — wave 5 researches the prowl.chat issuing path
+  (an account the door already holds) and adds a door or records the gap; never another agent's key.
 - Dashboard kit 1.0.0 (B-002, needs the operator's go): tokens, `.fd-grid`, `.fd-nav`,
   `.fd-scroll`, well-known `extensions` — removes the fixed 208/160 px nav.
 - HUB-PACKET/HANDOFF rewritten around ADR-0144 (B-014); FABRIC.md gateway rule fixed (B-013,
@@ -322,8 +331,8 @@ inventory and re-cut. Builds that share a seam run sequentially; research and ve
 | **2 — checkpoint v2 + attempt ledger** | KA-03, KA-04, KA-05, KA-10, KA-11, KA-12, B-006, B-008, B-025 | the 3 resume + KA-10×2 + KA-11 + KA-12 contracts green in `tests/`; crash-injection test at every durable boundary (`CrashAt`) proves no second paid dispatch; v1 → v2 migration tests incl. the three refusals; existing `runs/` load or refuse with the typed error; full suite green |
 | **3 — ledger v2** | KA-07, KA-08, KA-09, B-007 | KA-07/08/09 contracts green; order-independence property test; v1 ledger downgrade test; writer/citations/judge consume the new status; runbook-authoring updated; full suite green |
 | **4 — LLM budget + service parity** | KA-G01, B-003, B-004, B-005, B-029 | test stops the next LLM call before `max_llm_usd` incl. resume and retries; missing price ≠ 0; service parity tests (429 retry, reconnect, outcome mapping); full suite green |
-| **5 — Fabric contract** | B-014, B-021, FD-12 (callee side), B-019, B-002 (operator go) | pin + contentHash re-derived and validated; delegation tests (good token, wrong audience, expired, broken chain, own token still works); installer dry-run shows the vault-only consumer argv; service reinstalled and `check_service.py` re-run with every NOT_RUN named |
-| **6 — acceptance** | B-017, KA-G02, FD-13, FD-14, KA-G03, B-027 | judge fails every planted-bad fixture; live finance + subscription receipts; native panel observed; host chain receipt. Each item waits for its operator step |
+| **5 — Fabric contract** | B-014, B-021, FD-12 (callee side, by tier), B-019, FD-13 (LLM key via door; prowl key path), B-002 (operator go) | pin + contentHash re-derived and validated; delegation tests (good token, wrong audience, expired, broken chain, own token still works); installer dry-run shows the vault-only consumer argv; service reinstalled and `check_service.py` re-run with every NOT_RUN named |
+| **6 — acceptance** | B-017, KA-G02, FD-14, KA-G03, B-027 | judge fails every planted-bad fixture; live finance + subscription receipts; native panel observed; host chain receipt. Each item waits for its operator step |
 
 The final close (stages 9–10): docs + wiki + code graph, the ladder walk per REQ, the parent
 plan's KA rows updated with SHAs and receipts, and an **independent observer** agent that reads
@@ -338,7 +347,7 @@ the recommendation as **assumed**, and the waves that depend on it name it.
 |---|---|---|---|---|
 | Q1 | Integration: PR to `main` per wave, merged by the agent once the wave's close pass is green | yes | branches keep diverging from `main` (`origin/main` = `1dced8e`) | B-023, all |
 | Q2 | Dashboard kit 1.0.0 upgrade + the launchd restart it implies | yes, in wave 5 | dashboard stays legacy 480 px, B-002 waived | 5 |
-| Q3 | Keys for FD-13: you create a dedicated `prowl_` key on prowl.chat (sign-in, wallet, daily cap) and a capped LLM key; both go into a new Observatory slot `prowl-research/prod` | yes | live acceptance (wave 6) cannot run | 6 |
+| Q3 | ~~Keys for FD-13~~ — **resolved from the sources**: agents issue keys through Observatory doors (operator rule 2026-10-11); no operator action | — | — | 5 |
 | Q4 | Wave-6 budget: USD 15 total (2 live runs × ~$3.5 tool+LLM, judge calibration ~$3, one re-run) | yes | name another amount | 6 |
 | Q5 | Fabric Dashboards host 0.6.7 → 0.7.1 (your administration) and one look at the native panel | yes, at wave 6 | FD-14 stays NOT_VERIFIED | 6 |
 
@@ -347,3 +356,4 @@ the recommendation as **assumed**, and the waves that depend on it name it.
 | Date | Change | Why |
 |---|---|---|
 | 2026-10-11 | canvas created from the wave-0 survey at `c0dfb6e` | first cut |
+| 2026-10-11 | FD-12 scoped by trust tier (token optional on loopback, required beyond it); FD-13 moved to wave 5 as agent work; Q3 closed | ADR-0144 amendment 4 (`19ad05ca`); operator rule on key issuing (global instructions, 2026-10-11) |

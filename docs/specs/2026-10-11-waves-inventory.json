@@ -420,7 +420,7 @@
     },
     {
       "id": "FD-12",
-      "title": "Callee side of DEC-0039: the service MCP accepts and verifies delegation tokens offline (audience, actor chain, expiry), maps refusals to DL codes, keeps own agent tokens for outside callers. Same as KA-G03's admission half",
+      "title": "Callee side of DEC-0039 by trust tier (ADR-0144 amd. 4): loopback = T0, token optional/attribution, verified when present; non-loopback bind requires verification; own tokens stay for outside callers",
       "source": "docs/evidence/fabric-dashboard/HANDOFF.md:19; fabric-agent-contract src/delegation.ts:292",
       "status": "open — host issuer not built (Fabric 0.4.0 wave 4, REQ-37/CO-258)",
       "area": "fabric",
@@ -449,16 +449,16 @@
       "id": "FD-13",
       "title": "Provider wiring: PROWL_API_KEY and an LLM key through an Observatory consumer; none exist in any vault slot for prowl-research",
       "source": "research_agent/service/app.py:55-57; observatory names (prowl-research: none)",
-      "status": "needs-operator",
+      "status": "open — agent work (keys via Observatory doors)",
       "area": "fabric",
-      "node": "N-ACC",
+      "node": "N-FAB",
       "blocked_by": [
         "B-019"
       ],
-      "closable_in_one_pass": false,
-      "needs_operator": "create a dedicated prowl_ key (prowl.chat sign-in, wallet) and a capped LLM key; store both in a new Observatory slot prowl-research/prod",
-      "wave": 6,
-      "release": "this"
+      "closable_in_one_pass": true,
+      "wave": 5,
+      "release": "this",
+      "notes": "LLM key: openrouter.py issue; prowl_ key: no door yet — research issuing path in wave 5."
     },
     {
       "id": "B-002",
@@ -503,7 +503,7 @@
         "KA-G01"
       ],
       "closable_in_one_pass": false,
-      "needs_operator": "keys (FD-13); spend cites the 2026-10-09 approval (~$2-3 per run) plus one durable budget row B-027",
+      "needs_operator": "spend cites the 2026-10-09 approval (~$2-3 per run) plus one durable budget row B-027",
       "wave": 6,
       "release": "this"
     },
