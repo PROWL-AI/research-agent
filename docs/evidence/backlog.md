@@ -37,8 +37,8 @@
 | B-017 | Judge uncalibrated: FakeLLM fixed scores, no planted-bad control, no labelled agreement; KA-G02 requires the judge to reject planted bad output first | wave-0 survey 2026-10-11 · `evals/judge.py:35-49,206; tests/test_judge.py:72-94` | M | 3 | 2 | 0 | 6 | open | wave 6 |
 | B-027 | No spend policy for prowl-research; one durable budget request with a concrete amount for wave 6 live acceptance | wave-0 survey 2026-10-11 · `fabric-workspace knowledge/authority.md (L1 asked once at first paid run)` | S | 3 | 3 | 0 | 9 | open | wave 6 |
 | B-023 | audit/kimi-20261010 and feat/fabric-dashboard-20261010 are unmerged; origin/main is still 1dced8e | wave-0 survey 2026-10-11 · `git log main..HEAD` | S | 2 | 3 | 0 | 6 | open — needs operator | wave 1 |
-| B-020 | prowl-research has no row in the Fabric delegation-model adoption plan (step 4: callee adopts) | wave-0 survey 2026-10-11 · `fabric-workspace docs/evidence/plans/2026-10-11-delegation-model/README.md:53-58` | S | 2 | 3 | 0 | 6 | open — external owner | external |
-| B-026 | Observatory use_secret.py names prints its ambiguity message one character per line | wave-0 survey 2026-10-11 · `project-observatory tools/use_secret.py names prowl.chat` | S | 1 | 3 | 0 | 3 | open — external owner | external |
+| B-020 | prowl-research has no row in the Fabric delegation-model adoption plan (step 4: callee adopts) | wave-0 survey 2026-10-11 · `fabric-workspace docs/evidence/plans/2026-10-11-delegation-model/README.md:53-58` | S | 2 | 3 | 0 | 6 | open — forwarded by fabric-workspace-91 to fabric-b4 (plan owner), 2026-10-11 | Fabric delegation plan row (pending) |
+| B-026 | Observatory use_secret.py names prints its ambiguity message one character per line | wave-0 survey 2026-10-11 · `project-observatory tools/use_secret.py names prowl.chat` | S | 1 | 3 | 0 | 3 | fixed upstream, awaiting engine release (project-observatory-3d, 2026-10-11) | passioncode-ai/project-observatory-dashboard#208 |
 
 Prio = `Sev × Blast + age_bonus` (`age_bonus` 1 past 14 days, 2 past 30).
 

@@ -1,4 +1,30 @@
-# Research-agent handoff — Kimi and deep agent audits, 2026-10-10
+# Research-agent handoff
+
+## Current entry — wave program, 2026-10-11 (supersedes "Exact next task" below)
+
+Objective: close every open item of this agent in its final form, in waves
+(`/task-pipeline waves`), each followed by independent verification.
+
+- Plan: [`specs/2026-10-11-waves-canvas.md`](specs/2026-10-11-waves-canvas.md) — target state, seams,
+  six waves with exit criteria, operator questions Q1–Q5.
+- Inventory: [`specs/2026-10-11-waves-inventory.json`](specs/2026-10-11-waves-inventory.json)
+  (48 items, `python3 scripts/plan/assign_waves.py --check`). Board: [`evidence/backlog.md`](evidence/backlog.md).
+- Measured at `c0dfb6e`: suite 328 passed; contract probes 9 + 3 red (KA-03…KA-12 all open).
+- Done: wave 0 (survey, inventory, canvas, board) at `ba62421`; task packets for wave 1
+  ([`specs/waves/`](specs/waves/)).
+- Not done: wave 1 build. Both developer agents stopped before their first edit
+  (API session limit, resets 22:00 Europe/Warsaw); the machine disk was at 132 MiB free
+  (swap 23.4 of 25 GB) — free space before building.
+- **Exact next task:** run [`specs/waves/W1-T1-run-ownership.md`](specs/waves/W1-T1-run-ownership.md)
+  and [`specs/waves/W1-T2-docs-scenarios-ci.md`](specs/waves/W1-T2-docs-scenarios-ci.md) in parallel
+  (disjoint files), then the wave-1 close pass from the canvas §7.
+- Operator decisions pending: Q1 merge policy, Q2 dashboard kit, Q3 keys, Q4 USD 15, Q5 host update.
+- Cross-agent: B-001 (model profiles, waits on Fabric T1–T3), B-020 (forwarded to fabric-b4),
+  B-026 (fixed upstream, project-observatory-dashboard#208).
+
+---
+
+## Kimi and deep agent audits, 2026-10-10
 
 Objective: independently verify the Kimi session's deliverables and correct the
 documentation. This checkout belongs to `PROWL-AI/research-agent`; it is separate
