@@ -110,7 +110,7 @@
     {
       "id": "B-018",
       "title": "No wiki project card and no agent-estate entry for prowl-research (global rule: read/update before agent planning)",
-      "source": "sshlg-projects-vault synthesis/agent-estate.md (absent); projects/prowl.chat/references only",
+      "source": "operator's projects wiki (private): no card for this agent",
       "status": "open",
       "area": "knowledge",
       "node": "N-DOCS",
@@ -133,8 +133,8 @@
     },
     {
       "id": "B-030",
-      "title": "research.* tool namespace shared with the private ssheleg/research-agent (research.run vs research.runs.get); document the owner-qualified names, no rename (provider contentHash binds names)",
-      "source": "fabric/ capability declarations; private agent research.* tools",
+      "title": "Bare research.* tool names are ambiguous across the estate; document addressing by service id prowl-research.default / PROWL-AI/research-agent; no rename (provider contentHash binds names)",
+      "source": "fabric/ capability declarations",
       "status": "open",
       "area": "docs",
       "node": "N-DOCS",
@@ -510,7 +510,7 @@
     {
       "id": "B-027",
       "title": "No spend policy for prowl-research; one durable budget request with a concrete amount for wave 6 live acceptance",
-      "source": "fabric-workspace knowledge/authority.md (L1 asked once at first paid run)",
+      "source": "estate authority record (L1 asked once at first paid run)",
       "status": "needs-operator",
       "area": "acceptance",
       "node": "N-ACC",
@@ -565,7 +565,7 @@
     {
       "id": "B-020",
       "title": "prowl-research has no row in the Fabric delegation-model adoption plan (step 4: callee adopts)",
-      "source": "fabric-workspace docs/evidence/plans/2026-10-11-delegation-model/README.md:53-58",
+      "source": "Fabric delegation-model adoption plan (estate document)",
       "status": "open — external ask",
       "area": "fabric",
       "node": "N-EXT",
@@ -578,7 +578,7 @@
     {
       "id": "B-026",
       "title": "Observatory use_secret.py names prints its ambiguity message one character per line",
-      "source": "project-observatory tools/use_secret.py names prowl.chat",
+      "source": "Observatory use_secret.py names",
       "status": "open — external defect",
       "area": "external",
       "node": "N-EXT",
@@ -627,7 +627,7 @@
     {
       "id": "B-001",
       "title": "LLM model slots → named estate model profiles resolved by the fabric kit; KA-G01 becomes the profile's key route",
-      "source": "docs/evidence/backlog.md B-001; frame-agent proposal @ 9f05a3f",
+      "source": "docs/evidence/backlog.md B-001; estate runner/model-profile proposal (private)",
       "status": "waived — revisit: Fabric ADR, DEC CT-05, kit resolver T1–T3",
       "area": "cost",
       "node": "N-PROG",

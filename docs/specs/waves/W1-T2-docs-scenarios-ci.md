@@ -4,7 +4,7 @@ Wave 1 of [`../2026-10-11-waves-canvas.md`](../2026-10-11-waves-canvas.md). Read
 the core scenarios you write describe its **target** behaviour, marked `UNVERIFIED` until the wave
 that ships each one flips it.
 
-Repository: `/Users/sshlg/DATA/0xDEV/research-agent`. **Do not commit or push. Edit only the files
+Repository: this checkout of PROWL-AI/research-agent. **Do not commit or push. Edit only the files
 in the ownership list** — another agent is changing code, README.md and tests in parallel. No
 paid calls, do not read `.env`, do not restart services.
 
@@ -28,7 +28,7 @@ paid calls, do not read `.env`, do not restart services.
 3. **B-030 — namespace note** in `docs/FABRIC.md` (short section "Names"): this provider's tools
    are `research.run`, `research.tools.call`, `research.list_runbooks`, `research.artifact.get`,
    `research.tutorial`, `fabric.job.get`, `fabric.job.cancel`; a different, unrelated agent on the
-   estate also uses `research.*` (e.g. `research.runs.get`, `research.search`); always address this
+   estate also uses `research.*` names; always address this
    one as service `prowl-research.default` / repository `PROWL-AI/research-agent`. Names are not
    renamed because the provider's contentHash binds them. Do not name private agents' internals
    beyond what is needed to disambiguate (public repo).

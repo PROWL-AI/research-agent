@@ -230,13 +230,14 @@ Claim v2 (+ fields)
 
 - Contract pin `623bf613` → `8e49fbd` (B-021); re-derive `contentHash`, keep provider ids.
 - **Callee side of DEC-0039, by trust tier** (FD-12; ADR-0144 amendment 4, Fabric `19ad05ca`,
-  fabric-workspace `knowledge/authority.md` "Trust by machine"): the service binds loopback only,
+  the estate authority record, "Trust by machine"): the service binds loopback only,
   so every caller is T0 (this machine) — the operator's instruction is the authority and a
   delegation token is **optional, used for attribution only**: when present it is verified
   offline (EdDSA, audience = this provider, actor chain, ≤10 min expiry) and its actor chain is
   recorded on the job; a bad token is refused with the contract's DL code; absence is fine. Binding
-  beyond loopback (T1/T2) **requires** delegation verification and is refused at startup without
-  it. The own agent token stays for outside callers. Tests mint tokens with a test key. Host-chain
+  beyond loopback **requires** delegation verification and is refused at startup without it: until
+  enrollment in the operator's agent network (T1) can be proven on the wire, every non-loopback
+  caller is treated as T2. The own agent token stays for outside callers. Tests mint tokens with a test key. Host-chain
   acceptance waits for the Fabric issuer (Fabric 0.4.0 wave 4) — KA-G03.
 - Installer launches the service through an Observatory consumer, vault-only (B-019); the
   required slots are named in FABRIC.md (`PROWL_API_KEY`, `RESEARCH_LLM_API_KEY`).
@@ -273,7 +274,7 @@ delegation tokens (KA-G03).
 | ledger → writer / citations / judge | N-EVID | — | claim status + verification method | 3 |
 | LLM route → provider | N-LLMB | B-001 estate model profiles (fabric kit, T1–T3) | route object; limit lives on the route | 4 |
 | service ↔ Fabric host | N-FAB | passioncode-ai/fabric (issuer, hub.json), fabric-agent-contract DEC-0039 | delegation JWT, contract pin, provider contentHash | 5 |
-| service ↔ Observatory | N-FAB | project-observatory (consumer launch, vault slots) | slot names, never values | 5 |
+| service ↔ Observatory | N-FAB | Observatory credential registry (consumer launch, vault slots) | slot names, never values | 5 |
 | dashboard ↔ fabric-dashboards host | N-FAB | fabric-dashboards (0.7.1) | kit tokens, well-known extensions | 5 |
 
 ## 4. REQ → module → wave
@@ -314,8 +315,8 @@ delegation tokens (KA-G03).
 | Where are new MCP servers registered? | Each agent's own config; the shared gateway route is retired | machine-03 (current rule); B-013 fixes FABRIC.md |
 | Hub route or direct calls? | Direct calls with delegation tokens; hub issues, does not forward | passioncode-ai/fabric ADR-0144; contract DEC-0039 |
 | Is the dashboard-kit upgrade mandatory? | No; additive, operator go-ahead required | DEC-0036; dashboard-kit.md:111-113 |
-| May the service use the private research-agent's OpenRouter slot? | No — never spend another agent's key | global authority rule; Observatory `research-agent/prod` belongs to ssheleg/research-agent |
-| Rename `research.*` tools to avoid the collision? | No; provider contentHash binds names; document owner-qualified ids | fabric-agent.json provider revision 5 |
+| May the service use another agent's existing OpenRouter slot? | No — never spend another agent's key; issue its own | estate authority rule |
+| Rename `research.*` tools to avoid ambiguity across the estate? | No; provider contentHash binds names; address by service id | fabric-agent.json provider revision 5 |
 | Hosted CI triggers? | Nightly only, 23:00 Europe/Warsaw; no push/PR triggers | operator CI policy 2026-09-25 |
 | Keep `stop_reason` / `status` names in v2? | Yes; additive `terminal_code` avoids a wave-1 → wave-2 rename | this canvas, §2 N-OWN |
 
@@ -356,4 +357,5 @@ the recommendation as **assumed**, and the waves that depend on it name it.
 | Date | Change | Why |
 |---|---|---|
 | 2026-10-11 | canvas created from the wave-0 survey at `c0dfb6e` | first cut |
+| 2026-10-11 | Wave-1 certification: private estate names and home paths removed from public docs (forward fix; pushed history keeps them — operator decision); non-loopback callers treated as T2 until T1 enrollment is provable | product tier finding on `675e769` |
 | 2026-10-11 | FD-12 scoped by trust tier (token optional on loopback, required beyond it); FD-13 moved to wave 5 as agent work; Q3 closed | ADR-0144 amendment 4 (`19ad05ca`); operator rule on key issuing (global instructions, 2026-10-11) |

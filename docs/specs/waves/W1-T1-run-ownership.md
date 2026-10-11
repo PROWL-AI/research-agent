@@ -4,7 +4,7 @@ Wave 1 of [`../2026-10-11-waves-canvas.md`](../2026-10-11-waves-canvas.md) — r
 it is the contract this task implements. Do not design anything the canvas contradicts; if the
 code proves the canvas wrong, stop and report rather than improvise.
 
-Repository: `/Users/sshlg/DATA/0xDEV/research-agent` (PROWL-AI/research-agent, Python 3.11,
+Repository: this checkout of PROWL-AI/research-agent (Python 3.11,
 venv `.venv`). Branch `feat/fabric-dashboard-20261010`. **Do not commit, push, or touch files
 outside the ownership list below** — another agent edits docs in parallel. Do not restart the
 installed launchd service `chat.prowl.research`, do not call any paid provider, do not read `.env`.

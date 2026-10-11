@@ -20,7 +20,7 @@ Objective: close every open item of this agent in its final form, in waves
   (disjoint files), then the wave-1 close pass from the canvas §7.
 - Operator decisions pending: Q1 merge policy, Q2 dashboard kit, Q3 keys, Q4 USD 15, Q5 host update.
 - Cross-agent: B-001 (model profiles, waits on Fabric T1–T3), B-020 (forwarded to fabric-b4),
-  B-026 (fixed upstream, project-observatory-dashboard#208).
+  B-026 (fixed upstream in Observatory, awaiting its release).
 
 ---
 

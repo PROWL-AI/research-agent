@@ -6,7 +6,7 @@ B-008, B-025. Builds on wave 1 (`research_agent/evidence/runlock.py`, `terminal.
 `Checkpoint.terminal_code`, `tests/test_ka_contracts.py`) — read what wave 1 shipped first
 (`git log --oneline -5`, the files above).
 
-Repository `/Users/sshlg/DATA/0xDEV/research-agent`, Python 3.11, `.venv`. **Do not commit or push**;
+Repository: this checkout of PROWL-AI/research-agent, Python 3.11, `.venv`. **Do not commit or push**;
 no paid calls; do not read `.env`; do not restart services. Disk is tight — no large temp files.
 
 ## The defects (all reproduced at `c0dfb6e`; line numbers are at that revision — re-locate them)
@@ -43,7 +43,7 @@ Probes that must turn green and move into `tests/test_ka_contracts.py` (no xfail
   `test_ka11_known_cost_does_not_discard_previous_estimates`,
   `test_ka12_billed_failure_cost_survives_resume`; keep the 3 controls green.
 - resume (KA-03/04/05): fetch with
-  `git -C /Users/sshlg/DATA/0xDEV show origin/audit/kimi-20261010:docs/reports/2026-10-10-kimi-session-audit/raw/probe_research_resume.py`
+  from `PROWL-AI/prowl-app` ref `audit/kimi-20261010`, file `docs/reports/2026-10-10-kimi-session-audit/raw/probe_research_resume.py` (`git show <ref>:<path>` in a prowl-app checkout)
   (`test_catalog_change_does_not_skip_an_unexecuted_step`,
   `test_unstarted_steps_after_failure_remain_resumable`,
   `test_completed_step_is_persisted_before_worker_returns`).

@@ -84,7 +84,11 @@ MCP registration: the `prowl-research` entry lives in each agent client's own co
 
 This provider is service `prowl-research.default`, repository `PROWL-AI/research-agent`, provider id `https://prowl.chat/fabric/providers/research-agent` (`fabric-agent.json`). Its tools are `research.run`, `research.tools.call`, `research.list_runbooks`, `research.artifact.get`, `research.tutorial`, `fabric.job.get` and `fabric.job.cancel`. The legacy stdio server (`prowl-research mcp`) is a separate surface of the same core and exposes `research.run`, `research.list_runbooks`, `research.get_status` and `research.get_report`.
 
-A different, unrelated agent on the same estate also publishes `research.*` tools (for example `research.runs.get` and `research.search`). A bare tool name is therefore ambiguous: always address this one by its service id or repository, never by the tool name alone. The names are not renamed, because the provider revision's `contentHash` binds them; a rename would be a new provider revision every caller has to re-pin.
+Other agents on the same estate may also publish `research.*` tools, so a bare tool name is ambiguous: always address this one by its service id or repository, never by the tool name alone. The names are not renamed, because the provider revision's `contentHash` binds them; a rename would be a new provider revision every caller has to re-pin.
+
+## Job phase and run terminal state
+
+A research job (`fabric.job.get`) and the run checkpoint it drives (`research.artifact.get` → `checkpoint.json`) answer different questions. The job phase says what happened to the request; the checkpoint's `status` and `terminal_code` (README, "Run status") say what happened to the research. They agree on the outcome but not always on the word: a job cancelled by its caller or stopped by a service shutdown shows `cancelled` / `interrupted` on the job, while the owning orchestrator writes `partial` + `terminal_code=cancelled` on the checkpoint before releasing the run lock; a job past its wall-clock timeout fails with error code `timeout` and the checkpoint again reads `cancelled`. A service crash leaves the job `working` until restart recovery marks it interrupted, and the checkpoint `running` until reconciliation under the run lock marks it `interrupted` (resumable). The full mapping table lands with the service-parity wave (canvas N-SVC).
 
 ## Accounting and intervention
 
