@@ -32,19 +32,24 @@ no further approval is needed for reversible implementation.
 
 ## Requirements and observable checks
 
-| ID | Deliverable | Observable |
-|---|---|---|
-| FD-01 | Fabric service discovery, lifecycle, auth and build identity | Exact schemas; denied cross-origin/tokenless mutations; one process and persistent state |
-| FD-02 | Agent capabilities with durable jobs, cancellation and trace | Real local MCP requests create/read/cancel jobs; same request cannot duplicate execution |
-| FD-03 | Operator overview and searchable request list | State, freshness, requester, chain, spend and next action visible; empty/error/offline states |
-| FD-04 | Request inspection and readable results | Input, steps, raw/data table, sources and report accessible without leaving request |
-| FD-05 | Chain participation | Project/chain/node/parent/requester/trace retained; distinguish caller-declared links from Fabric-verified binding |
-| FD-06 | Billing | Tool vs LLM, actual vs estimated vs unknown, per run/model/day; fixtures excluded |
-| FD-07 | Model and orchestrator settings | Validated revisioned config; diff before apply; active run keeps captured config |
-| FD-08 | Human intervention | Bound proposal, approve/reject, expiry, stale revision refusal; cancel is explicit and audited |
-| FD-09 | Tutorials | Safe sample request with labeled synthetic results, no provider calls or real spend |
-| FD-10 | Detailed design, responsive keyboard UI | Scenarios, screen states, token source, browser walkthrough with receipts |
-| FD-11 | Delivery and operator entry point | Tests, schema/semantic/runtime gate table, registered service/host link or exact unresolved gate |
+| ID | Deliverable | Observable | Status (2026-10-11) |
+|---|---|---|---|
+| FD-01 | Fabric service discovery, lifecycle, auth and build identity | Exact schemas; denied cross-origin/tokenless mutations; one process and persistent state | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
+| FD-02 | Agent capabilities with durable jobs, cancellation and trace | Real local MCP requests create/read/cancel jobs; same request cannot duplicate execution | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
+| FD-03 | Operator overview and searchable request list | State, freshness, requester, chain, spend and next action visible; empty/error/offline states | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
+| FD-04 | Request inspection and readable results | Input, steps, raw/data table, sources and report accessible without leaving request | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
+| FD-05 | Chain participation | Project/chain/node/parent/requester/trace retained; distinguish caller-declared links from Fabric-verified binding | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
+| FD-06 | Billing | Tool vs LLM, actual vs estimated vs unknown, per run/model/day; fixtures excluded | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
+| FD-07 | Model and orchestrator settings | Validated revisioned config; diff before apply; active run keeps captured config | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
+| FD-08 | Human intervention | Bound proposal, approve/reject, expiry, stale revision refusal; cancel is explicit and audited | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
+| FD-09 | Tutorials | Safe sample request with labeled synthetic results, no provider calls or real spend | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
+| FD-10 | Detailed design, responsive keyboard UI | Scenarios, screen states, token source, browser walkthrough with receipts | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
+| FD-11 | Delivery and operator entry point | Tests, schema/semantic/runtime gate table, registered service/host link or exact unresolved gate | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
+| FD-12 | Callee side of DEC-0039 delegation tokens, by trust tier | On this machine and the operator's enrolled machines the operator's instruction is the authority: no delegation token is required; a token a local caller does send is verified and recorded for attribution only. A token is required only for callers across the machine boundary or another person's calls (Fabric ADR-0144 amendment 4, Fabric commit `19ad05ca`, operator decision 2026-10-11) | open — wave 5 ([canvas §2 N-FAB](../../specs/2026-10-11-waves-canvas.md)); Fabric host issuer not built yet; host-chain acceptance is KA-G03, wave 6 |
+| FD-13 | Provider wiring through an Observatory consumer | Service launched vault-only with `PROWL_API_KEY` and `RESEARCH_LLM_API_KEY`; status leaves `degraded` | open — wave 5, agent work since the canvas revision of 2026-10-11: the LLM key is issued through an Observatory door; the `prowl_` key has no door yet, and wave 5 adds one or records the gap |
+| FD-14 | Native panel rendering in the Fabric Dashboards host | The service page observed inside the host app, not a browser stand-in | NOT_VERIFIED — wave 6; installed host 0.6.7, current 0.7.1; host upgrade is the operator's administration |
+
+FD-12 originally assumed a hub-forwarding route (the host relays a call to this service). Fabric ADR-0144 (passioncode-ai/fabric, accepted 2026-10-11) retired that route: the hub issues the delegation chain and callers call this service directly. [HUB-PACKET](HUB-PACKET.md) still describes the retired route and is rewritten in wave 5 (B-014).
 
 ## Architecture decisions
 

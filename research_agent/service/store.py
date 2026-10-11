@@ -128,6 +128,12 @@ class Store:
             return job
 
     def recover(self):
+        # Run dirs first: a research job's checkpoint left 'running' by a
+        # crashed service process is claimed under its run lock (a lock held
+        # elsewhere means a live owner, and the run is left alone).
+        from research_agent.evidence.runlock import reconcile_orphans
+
+        reconcile_orphans(self.root / "runs")
         for job in self.jobs():
             if job["status"] == "working":
                 self.transition(job["id"], "failed", "interrupted", error={"code": "interrupted", "message": "Service restarted. Inspect receipts; do not blindly retry."})

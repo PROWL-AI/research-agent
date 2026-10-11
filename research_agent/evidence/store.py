@@ -59,6 +59,11 @@ class Checkpoint(BaseModel):
     stats: dict[str, Any] = {}
     partial: bool = False
     stop_reason: str | None = None
+    #: Why the run reached its terminal state — one of
+    #: research_agent.evidence.terminal.TERMINAL_CODES. None while the run is
+    #: live (and in checkpoints written before the field existed). Additive:
+    #: schema_version stays 1.
+    terminal_code: str | None = None
 
 
 class ArtifactStore:

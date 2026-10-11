@@ -7,9 +7,16 @@ sizing, equity research, SEO, AI visibility and more), calls the
 reviews, scraping, app intelligence, LLM cross-checks), stores extracted claims in an
 **evidence ledger**, and produces reports with source citations and verification disclosures.
 
-It is both a CLI for humans and an **MCP server** for agents
-(`research.run`, `research.list_runbooks`, `research.get_report`,
-`research.get_status`).
+It is a CLI for humans and has two MCP surfaces for agents:
+
+- the **Fabric service** (`prowl-research-service`, HTTP MCP at
+  `http://127.0.0.1:18764/mcp`, the connection `fabric-agent.json` declares) —
+  7 tools: `research.run`, `research.tools.call`, `research.tutorial`,
+  `research.list_runbooks`, `research.artifact.get`, `fabric.job.get`,
+  `fabric.job.cancel` (see [Fabric service](#fabric-service-and-operator-dashboard));
+- the legacy local **stdio MCP server** (`prowl-research mcp`) — 4 tools:
+  `research.run`, `research.list_runbooks`, `research.get_status`,
+  `research.get_report`.
 
 ## Quick start for a new teammate
 
@@ -38,8 +45,10 @@ Other environment knobs (all optional):
 - `RESEARCH_LLM_MODEL_STRONG` — the strong-tier model (planning, writing,
   repair); `RESEARCH_LLM_MODEL` covers the cheap tier.
 - `RESEARCH_RUNS_DIR` — where runs are written (MCP server only; the CLI
-  always uses `./runs`). Default `./runs` relative to the server process;
-  set it explicitly in MCP client configs.
+  uses `./runs` for `run`, `report`, `rewrite`, `export` and `prune`, but
+  `status` reads this variable through the stdio server's status helper).
+  Default `./runs` relative to the server process; set it explicitly in MCP
+  client configs.
 - `RESEARCH_NO_SUBAGENTS=1` — force sequential execution (no worker fan-out).
 - `RESEARCH_PROWL_CALL_TIMEOUT_S` — read timeout in seconds for each Prowl
   MCP call (default 180; a hung server fails the call instead of parking it).
@@ -78,8 +87,10 @@ Register the agent as an MCP server (stdio) in any MCP client:
 }
 ```
 
-The server exposes four tools: `research.run`, `research.list_runbooks`,
-`research.get_status`, `research.get_report`.
+The stdio server exposes four tools: `research.run`, `research.list_runbooks`,
+`research.get_status`, `research.get_report`. It is the legacy local surface;
+the Fabric bundle points at the HTTP service, which exposes seven (listed at
+the top of this file).
 
 Proving tool call (verifies install and registration; needs **no keys** and
 makes **no billed calls**):
@@ -101,6 +112,30 @@ the checkpoint shows `complete`, `partial`, `failed`, or `interrupted`.
 For `complete`/`partial`, fetch the result with
 `research.get_report(run_id)`. Use `wait=true` only when the caller can block
 for the whole run.
+
+Next to `status`, every terminal state carries a `terminal_code` saying *why*
+the run stopped (`null` while it is live). The set is closed:
+
+| `terminal_code` | `status` | meaning |
+|---|---|---|
+| `completed` | `complete` (or `partial` on a resume that kept earlier skip disclosures) | every step ran |
+| `budget_tools` / `budget_usd` / `budget_minutes` | `partial` | a runbook budget ran out; the report marks what is missing |
+| `budget_llm` | `partial` | LLM-spend budget (reserved; not set yet) |
+| `step_failed` | `partial` | a step failed hard or a worker crashed |
+| `evidence_incomplete` | — | evidence could not be persisted (reserved; not set yet) |
+| `cancelled` | `partial` | the caller, the service cancel or its timeout cancelled the run |
+| `error` | `failed` | an exception escaped the run; `stop_reason` carries it |
+| `interrupted` | `interrupted` | the owning process exited without finishing; resumable |
+
+Run state has exactly one writer: the process holding the run's lock
+(`runs/<id>/.lock`). The orchestrator records `cancelled`/`error` itself before
+releasing the lock; a second process on the same run is refused
+(`run … is locked by another process`) and writes nothing. `interrupted` is
+written by reconciliation — at stdio server start, at CLI `run`/`status`, and
+at Fabric service start — and only for a `running` checkpoint whose lock is
+free. `get_status` also reports `has_checkpoint`: `false` when a run accepted
+by this server failed before its checkpoint existed (the status then comes from
+the in-process job and disappears with it).
 
 First real run (makes billed Prowl calls; see budget limits below):
 
@@ -148,12 +183,15 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
 ## Current verification and resume limits
 
 The [deep agent audit](docs/reports/2026-10-10-agent-deep-audit/README.md) adds
-seven open defects: lifecycle ownership, false evidence verification, hidden
-artifact/extraction failures and budget accounting across mixed receipts/resume.
+seven defects: lifecycle ownership (KA-06, fixed by the run-lock ownership
+above), false evidence verification, hidden artifact/extraction failures and
+budget accounting across mixed receipts/resume.
 Its explicit probes reproduce nine contract violations; three controls pass.
 The [2026-10-10 handoff](docs/HANDOFF.md) links the remediation plan and records the audited source revision,
-checks and next repair tasks. The offline suite passed 304 tests at `1dced8e`;
-this does not establish live provider quality or Fabric host acceptance.
+checks and next repair tasks. The offline suite is `.venv/bin/python -m pytest
+tests/ -q` (network-free); its pass count is a fact about one revision, so it is
+recorded with that revision in the handoff rather than here. A green run does
+not establish live provider quality or Fabric host acceptance.
 
 Resume currently has confirmed gaps: pruning a changed tool catalog can shift
 step indices and skip pending work; a worker failure marks unstarted tail steps
@@ -167,10 +205,10 @@ Finance/subscription live acceptance remains unverified. `max_usd` limits the
 Prowl tool-call budget, with concurrent in-flight calls potentially overshooting
 it; it is not a cap on the separate LLM provider spend.
 
-## License
-
-MIT — see [LICENSE](LICENSE).
-
 ## Fabric service and operator dashboard
 
 The separate `prowl-research-service` entry point adds durable jobs, observed tool/LLM receipts, human decisions and a service-owned dashboard for Fabric Dashboards. It reuses the existing research core. See [Fabric setup and architecture](docs/FABRIC.md), [dashboard design](docs/design/fabric-dashboard.md), and [current verification/handoff](docs/evidence/fabric-dashboard/HANDOFF.md). Legacy CLI/stdio and their existing run directories remain separate entry points.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

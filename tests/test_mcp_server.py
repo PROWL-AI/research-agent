@@ -153,7 +153,9 @@ def test_cli_status_and_report_parity(wired, fake_llm, tmp_path, monkeypatch, ca
 
     assert main(["status", "cli-run"]) == 0
     out = capsys.readouterr().out
-    assert "cli-run" in out and "running" in out
+    # W1-T1 (B-009): nobody holds this run's lock, so it is an orphan — CLI
+    # status reconciles it instead of reporting a dead run as running.
+    assert "cli-run" in out and "interrupted" in out
 
     monkeypatch.chdir(tmp_path)
     assert main(["report", "cli-run"]) == 0

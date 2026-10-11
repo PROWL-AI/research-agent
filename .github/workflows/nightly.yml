@@ -1,0 +1,48 @@
+# Nightly hosted check of the whole offline suite.
+#
+# Estate CI policy (2026-09-25): complete hosted checks run nightly at 23:00 Europe/Warsaw, never on
+# every push or pull request. GitHub cron is UTC and has no time zone, so "0 21 * * *" is 23:00 in
+# Warsaw summer time (CEST, UTC+2) and 22:00 in winter time (CET, UTC+1).
+#
+# GitHub runs a schedule only from the default branch. No step needs a provider key and the workflow
+# reads no secret; `validate` runs without --online, so it does not contact the Prowl catalog.
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Tests
+        run: python -m pytest tests/ -q
+
+      - name: Runbooks validate (offline)
+        run: python -m research_agent validate
+
+      - name: Wave inventory is current
+        run: python scripts/plan/assign_waves.py --check

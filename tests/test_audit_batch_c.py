@@ -124,7 +124,10 @@ class TestOrphanedRuns:
         orphan = _checkpoint_on_disk(tmp_path, "c2-orphan")
         assert orphan["status"] == "interrupted"
         assert orphan["partial"] is True
-        assert orphan["stop_reason"] == "server restarted before completion"
+        # W1-T1: reconciliation now runs for CLI and service run dirs too, so
+        # the reason names what is known — the owner exited — not a server.
+        assert orphan["stop_reason"] == "process exited before completion"
+        assert orphan["terminal_code"] == "interrupted"
         assert _checkpoint_on_disk(tmp_path, "c2-done")["status"] == "complete"
 
     def test_serve_reconciles_before_running(self, wired, tmp_path: Path, monkeypatch):

@@ -78,7 +78,13 @@ Open through Fabric Dashboards' resolved `open_link`; direct HTTP without host l
 
 Provider secrets must be supplied by an Observatory-managed consumer launch, outside Git, dashboard fields and plist values. Required names: PROWL_API_KEY and RESEARCH_LLM_API_KEY (or OPENROUTER_API_KEY). No keys means degraded-but-usable tutorial/inspection, not a healthy paid runtime. Local install intentionally does not copy parent `.env` files or reuse unrelated agent credentials.
 
-New MCP registration belongs to `~/.config/agentgateway/servers.yaml`, with only this service's agent token in the gateway secrets store. Do not put the host token in agent configs. Generate gateway configuration and migrate only the named server; this machine-specific configuration is not committed here. A gateway route is not Fabric hub admission.
+MCP registration: the `prowl-research` entry lives in each agent client's own configuration — on the operator's machine, Claude Code, Cursor, OpenCode and Codex (see [verification, machine integration footprint](evidence/fabric-dashboard/VERIFICATION.md#machine-integration-footprint)). Registering new servers in a shared gateway file (`~/.config/agentgateway/servers.yaml`) is a retired route on that machine; do not add this service there. Each client entry points at a scoped gateway profile named `prowl` (launchd label `dev.agentgateway.prowl`), which fronts this service with the service's agent token. The host token never goes into a client or gateway configuration. Client configurations, gateway configuration and tokens are machine-local and are not committed here. A client session started before its entry was added does not see the tools; restart it, and a new session discovers the 7 tools listed above. A gateway route is not Fabric hub admission.
+
+## Names
+
+This provider is service `prowl-research.default`, repository `PROWL-AI/research-agent`, provider id `https://prowl.chat/fabric/providers/research-agent` (`fabric-agent.json`). Its tools are `research.run`, `research.tools.call`, `research.list_runbooks`, `research.artifact.get`, `research.tutorial`, `fabric.job.get` and `fabric.job.cancel`. The legacy stdio server (`prowl-research mcp`) is a separate surface of the same core and exposes `research.run`, `research.list_runbooks`, `research.get_status` and `research.get_report`.
+
+A different, unrelated agent on the same estate also publishes `research.*` tools (for example `research.runs.get` and `research.search`). A bare tool name is therefore ambiguous: always address this one by its service id or repository, never by the tool name alone. The names are not renamed, because the provider revision's `contentHash` binds them; a rename would be a new provider revision every caller has to re-pin.
 
 ## Accounting and intervention
 

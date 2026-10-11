@@ -17,7 +17,7 @@ Runtime source and installed build: **891fbc995cb382ec6ccaed5f1b91611918b931c7**
 | Fabric hub chain/admission | BLOCKED_BY_HOST_CAPABILITY | [FD-12 packet](HUB-PACKET.md): hub only connects fabric-inbox; no active hub.json observed |
 | Paid provider acceptance | NOT_RUN | New supervised service has no provider credentials; no funds spent by these probes |
 | UX docs | PASS, exit 0 | `python3 <super-ux-0.59.1>/scripts/ux_lint.py` returned `OK — docs/ux is consistent` |
-| Hosted CI | NOT_RUN | Existing nightly policy retained; unmerged branch is outside its snapshot |
+| Hosted CI | NOT_RUN | `.github/workflows/nightly.yml` now exists (added 2026-10-11, B-031): nightly schedule plus manual dispatch, no push/PR triggers, per the estate nightly CI policy. First scheduled run pending; stays NOT_RUN until a run is read green. GitHub runs a schedule from the default branch only, so the file on this unmerged branch does not run until it reaches the default branch |
 
 ## Corrections discovered during verification
 

@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from research_agent.__main__ import _lock_held, main
+from research_agent.__main__ import main
+from research_agent.evidence.runlock import is_locked_elsewhere
 from research_agent.evidence.store import ArtifactStore, Checkpoint
 from research_agent.runbook import RunbookError, list_runbooks, load_runbook
 
@@ -178,14 +179,17 @@ class TestPrune:
         assert "nothing to prune" in capsys.readouterr().out
 
     def test_lock_held_helper(self, tmp_path: Path):
+        # prune's lock probe moved to research_agent.evidence.runlock (W1-T1);
+        # same contract, keyed by run dir instead of lock-file path.
         lock = tmp_path / ".lock"
         lock.write_text("", encoding="utf-8")
-        assert _lock_held(lock) is False
+        assert is_locked_elsewhere(tmp_path) is False
         with lock.open("r+b") as held:
             fcntl.flock(held.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            assert _lock_held(lock) is True
+            assert is_locked_elsewhere(tmp_path) is True
             fcntl.flock(held.fileno(), fcntl.LOCK_UN)
-        assert _lock_held(tmp_path / "missing.lock") is False
+        assert is_locked_elsewhere(tmp_path / "missing") is False
+        assert not (tmp_path / "missing").exists()
 
 
 class TestOnlineValidation:
