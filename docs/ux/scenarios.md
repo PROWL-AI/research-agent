@@ -174,14 +174,14 @@
 | CORE-01 | Запуск до терминального состояния (CLI, stdio MCP) | 1 | PASS@583f1d1 |
 | CORE-02 | Запуск через Fabric `research.run`: исход совпадает с ядром | 4 | UNVERIFIED |
 | CORE-03 | Второй процесс не меняет живой прогон | 1 | PASS@583f1d1 |
-| CORE-04 | Осиротевший прогон → `interrupted` → продолжение | 1, 2 | PASS@W2 |
-| CORE-05 | Продолжение после сбоя не платит дважды | 2 | PASS@W2 |
-| CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | PASS@W2 |
+| CORE-04 | Осиротевший прогон → `interrupted` → продолжение | 1, 2 | PASS@0b0347b |
+| CORE-05 | Продолжение после сбоя не платит дважды | 2 | PASS@0b0347b |
+| CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | PASS@0b0347b |
 | CORE-07 | Остановка по бюджету LLM | 4 | UNVERIFIED |
-| CORE-08 | Оплаченный сбой входит в бюджет и после продолжения | 2 | PASS@W2 |
+| CORE-08 | Оплаченный сбой входит в бюджет и после продолжения | 2 | PASS@0b0347b |
 | CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | UNVERIFIED |
 | CORE-10 | Конфликт остаётся конфликтом | 3 | UNVERIFIED |
-| CORE-11 | Потеря доказательств → `partial`, не `complete` | 2 | PASS@W2 |
+| CORE-11 | Потеря доказательств → `partial`, не `complete` | 2 | PASS@0b0347b |
 | CORE-12 | Переписать отчёт активного прогона нельзя | 1 | PASS@583f1d1 |
 | CORE-13 | Судья отвергает заведомо плохой отчёт | 6 | UNVERIFIED |
 
@@ -224,7 +224,7 @@
 - **Coverage:** `test_ka06_non_owner_cannot_mutate_locked_checkpoint[run|startup]`, `test_research_run_wait_false_refuses_a_run_locked_elsewhere`, `tests/test_two_process_lock.py::test_second_process_cannot_write_a_locked_run`
 
 ### CORE-04: Осиротевший прогон → `interrupted` → продолжение
-- **Status:** PASS@W2
+- **Status:** PASS@0b0347b
 - **Actor:** оператор (P-01)
 - **Trigger:** процесс прогона убит (сбой, перезагрузка); затем `prowl-research status <run_id>`, старт stdio MCP или восстановление сервиса (`Store.recover`)
 - **Preconditions:** checkpoint в `running`, блокировку никто не держит. Каталог прогонов один для всех команд CLI и stdio MCP: `RESEARCH_RUNS_DIR`, иначе `./runs`; у сервиса — свой `runs/` в корне сервиса.
@@ -237,7 +237,7 @@
 - **Coverage:** волна 1 (сверка): `test_control_unlocked_orphan_is_reconciled`, `test_reconcile_orphans_reports_what_it_marked_and_skips_active`, `test_reconcile_survives_an_unwritable_run_dir`, `test_cli_status_reconciles_an_orphan_and_prints_terminal`, `test_service_recover_reconciles_its_run_dirs`; волна 2 (продолжение по состояниям шагов): `test_ka03_*`, `test_outcome_unknown_attempt_is_resent_with_the_same_key`, `tests/test_durability.py`
 
 ### CORE-05: Продолжение после сбоя не платит дважды
-- **Status:** PASS@W2
+- **Status:** PASS@0b0347b
 - **Actor:** оператор (P-01); вызывающий агент
 - **Trigger:** продолжение прогона, упавшего на любой границе сохранения шага
 - **Preconditions:** для шага уже сохранён raw (`raw_saved`) или попытка отправлена без известного исхода (`dispatching`).
@@ -249,7 +249,7 @@
 - **Coverage:** `tests/test_durability.py::test_every_durable_boundary_is_resumable_without_paying_twice`, `test_ka10_resume_finishes_extraction_from_saved_raw_without_paying`, `test_outcome_unknown_attempt_is_resent_with_the_same_key`
 
 ### CORE-06: Остановка по бюджету: вызовы, USD, минуты
-- **Status:** PASS@W2
+- **Status:** PASS@0b0347b
 - **Actor:** оператор (P-01); вызывающий агент
 - **Trigger:** прогон достигает лимита runbook `Budget` по вызовам инструментов, USD или минутам
 - **Preconditions:** лимит меньше, чем требует план.
@@ -273,7 +273,7 @@
 - **Coverage:** —
 
 ### CORE-08: Оплаченный сбой входит в бюджет и после продолжения
-- **Status:** PASS@W2
+- **Status:** PASS@0b0347b
 - **Actor:** оператор (P-01)
 - **Trigger:** инструмент вернул ошибку, но провайдер списал стоимость; прогон затем продолжен
 - **Preconditions:** ошибка несёт списанную стоимость (`ProwlError.cost_usd`).
@@ -309,7 +309,7 @@
 - **Coverage:** —
 
 ### CORE-11: Потеря доказательств → `partial`, не `complete`
-- **Status:** PASS@W2
+- **Status:** PASS@0b0347b
 - **Actor:** оператор (P-01); вызывающий агент
 - **Trigger:** запись raw или извлечение шага не удались
 - **Preconditions:** —
