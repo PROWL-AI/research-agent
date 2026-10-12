@@ -36,12 +36,24 @@ COST_META_KEYS = ("cost_usd", "cost", "price_usd", "price")
 _WARNING_KEYS = ("billing_warning", "deprecation", "deprecation_warning", "warning")
 
 
+#: JSON-RPC code the MCP SDK uses for a client-side read timeout (HTTP 408).
+_REQUEST_TIMEOUT = 408
+
+
 class ProwlError(Exception):
-    pass
+    #: The billed cost of the failed dispatch, when the server reported one —
+    #: a billed failure is still money spent (KA-12).
+    cost_usd: float | None = None
 
 
 class ToolCallError(ProwlError):
-    pass
+    """A definite refusal: the call was answered (or never left the process)."""
+
+
+class DispatchOutcomeUnknown(ProwlError):
+    """A billed dispatch whose outcome is unknown — a timeout or a lost reply.
+    The server may have executed and charged it; a retry must re-send the
+    same idempotency key."""
 
 
 @dataclass
@@ -62,6 +74,9 @@ class ProwlClient:
     call_log: list[ToolCallRecord] = field(default_factory=list)
     cost_usd: float | None = None
     tool_prices: dict[str, float | None] = field(default_factory=dict)
+    #: idempotency key → billed cost of that dispatch (None = not reported).
+    #: Per-attempt cost for concurrent workers, which cannot diff `cost_usd`.
+    cost_by_key: dict[str, float | None] = field(default_factory=dict)
 
     _stack: AsyncExitStack | None = field(default=None, init=False, repr=False)
     _session: ClientSession | None = field(default=None, init=False, repr=False)
@@ -154,13 +169,16 @@ class ProwlClient:
             f"prowl RPC '{name}' failed after {attempts} attempts: {last_error}"
         )
 
-    async def _invoke(self, prowl_tool: str, arguments: dict[str, Any]) -> Any:
-        record = ToolCallRecord(
-            tool=prowl_tool,
-            arguments=arguments,
-            ok=False,
-            at=datetime.now(timezone.utc).isoformat(),
-        )
+    async def _invoke(
+        self, prowl_tool: str, arguments: dict[str, Any], *, record: ToolCallRecord | None = None
+    ) -> Any:
+        if record is None:
+            record = ToolCallRecord(
+                tool=prowl_tool,
+                arguments=arguments,
+                ok=False,
+                at=datetime.now(timezone.utc).isoformat(),
+            )
         self.call_log.append(record)
         # NEVER retry the billed data plane: the server debits the wallet per
         # dispatch, so a timed-out-but-executed call retried by the client is
@@ -171,6 +189,10 @@ class ProwlClient:
             result = await self._rpc(prowl_tool, arguments, retry=retry)
         except McpError as exc:
             record.error = f"JSON-RPC {exc.error.code}: {exc.error.message}"
+            if prowl_tool == "prowl_call_tool" and exc.error.code == _REQUEST_TIMEOUT:
+                # The SDK reports its own read timeout this way: the request was
+                # sent and may have run server-side.
+                raise DispatchOutcomeUnknown(f"{prowl_tool}: {record.error}") from exc
             raise ToolCallError(f"{prowl_tool}: {record.error}") from exc
         except ProwlError as exc:
             record.error = str(exc)
@@ -203,11 +225,15 @@ class ProwlClient:
                 )
             else:
                 log.warning("prowl refused %s: %s", prowl_tool, record.error)
-            raise ToolCallError(f"{prowl_tool}: {record.error[:300]}")
+            error = ToolCallError(f"{prowl_tool}: {record.error[:300]}")
+            error.cost_usd = record.cost_usd
+            raise error
 
         if result.isError:
             record.error = _content_text(result)
-            raise ToolCallError(f"{prowl_tool}: tool returned error: {record.error[:300]}")
+            error = ToolCallError(f"{prowl_tool}: tool returned error: {record.error[:300]}")
+            error.cost_usd = record.cost_usd
+            raise error
 
         record.warning = _extract_warning(payload)
         if record.warning is not None:
@@ -267,7 +293,15 @@ class ProwlClient:
             # re-sends its key so the server does not double-bill a dispatch
             # it already executed.
             request["idempotency_key"] = idempotency_key
-        return await self._invoke("prowl_call_tool", request)
+        record = ToolCallRecord(
+            tool="prowl_call_tool", arguments=request, ok=False,
+            at=datetime.now(timezone.utc).isoformat(),
+        )
+        try:
+            return await self._invoke("prowl_call_tool", request, record=record)
+        finally:
+            if idempotency_key is not None:
+                self.cost_by_key[idempotency_key] = record.cost_usd
 
     async def wallet(self) -> Any:
         return await self._invoke("prowl_get_wallet", {})

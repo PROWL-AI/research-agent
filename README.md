@@ -117,11 +117,11 @@ the run stopped (`null` while it is live). The set is closed:
 
 | `terminal_code` | `status` | meaning |
 |---|---|---|
-| `completed` | `complete` (or `partial` on a resume that kept earlier skip disclosures) | every step ran |
+| `completed` | `complete` (or `partial` when a disclosed omission remains, e.g. a step excluded because its tool left the catalog) | every runnable step ran and its evidence was saved |
 | `budget_tools` / `budget_usd` / `budget_minutes` | `partial` | a runbook budget ran out; the report marks what is missing |
 | `budget_llm` | `partial` | LLM-spend budget (reserved; not set yet) |
 | `step_failed` | `partial` | a step failed hard or a worker crashed |
-| `evidence_incomplete` | — | evidence could not be persisted (reserved; not set yet) |
+| `evidence_incomplete` | `partial` | evidence is missing with no other stop: a claim extraction failed (the resume finishes it from the saved raw, no new paid call), or a required step's raw could not be written (the resume fetches it again — a new, paid call; an optional step is `skipped_on_error` instead) |
 | `cancelled` | `partial` | any cancellation of the owning task: a caller or service cancel, the service timeout (job error `timeout`), Ctrl-C, a client closing its session or a graceful service shutdown |
 | `error` | `failed` | an exception escaped the run; `stop_reason` carries it |
 | `interrupted` | `interrupted` | the owning process died without a terminal write (a hard kill or crash); written by reconciliation, resumable |
@@ -135,7 +135,10 @@ refusal is returned synchronously, also for `wait=false`. `get_status` reports
 live owner anywhere). `interrupted` is
 written by reconciliation — at stdio server start, at CLI `run`/`status`, and
 at Fabric service start — and only for a `running` checkpoint whose lock is
-free. `get_status` also reports `has_checkpoint`: `false` while a run accepted
+free. A run whose version-1 checkpoint cannot be migrated without guessing is
+reported with `status: needs_attention` and the reason in `stop_reason`: its report
+stays readable and exportable, it can be pruned, and `research.run` refuses to
+resume it. `get_status` also reports `has_checkpoint`: `false` while a run accepted
 by this server is still starting, or when it failed or was cancelled before it
 took the run lock (the status then comes from the in-process job and
 disappears with it).
@@ -176,6 +179,12 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
 - Runbooks declare their **tool allowlist** and **budget**
   (`max_tool_calls` / `max_usd` / `max_minutes`). On budget exhaustion the agent
   emits a partial report that marks what is missing — it never fails silently.
+  The budget is read from the run's **attempt ledger**: every dispatched call is
+  recorded before it is sent (so in-flight calls count against `max_tool_calls`),
+  and its cost is stored when it returns or fails — a billed failure costs money
+  too. Spend = server-reported actual costs + estimates for calls without one
+  (the catalog price, else the runbook's per-call share of `max_usd`, never zero);
+  `stats.cost_source` says `server`, `mixed`, `estimate`, or `null` before any tool attempt.
   Budgets cap **Prowl tool calls only**: the agent's own LLM usage (planning,
   claim extraction, transforms, writing, citation repair) is billed by your
   LLM provider on top of `max_usd` — it is metered, not capped, and reported
@@ -186,27 +195,56 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
 ## Current verification and resume limits
 
 The [deep agent audit](docs/reports/2026-10-10-agent-deep-audit/README.md) adds
-seven defects: lifecycle ownership (KA-06 — addressed in wave 1 by the
-run-lock ownership above; certification pending), false evidence verification, hidden artifact/extraction failures and
-budget accounting across mixed receipts/resume.
-Its explicit probes (`PYTHONPATH=tests:. .venv/bin/python -m pytest -q docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py`) are expected to fail until waves 2–3 close KA-07…KA-12; the KA-06 cases and the three controls pass.
+seven defects: lifecycle ownership (KA-06 — wave 1), hidden artifact/extraction
+failures and budget accounting across mixed receipts/resume (KA-10…KA-12 — wave 2),
+and false evidence verification (KA-07…KA-09 — open, wave 3). The ported contracts
+live in `tests/test_ka_contracts.py`. The historical probe file stays as the
+audit's cut: its KA-07/08/09 cases fail until wave 3, and its success control
+asserts a cwd-relative `raw_ref`, which wave 2 replaced with a run-dir-relative one.
 The [2026-10-10 handoff](docs/HANDOFF.md) links the remediation plan and records the audited source revision,
 checks and next repair tasks. The offline suite is `.venv/bin/python -m pytest
 tests/ -q` (network-free); its pass count is a fact about one revision, so it is
 recorded with that revision in the handoff rather than here. A green run does
 not establish live provider quality or Fabric host acceptance.
 
-Resume currently has confirmed gaps: pruning a changed tool catalog can shift
-step indices and skip pending work; a worker failure marks unstarted tail steps
-completed; and a worker writes its checkpoint before adding successful completion.
-These can omit work or replay a previously executed step after a crash. Inspect
-checkpoint, raw artifacts and remaining steps before resuming a paid run. A stable
-caller idempotency key alone does not guarantee exactly-once execution or billing.
-See the handoff for source locations and reproducible acceptance tests.
+Resume works from the checkpoint's step records (schema version 2, wave 2):
+every step has an immutable `step_id` assigned when the plan is made, so a tool
+leaving the catalog excludes that step by id and shifts nothing. A step's state is
+`pending`, `dispatching`, `outcome_unknown`, `raw_saved`, `completed`, `failed`,
+`skipped_on_error`, `skipped_budget` or `excluded`. A resume runs `pending` and
+`failed` steps, finishes `raw_saved` steps from their saved raw **without a new
+paid call**, and re-sends an `outcome_unknown` call with the **same idempotency
+key** (`<run_id>:<step_id>:<attempt>`) so the server can replay it instead of
+billing twice. A client read timeout counts as an unknown outcome, never as a
+refusal, and a budget stop leaves such a step `outcome_unknown` so its key
+survives. **The Prowl server deduplicates a re-sent key only within its retry
+window (15 minutes by default):** a resume after that may be charged again, and
+the re-send is still recorded as one attempt — the budget then undercounts by that
+call. A step migrated from version 1 whose dispatch may have reached the server is
+first re-sent under its v1 key (`<run_id>:<index>:<tool>`). Version-1 checkpoints are migrated on load; a v1 state that cannot be mapped
+without guessing is reported `needs_attention` (above) and never resumed.
+**The upgrade is one-way for a run directory:** the first save of a migrated run
+keeps its v1 file as `checkpoint.v1.json`, but a pre-v2 build reading the new
+`checkpoint.json` re-plans (and re-bills) the run. Restart stdio sessions and
+reinstall the Fabric service before resuming runs a v2 build has touched; a build
+refuses a checkpoint whose `schema_version` is newer than it understands.
 
-Finance/subscription live acceptance remains unverified. `max_usd` limits the
-Prowl tool-call budget, with concurrent in-flight calls potentially overshooting
-it; it is not a cap on the separate LLM provider spend.
+**Status and checkpoint shape (schema 2).** `research.get_status` returns
+`completed_steps` as step ids (not indexes), `planned_steps` without excluded
+steps, `step_counts` per state, `skipped_steps` entries carrying `step_id`,
+`index`, `step`, `tool`, `reason` and `state` (while a run is live, steps still in
+flight are not listed), and `counters` with `data_calls`, `attempted_calls`,
+`cost_usd`, `cost_estimate_usd`, `spend_usd` and `cost_unknown_attempts` (the same
+keys appear in a run's `stats`). `stats.cost_source` is `server`, `mixed`,
+`estimate` or `null` (no tool attempt yet). `checkpoint.json` (also what
+`research.artifact.get` serves) holds `plan_raw`, `steps` and `attempts`; it no
+longer persists `plan`, `completed_steps`, `skipped_steps` or `counters`.
+Crash injection at every durable write is covered by `tests/test_durability.py`.
+
+Finance/subscription live acceptance remains unverified. With several workers,
+the USD check can still overshoot by the in-flight calls' unknown cost (each
+counts at its estimate); `max_usd` is not a cap on the separate LLM provider
+spend.
 
 ## Fabric service and operator dashboard
 

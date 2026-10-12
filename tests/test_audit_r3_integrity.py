@@ -39,6 +39,12 @@ def _seed_checkpoint(runs: Path, run_id: str, **overrides) -> None:
     }
     payload.update(overrides)
     (runs / run_id).mkdir(parents=True, exist_ok=True)
+    # A legitimate version-1 run: every completed step has its raw artifact
+    # (a completed step without one is refused by the v1 → v2 migration).
+    raw = runs / run_id / "raw"
+    raw.mkdir(exist_ok=True)
+    for i in payload.get("completed_steps", []):
+        (raw / f"{i:02d}_{payload['plan'][i]['tool']}.json").write_text("{}")
     (runs / run_id / "checkpoint.json").write_text(json.dumps(payload))
 
 
@@ -121,16 +127,21 @@ class TestCrashDisclosure:
             ledger=Ledger(tmp_path / "x" / "ledger.json"),
             budget=None,
         )
-        chunk = [(i, PlanItem(step=f"s{i}", tool="spyfu_get_domain_stats")) for i in range(3)]
+        from research_agent.evidence.store import StepRecord
+
+        chunk = [StepRecord(step_id=f"s-{i}", raw_index=i, tool="spyfu_get_domain_stats", step=f"s{i}")
+                 for i in range(3)]
+        checkpoint.steps = chunk
 
         summaries = await run_data_segment(chunk, ctx, 1)
 
         assert [o.status for o in summaries[0].outcomes] == ["failed"] * 3
         skips = {s["index"]: s for s in checkpoint.skipped_steps}
         assert set(skips) == {0, 1, 2}
-        assert all("worker crash" in s["reason"] for s in skips.values())
-        # Not completed: a resume must re-execute them.
+        assert all("crashed" in s["reason"] for s in skips.values())
+        # Not completed: they stay pending and a resume re-executes them.
         assert checkpoint.completed_steps == []
+        assert {s.state for s in chunk} == {"pending"}
 
     async def test_crash_skip_entries_are_reexecuted_on_resume(
         self, patched_runbooks, tmp_path: Path, fake_llm: FakeLLM, fake_prowl: FakeProwl
@@ -208,15 +219,12 @@ class TestSkipIndexNamespaces:
         # budget-skipped; the plan_drop at raw index 2 must not hide that.
         result = await orch.run("mini-teardown", {"competitors": ["a.com"]}, run_id="r-ns")
 
-        skips = result.skipped_steps
-        assert any(
-            s["index"] == 2 and s.get("kind") == "plan_drop" and s["step"] == "bad"
-            for s in skips
-        )
-        assert any(
-            s["index"] == 2 and s.get("kind") == "runtime_skip" and s["step"] == "s3"
-            for s in skips
-        )
+        # v2 has one identity per step, so the two can no longer collide: the
+        # planner drop is an excluded step, the budget-stopped one is skipped.
+        skips = {s["step"]: s for s in result.skipped_steps}
+        assert skips["bad"]["state"] == "excluded" and skips["bad"]["index"] == 2
+        assert skips["s3"]["state"] == "skipped_budget" and skips["s3"]["index"] == 3
+        assert skips["bad"]["step_id"] != skips["s3"]["step_id"]
 
     async def test_plan_drop_survives_the_resume_filter(
         self, patched_runbooks, tmp_path: Path, fake_llm: FakeLLM, fake_prowl: FakeProwl
@@ -234,7 +242,7 @@ class TestSkipIndexNamespaces:
 
         result = await orch.run("mini-usd", {"competitors": ["a.com"]}, run_id="r-pd")
 
-        plan_drops = [s for s in result.skipped_steps if s.get("kind") == "plan_drop"]
+        plan_drops = [s for s in result.skipped_steps if s.get("state") == "excluded"]
         assert len(plan_drops) == 1
         assert plan_drops[0]["step"] == "bad"
 

@@ -21,7 +21,23 @@ from research_agent.events import emit
 from research_agent.evidence import terminal
 from research_agent.evidence.ledger import Ledger, _atomic_write_text
 from research_agent.evidence.runlock import RunLock
-from research_agent.evidence.store import ArtifactStore, Checkpoint
+from research_agent.evidence.store import (
+    COMPLETED,
+    DISPATCHING,
+    EXCLUDED,
+    FAILED,
+    OUTCOME_UNKNOWN,
+    PENDING,
+    RAW_SAVED,
+    SETTLED_STATES,
+    SKIPPED_BUDGET,
+    SKIPPED_ON_ERROR,
+    ArtifactStore,
+    Checkpoint,
+    CheckpointMigrationError,
+    StepRecord,
+    make_step_id,
+)
 from research_agent.llm import LLMClient
 from research_agent.prowl_client import ProwlClient, ProwlError
 from research_agent.runbook import Runbook, RunbookInput, get_runbook
@@ -144,11 +160,53 @@ def _coerce_input(spec: RunbookInput, value: Any) -> Any:
     return value.strip()
 
 
+def build_steps(
+    plan: list[dict[str, Any]],
+    allowlist: list[str],
+    catalog: list[str],
+) -> list[StepRecord]:
+    """The plan as executed: one StepRecord per planned item, validated ONCE.
+    A dropped item is an `excluded` step carrying the validator's reason; its
+    step_id is assigned here and never re-derived (KA-03)."""
+    valid_by_index, dropped = _validate_indexed(plan, allowlist, catalog)
+    reasons = {d["index"]: d["reason"] for d in dropped}
+    steps: list[StepRecord] = []
+    for index, raw in enumerate(plan):
+        item = valid_by_index.get(index)
+        if item is None:
+            tool = str(raw.get("tool", "?")) if isinstance(raw, dict) else "?"
+            arguments = raw.get("arguments") if isinstance(raw, dict) and isinstance(raw.get("arguments"), dict) else {}
+            steps.append(StepRecord(
+                step_id=make_step_id(index, tool, arguments), raw_index=index,
+                kind="transform" if tool.lower() in TRANSFORM_TOOLS else "data", tool=tool,
+                arguments=arguments, step=str(raw.get("step", "?")) if isinstance(raw, dict) else "?",
+                state=EXCLUDED, reason=f"plan: {reasons.get(index, 'invalid')}",
+            ))
+            continue
+        steps.append(StepRecord(
+            step_id=make_step_id(index, item.tool, item.arguments), raw_index=index,
+            kind="transform" if item.tool.lower() in TRANSFORM_TOOLS else "data",
+            tool=item.tool, arguments=item.arguments, step=item.step,
+            instruction=item.instruction, on_error_skip=item.on_error_skip,
+        ))
+    return steps
+
+
 def validate_plan(
     plan: list[dict[str, Any]],
     allowlist: list[str],
     catalog: list[str],
 ) -> tuple[list[PlanItem], list[dict[str, Any]]]:
+    """Executable steps of a raw plan plus every drop (planner-time check)."""
+    valid_by_index, dropped = _validate_indexed(plan, allowlist, catalog)
+    return [valid_by_index[i] for i in sorted(valid_by_index)], dropped
+
+
+def _validate_indexed(
+    plan: list[dict[str, Any]],
+    allowlist: list[str],
+    catalog: list[str],
+) -> tuple[dict[int, PlanItem], list[dict[str, Any]]]:
     """Filter the raw plan to executable steps; report every drop.
 
     Returns (valid, dropped). Tool names are normalised to the live catalog's
@@ -159,7 +217,7 @@ def validate_plan(
     """
     allowed_lower = {t.lower() for t in allowlist}
     live = {t.lower(): t for t in catalog}
-    valid: list[PlanItem] = []
+    valid: dict[int, PlanItem] = {}
     dropped: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     transforms = 0
@@ -187,7 +245,7 @@ def validate_plan(
             if transforms > _MAX_TRANSFORM_STEPS:
                 _drop(index, raw, f"transform cap ({_MAX_TRANSFORM_STEPS}) exceeded")
                 continue
-            valid.append(item)
+            valid[index] = item
             continue
         if item.tool.lower() not in allowed_lower:
             _drop(index, raw, f"tool '{item.tool}' is not in the runbook allowlist")
@@ -202,7 +260,7 @@ def validate_plan(
             _drop(index, raw, "duplicate step (same tool and arguments)")
             continue
         seen.add(key)
-        valid.append(item)
+        valid[index] = item
     return valid, dropped
 
 
@@ -340,7 +398,10 @@ class Orchestrator:
         store: ArtifactStore,
     ) -> RunResult:
         ledger = Ledger.load(store.run_dir / "ledger.json")
-        checkpoint = store.load_checkpoint()
+        try:
+            checkpoint = store.load_checkpoint()
+        except CheckpointMigrationError as exc:
+            raise OrchestratorError(f"run {run_id} needs attention: {exc}") from exc
         if checkpoint is not None and checkpoint.runbook != runbook_name:
             raise OrchestratorError(
                 f"run {run_id} already belongs to runbook '{checkpoint.runbook}'"
@@ -351,7 +412,7 @@ class Orchestrator:
                 "reusing the id would silently re-plan over its artifacts and mix "
                 "two runs' claims in one ledger; choose a new run-id"
             )
-        resuming = checkpoint is not None and bool(checkpoint.plan)
+        resuming = checkpoint is not None and bool(checkpoint.steps)
         if resuming and checkpoint.brief:
             # The plan was built against the checkpoint's brief — validating
             # freshly passed inputs would either reject them (unknown keys) or
@@ -366,28 +427,21 @@ class Orchestrator:
         else:
             brief = build_brief(runbook, inputs)
         if resuming:
-            persisted_cost = checkpoint.counters.get("cost_usd")
-            if persisted_cost is not None and self.prowl.cost_usd is None:
-                # The client is fresh on resume — without the prior attempt's
-                # spend, max_usd and the final stats only see this session.
-                self.prowl.cost_usd = persisted_cost
-            log.info("resuming run %s after step %s", run_id, checkpoint.completed_steps[-1] if checkpoint.completed_steps else -1)
-            # A persisted stop_reason belongs to the attempt that crashed or
-            # finished partial: non-completed steps are re-executed now, so the
-            # stale reason and its skip disclosures must not skip them again.
-            # Completed steps keep their disclosures (on_error_skip) or stay
-            # untouched (post-failure chunk skips are never re-billed).
-            # plan_drop entries are in raw-plan index space — completed_steps
-            # is validated-plan space — so they are never filtered out here.
-            completed = set(checkpoint.completed_steps)
-            checkpoint.skipped_steps = [
-                entry for entry in checkpoint.skipped_steps
-                if entry.get("kind") == "plan_drop" or entry.get("index") in completed
-            ]
+            # Persisted steps are authoritative (KA-03). A step caught mid-call
+            # becomes outcome_unknown (re-sent with the same key); a failed or
+            # budget-skipped step runs again — the budget check stops it again
+            # if the money is still gone. Completed, skipped-on-error and
+            # excluded steps never re-run.
+            for record in checkpoint.steps:
+                if record.state == DISPATCHING:
+                    record.state, record.reason = OUTCOME_UNKNOWN, "process exited during dispatch"
+                elif record.state == SKIPPED_BUDGET or (record.state == FAILED and not record.on_error_skip):
+                    record.state, record.reason = PENDING, None
+            log.info("resuming run %s: %s", run_id, checkpoint.step_counts())
             checkpoint.stop_reason = None
             checkpoint.terminal_code = None
             checkpoint.status = "running"
-            checkpoint.partial = checkpoint.partial and bool(checkpoint.skipped_steps)
+            checkpoint.partial = False
             store.save_checkpoint(checkpoint)
         else:
             checkpoint = Checkpoint(run_id=run_id, runbook=runbook_name, brief=brief)
@@ -402,28 +456,30 @@ class Orchestrator:
         catalog = await self.prowl.list_tools()
 
         if not resuming:
-            plan, dropped = await self._plan(runbook, brief, catalog)
-            checkpoint.plan = [item.model_dump() for item in plan]
-            checkpoint.skipped_steps.extend(dropped)
+            raw_plan = await self._plan(runbook, brief, catalog)
+            checkpoint.plan_raw = raw_plan
+            checkpoint.steps = build_steps(raw_plan, runbook.meta.tools, catalog)
             store.save_checkpoint(checkpoint)
+        else:
+            self._exclude_vanished_tools(checkpoint, runbook.meta.tools, catalog)
+            store.save_checkpoint(checkpoint)
+        await self._execute(runbook, checkpoint, store, ledger, started_monotonic)
 
-        plan, dropped = validate_plan(checkpoint.plan, runbook.meta.tools, catalog)
-        if dropped:
-            already = {
-                (entry.get("index"), entry.get("step"), entry.get("tool"))
-                for entry in checkpoint.skipped_steps
-                if entry.get("kind") == "plan_drop"
-            }
-            checkpoint.skipped_steps.extend(
-                d for d in dropped
-                if (d.get("index"), d.get("step"), d.get("tool")) not in already
-            )
-            store.save_checkpoint(checkpoint)
-        await self._execute(runbook, checkpoint, plan, store, ledger, started_monotonic)
+        evidence_incomplete = any(
+            s.state in (RAW_SAVED, OUTCOME_UNKNOWN) or (s.state == FAILED and (s.reason or "").startswith("raw_write"))
+            for s in checkpoint.steps
+        )
+        unfinished = any(
+            s.state not in (COMPLETED, SKIPPED_ON_ERROR, EXCLUDED)
+            or (s.state == EXCLUDED and (s.reason or "").startswith("catalog_changed"))
+            for s in checkpoint.steps
+        )
+        checkpoint.partial = checkpoint.partial or unfinished or evidence_incomplete
+        disclosures = checkpoint.disclosures(final=True)
 
         outcome, fidelity = await produce_report(
             self.llm, runbook, ledger, brief,
-            partial=checkpoint.partial, skipped_steps=checkpoint.skipped_steps,
+            partial=checkpoint.partial, skipped_steps=disclosures,
             transform_notes=checkpoint.transform_notes,
         )
 
@@ -431,20 +487,25 @@ class Orchestrator:
         _atomic_write_text(report_path, outcome.report_md)
         ledger.save()
         checkpoint.status = "partial" if checkpoint.partial else "complete"
-        checkpoint.terminal_code = terminal.code_for_stop_reason(checkpoint.stop_reason)
+        if checkpoint.stop_reason is not None:
+            checkpoint.terminal_code = terminal.code_for_stop_reason(checkpoint.stop_reason)
+        elif evidence_incomplete:
+            checkpoint.terminal_code = terminal.EVIDENCE_INCOMPLETE
+        else:
+            checkpoint.terminal_code = terminal.COMPLETED
+        counters = checkpoint.counters
         stats = {
-            "data_calls": checkpoint.counters.get("data_calls", 0),
-            "attempted_calls": checkpoint.counters.get(
-                "attempted_calls", checkpoint.counters.get("data_calls", 0)
-            ),
+            "data_calls": counters["data_calls"],
+            "attempted_calls": counters["attempted_calls"],
             "total_calls": self.prowl.calls_made,
-            "cost_usd": checkpoint.counters.get("cost_usd"),
-            "cost_estimate_usd": checkpoint.counters.get("cost_estimate_usd"),
-            # None reads as "free" in a report — it is not: it means the server
-            # never told us. The estimate falls back to catalog price hints.
-            "cost_source": (
-                "server" if self.prowl.cost_usd is not None else "estimate_or_none"
-            ),
+            "cost_usd": counters["cost_usd"],
+            "cost_estimate_usd": counters["cost_estimate_usd"],
+            "spend_usd": counters["spend_usd"],
+            "cost_unknown_attempts": counters["cost_unknown_attempts"],
+            # server = every attempt reported its cost; mixed = some did;
+            # estimate = none did (catalog price or per-call share of max_usd).
+            "cost_source": checkpoint.cost_source("tool"),
+            "steps": checkpoint.step_counts(),
             # max_usd / max_tool_calls bound Prowl tool spend only. Planner,
             # extraction, transform, writer and fidelity LLM tokens are billed
             # by the LLM provider on top — say so wherever cost_usd is read.
@@ -477,9 +538,26 @@ class Orchestrator:
             partial=checkpoint.partial,
             report_path=str(report_path),
             ledger_path=str(ledger.path),
-            skipped_steps=checkpoint.skipped_steps,
+            skipped_steps=disclosures,
             stats=stats,
         )
+
+    @staticmethod
+    def _exclude_vanished_tools(checkpoint: Checkpoint, allowlist: list[str], catalog: list[str]) -> None:
+        """On resume, a tool that left the live catalog or the runbook allowlist
+        excludes THAT step by id; nothing shifts and nothing settled changes."""
+        allowed = {t.lower() for t in allowlist}
+        live = {t.lower() for t in catalog}
+        for record in checkpoint.steps:
+            if record.kind != "data" or record.state in SETTLED_STATES or record.state == RAW_SAVED:
+                continue
+            name = record.tool.lower()
+            if name not in live or name not in allowed:
+                where = "live catalog" if name not in live else "runbook allowlist"
+                record.state = EXCLUDED
+                record.reason = f"catalog_changed: '{record.tool}' is no longer in the {where}"
+                emit(log, "step.state", run_id=checkpoint.run_id, step_id=record.step_id,
+                     tool=record.tool, **{"from": "runnable", "to": EXCLUDED})
 
     @staticmethod
     def _export_html(run_dir: Path) -> None:
@@ -492,7 +570,8 @@ class Orchestrator:
 
     async def _plan(
         self, runbook: Runbook, brief: dict[str, Any], catalog: list[str]
-    ) -> tuple[list[PlanItem], list[dict[str, Any]]]:
+    ) -> list[Any]:
+        """The planner's raw plan; validation happens once, in build_steps."""
         schemas = await self._tool_schemas(runbook.meta.tools, catalog)
         budget = runbook.meta.budget
         user = (
@@ -515,10 +594,10 @@ class Orchestrator:
         raw_plan = payload.get("plan") if isinstance(payload, dict) else None
         if not isinstance(raw_plan, list):
             raise OrchestratorError("planner did not return a JSON object with a 'plan' list")
-        plan, dropped = validate_plan(raw_plan, runbook.meta.tools, catalog)
+        plan, _dropped = validate_plan(raw_plan, runbook.meta.tools, catalog)
         if not plan:
             raise OrchestratorError("planner produced no executable steps after validation")
-        return plan, dropped
+        return [item for item in raw_plan]
 
     async def _tool_schemas(self, tools: list[str], catalog: list[str]) -> dict[str, Any]:
         live = set(catalog)
@@ -539,7 +618,6 @@ class Orchestrator:
         self,
         runbook: Runbook,
         checkpoint: Checkpoint,
-        plan: list[PlanItem],
         store: ArtifactStore,
         ledger: Ledger,
         started_monotonic: float,
@@ -554,7 +632,6 @@ class Orchestrator:
         )
 
         budget = runbook.meta.budget
-        completed = set(checkpoint.completed_steps)
         effort = effort_for(budget.max_tool_calls, runbook.meta.effort)
         n_workers = self.max_workers if self.max_workers is not None else (1 if os.environ.get("RESEARCH_NO_SUBAGENTS") else EFFORT_WORKERS[effort])
         ctx = WorkerContext(
@@ -567,36 +644,38 @@ class Orchestrator:
         )
         log.info("execution effort=%s workers=%d", effort, n_workers)
 
-        if self.prowl.cost_usd is None:
-            log.info(
-                "no cost metadata from server; max_usd=%.2f enforced only if cost info appears",
-                budget.max_usd,
-            )
+        # Paid-for evidence first: a data step whose raw is saved finishes its
+        # extraction before any budget check — extraction spends no tool money,
+        # and a spent budget must not strand it (resume of a crashed run).
+        from research_agent.agent.subagent import extract_step
 
-        segments = split_segments(plan, completed)
+        for record in checkpoint.steps:
+            if record.kind == "data" and record.state == RAW_SAVED:
+                await extract_step(ctx, record, None)
+
+        segments = split_segments(checkpoint.steps)
         for seg_index, (kind, items) in enumerate(segments):
             if checkpoint.stop_reason is not None:
-                # A worker (or a transform) hit a hard failure / budget stop in an
-                # earlier segment: every step never reached still has to be
-                # disclosed in the partial report, not silently absent.
-                self._skip_remaining(checkpoint, segments[seg_index:], checkpoint.stop_reason)
-                store.save_checkpoint(checkpoint)
+                # A hard failure in an earlier segment: the steps never reached
+                # stay `pending` (a resume runs them) and are disclosed via the
+                # run's stop_reason.
                 break
 
-            stop_reason = self._budget_stop_reason(budget, checkpoint)
-            if stop_reason is not None:
-                self._skip_remaining(checkpoint, segments[seg_index:], stop_reason)
-                checkpoint.partial = True
-                checkpoint.stop_reason = stop_reason
-                log.warning("budget exhausted (%s); skipping remaining steps", stop_reason)
-                # Persist BEFORE the writer runs: dying here without a saved
-                # stop_reason makes resume re-execute (and re-bill) skipped steps.
-                store.save_checkpoint(checkpoint)
-                break
+            if kind == "data" or not all(r.state == RAW_SAVED for r in items):
+                stop_reason = self._budget_stop_reason(budget, checkpoint)
+                if stop_reason is not None:
+                    self._skip_remaining(checkpoint, segments[seg_index:], stop_reason)
+                    checkpoint.partial = True
+                    checkpoint.stop_reason = stop_reason
+                    emit(log, "budget.stop", logging.WARNING, run_id=checkpoint.run_id,
+                         reason=stop_reason, spend_usd=checkpoint.spend_usd("tool"))
+                    # Persist BEFORE the writer runs: dying here without a saved
+                    # stop_reason makes resume re-execute (and re-bill) skipped steps.
+                    store.save_checkpoint(checkpoint)
+                    break
 
             if kind == "transform":
-                index, item = items[0]
-                await self._execute_transform(index, item, checkpoint, store, ledger)
+                await self._execute_transform(items[0], checkpoint, store, ledger)
                 continue
 
             summaries = await run_data_segment(items, ctx, n_workers)
@@ -614,71 +693,83 @@ class Orchestrator:
     @staticmethod
     def _skip_remaining(
         checkpoint: Checkpoint,
-        segments: list[tuple[str, list[tuple[int, "PlanItem"]]]],
-        reason: str | None,
+        segments: list[tuple[str, list[StepRecord]]],
+        reason: str,
     ) -> None:
-        """Disclose every unreached step in the partial report — once. Resume
-        re-enters this branch, so indexes already recorded are not duplicated.
-        Dedup runs against runtime skips only: a plan_drop entry's index is in
-        raw-plan space and must not suppress a validated-plan disclosure."""
-        already = {
-            entry.get("index") for entry in checkpoint.skipped_steps
-            if entry.get("kind") != "plan_drop"
-        }
-        checkpoint.skipped_steps.extend(
-            {"index": j, "step": item.step, "tool": item.tool, "reason": reason,
-             "kind": "runtime_skip"}
-            for _, items in segments
-            for j, item in items
-            if j not in already
-        )
+        """A budget stop: every runnable step not reached is `skipped_budget`
+        (disclosed, resumable once the budget allows). Saved raw keeps its
+        state — finishing it costs no tool money."""
+        for _, items in segments:
+            for record in items:
+                # outcome_unknown keeps its state: its next send must reuse the
+                # original idempotency key, whatever stops this attempt.
+                if record.state not in SETTLED_STATES and record.state not in (RAW_SAVED, OUTCOME_UNKNOWN):
+                    record.state, record.reason = SKIPPED_BUDGET, reason
 
     async def _execute_transform(
         self,
-        index: int,
-        item: PlanItem,
+        record: StepRecord,
         checkpoint: Checkpoint,
         store: ArtifactStore,
         ledger: Ledger,
     ) -> None:
-        log.info("transform step %d: %s", index, item.step)
+        from research_agent.agent.subagent import WorkerContext, extract_step, save_state
+
+        ctx = WorkerContext(orch=self, checkpoint=checkpoint, store=store, ledger=ledger,
+                            budget=None, extract_claims=self._extract_claims)
+        if record.state == RAW_SAVED:
+            await extract_step(ctx, record, None)
+            return
+        log.info("transform step %s: %s", record.step_id, record.step)
         try:
-            result = await self._run_transform(item, store)
+            result = await self._run_transform(record, checkpoint, store)
         except Exception as exc:
-            if item.on_error_skip:
-                log.warning("transform step %d failed (on_error_skip): %s", index, exc)
-                checkpoint.skipped_steps.append(
-                    {"index": index, "step": item.step, "tool": item.tool, "reason": str(exc)[:200]}
-                )
-                checkpoint.completed_steps.append(index)
-                store.save_checkpoint(checkpoint)
+            if record.on_error_skip:
+                log.warning("transform step %s failed (on_error_skip): %s", record.step_id, exc)
+                record.state, record.reason = SKIPPED_ON_ERROR, str(exc)[:300]
+                save_state(checkpoint, store)
                 return
             checkpoint.partial = True
-            checkpoint.stop_reason = f"step '{item.step}' failed: {exc}"
-            checkpoint.skipped_steps.append(
-                {"index": index, "step": item.step, "tool": item.tool, "reason": checkpoint.stop_reason}
-            )
-            log.error("transform step %d failed, aborting to writer: %s", index, exc)
+            checkpoint.stop_reason = f"step '{record.step}' failed: {exc}"
+            record.state, record.reason = FAILED, checkpoint.stop_reason[:300]
+            # Saved now, not at the next segment: a crash before then would
+            # forget the failure (B-008).
+            save_state(checkpoint, store)
+            log.error("transform step %s failed, aborting to writer: %s", record.step_id, exc)
             return
-        raw_path = store.save_markdown(index, "transform", str(result))
-        checkpoint.transform_notes.append(str(result))
         try:
-            await self._extract_claims(item, result, raw_path, ledger)
-        except Exception as exc:
-            log.warning("claim extraction failed for transform step %d: %s", index, exc)
-        ledger.save()
-        checkpoint.completed_steps.append(index)
-        store.save_checkpoint(checkpoint)
+            record.raw_ref, record.raw_sha256 = store.save_markdown(record.step_id, "transform", str(result))
+        except Exception as exc:  # noqa: BLE001 — typed into the step (B-006)
+            record.state, record.reason = FAILED, f"raw_write: {exc}"[:300]
+            checkpoint.partial = True
+            emit(log, "evidence.incomplete", logging.WARNING, run_id=checkpoint.run_id,
+                 step_id=record.step_id, reason="raw_write", error=exc)
+            save_state(checkpoint, store)
+            return
+        checkpoint.transform_notes.append(str(result))
+        record.state = RAW_SAVED
+        save_state(checkpoint, store)
+        await extract_step(ctx, record, str(result))
 
-    async def _run_transform(self, item: PlanItem, store: ArtifactStore) -> str:
-        instruction = item.instruction or (
-            json.dumps(item.arguments, ensure_ascii=False) if item.arguments else item.step
+    async def _run_transform(self, record: StepRecord, checkpoint: Checkpoint, store: ArtifactStore) -> str:
+        instruction = record.instruction or (
+            json.dumps(record.arguments, ensure_ascii=False) if record.arguments else record.step
         )
+        # The most recent data artifacts in plan order (raw names are step ids,
+        # so directory order says nothing about recency).
+        recent = [
+            s for s in checkpoint.steps
+            if s.kind == "data" and s.raw_ref and s.state in (COMPLETED, RAW_SAVED)
+        ][-_TRANSFORM_CONTEXT_ARTIFACTS:]
         context_parts = []
-        for path in store.raw_files()[-_TRANSFORM_CONTEXT_ARTIFACTS:]:
-            snippet = path.read_text(encoding="utf-8")[:_TRANSFORM_CONTEXT_CHARS]
+        for s in recent:
+            try:
+                snippet = store.read_artifact(s.raw_ref)[:_TRANSFORM_CONTEXT_CHARS]
+            except OSError as exc:
+                log.warning("transform context: %s unreadable: %s", s.raw_ref, exc)
+                continue
             context_parts.append(
-                f"### {path.name}\n{_UNTRUSTED_OPEN}\n{snippet}\n{_UNTRUSTED_CLOSE}"
+                f"### {s.step} ({s.tool})\n{_UNTRUSTED_OPEN}\n{snippet}\n{_UNTRUSTED_CLOSE}"
             )
         system = (
             "You are a transform step in a research run: you synthesize and extract "
@@ -700,12 +791,14 @@ class Orchestrator:
         )
 
     def _budget_stop_reason(self, budget: Any, checkpoint: Checkpoint) -> str | None:
-        # Attempted (not just successful) calls: the server bills failed
-        # dispatches too, so a budget that ignores them is not a budget.
-        attempted = checkpoint.counters.get(
-            "attempted_calls", checkpoint.counters.get("data_calls", 0)
-        )
-        if attempted >= budget.max_tool_calls:
+        """Read from the attempt ledger, never from the client: every attempted
+        dispatch counts (the server bills failures too), and spend is Σ actual +
+        Σ estimate for attempts without an actual — a known cost never discards
+        the estimates of other attempts (KA-11), and a billed failure's cost
+        survives resume (KA-12)."""
+        if budget is None:
+            return None
+        if len(checkpoint.tool_attempts()) >= budget.max_tool_calls:
             return terminal.budget_stop_text(terminal.BUDGET_TOOLS, budget.max_tool_calls)
         # Elapsed is measured from the checkpoint's creation, not from this
         # process start — otherwise every resume resets the clock and a
@@ -716,22 +809,21 @@ class Orchestrator:
         elapsed_minutes = (datetime.now(timezone.utc) - created).total_seconds() / 60
         if elapsed_minutes >= budget.max_minutes:
             return terminal.budget_stop_text(terminal.BUDGET_MINUTES, budget.max_minutes)
-        cost = self.prowl.cost_usd
-        if cost is None:
-            cost = checkpoint.counters.get("cost_estimate_usd")
-            if cost is not None and cost >= budget.max_usd:
-                return terminal.budget_stop_text(
-                    terminal.BUDGET_USD, budget.max_usd, note="estimated from catalog prices"
-                )
-        elif cost >= budget.max_usd:
-            return terminal.budget_stop_text(terminal.BUDGET_USD, budget.max_usd)
+        spend = checkpoint.spend_usd("tool")
+        if spend >= budget.max_usd:
+            source = checkpoint.cost_source("tool")
+            note = None if source == "server" else f"{source} cost: actual + estimates"
+            return terminal.budget_stop_text(terminal.BUDGET_USD, budget.max_usd, note=note)
         return None
 
     async def _extract_claims(
-        self, item: PlanItem, result: Any, raw_path: Path, ledger: Ledger
+        self, item: PlanItem, result: Any, raw_path: Path, ledger: Ledger,
+        step_id: str | None = None,
     ) -> int:
         """Extract ledger claims from a raw result; returns how many were added
-        (the caller's accounting must not diff a shared ledger under fan-out)."""
+        (the caller's accounting must not diff a shared ledger under fan-out).
+        The step_id is accepted for callers that record which claims a step
+        produced (research_agent.agent.subagent.extract_step)."""
         raw_text = json.dumps(
             _strip_envelope_meta(result), ensure_ascii=False, default=str
         )[:_RAW_SNIPPET_CHARS]
@@ -763,18 +855,28 @@ class Orchestrator:
         for raw_claim in claims[:8]:
             if not isinstance(raw_claim, dict) or not raw_claim.get("claim"):
                 continue
-            ledger.add(
-                claim=str(raw_claim["claim"]),
-                value=raw_claim.get("value"),
-                unit=raw_claim.get("unit"),
-                subject=raw_claim.get("subject"),
-                source_tool=item.tool,
-                source_url=raw_claim.get("source_url"),
-                raw_ref=str(raw_path),
-                verbatim=bool(raw_claim.get("verbatim")),
-            )
+            try:
+                self._add_claim(ledger, item, raw_claim, raw_path)
+            except ValueError as exc:
+                # One malformed claim (e.g. a NaN value) is dropped on its own;
+                # it must not cost the step its other evidence.
+                log.warning("claim dropped for %s: %s", item.tool, exc)
+                continue
             added += 1
         return added
+
+    @staticmethod
+    def _add_claim(ledger: Ledger, item: PlanItem, raw_claim: dict[str, Any], raw_path: Path) -> None:
+        ledger.add(
+            claim=str(raw_claim["claim"]),
+            value=raw_claim.get("value"),
+            unit=raw_claim.get("unit"),
+            subject=raw_claim.get("subject"),
+            source_tool=item.tool,
+            source_url=raw_claim.get("source_url"),
+            raw_ref=str(raw_path),
+            verbatim=bool(raw_claim.get("verbatim")),
+        )
 
     @staticmethod
     def _new_run_id(runbook_name: str) -> str:

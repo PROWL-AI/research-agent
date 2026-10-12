@@ -13,23 +13,28 @@ from research_agent.evidence.store import ArtifactStore, Checkpoint
 class TestSaveRawIsAtomic:
     def test_save_raw_leaves_no_partial_file(self, tmp_path: Path):
         store = ArtifactStore(tmp_path / "run1")
-        path = store.save_raw(0, "some_tool", {"rows": [1, 2, 3]})
+        ref, sha = store.save_raw("s-abc", "some_tool", {"rows": [1, 2, 3]})
+        path = store.resolve(ref)
+        assert ref == "raw/s-abc_some_tool.json"  # run-dir-relative (B-025)
         assert path.is_file()
         assert not list(store.raw_dir.glob("*.tmp"))
         assert json.loads(path.read_text()) == {"rows": [1, 2, 3]}
+        assert store.read_artifact(ref, sha) == path.read_text()
 
     def test_save_raw_rejects_non_finite_numbers(self, tmp_path: Path):
         store = ArtifactStore(tmp_path / "run1")
         with pytest.raises(ValueError):
-            store.save_raw(0, "some_tool", {"value": float("nan")})
+            store.save_raw("s-abc", "some_tool", {"value": float("nan")})
         assert not list(store.raw_dir.glob("*.json"))
 
 
 class TestCheckpointStrictJson:
-    def test_save_checkpoint_rejects_non_finite_counters(self, tmp_path: Path):
+    def test_save_checkpoint_rejects_non_finite_costs(self, tmp_path: Path):
+        from research_agent.evidence.store import AttemptRecord
+
         store = ArtifactStore(tmp_path / "run1")
         checkpoint = Checkpoint(run_id="run1", runbook="x")
-        checkpoint.counters["cost_usd"] = float("inf")
+        checkpoint.attempts.append(AttemptRecord(attempt_id="a", step_id="s", actual_usd=float("inf")))
         with pytest.raises(ValueError):
             store.save_checkpoint(checkpoint)
         assert not store.checkpoint_path.exists()
@@ -40,7 +45,7 @@ class TestCheckpointSchemaVersion:
         store = ArtifactStore(tmp_path / "run1")
         store.save_checkpoint(Checkpoint(run_id="run1", runbook="x"))
         data = json.loads(store.checkpoint_path.read_text())
-        assert data["schema_version"] == 1
+        assert data["schema_version"] == 2
 
     def test_checkpoint_without_schema_version_still_loads(self, tmp_path: Path):
         # Pre-versioning checkpoints stay resumable.
@@ -54,5 +59,6 @@ class TestCheckpointSchemaVersion:
         store = ArtifactStore(run_dir)
         checkpoint = store.load_checkpoint()
         assert checkpoint is not None
-        assert checkpoint.schema_version == 1
+        assert checkpoint.migrated_from == 1  # loaded through the v1 → v2 migration
         assert checkpoint.run_id == "run1"
+        assert [s.tool for s in checkpoint.steps] == ["t"] and checkpoint.steps[0].state == "pending"

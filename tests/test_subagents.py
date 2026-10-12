@@ -135,22 +135,29 @@ class TestPartitionWorkers:
 
 
 class TestSplitSegments:
+    @staticmethod
+    def _steps(tools, settled=()):
+        from research_agent.evidence.store import StepRecord, make_step_id
+
+        out = []
+        for i, tool in enumerate(tools):
+            out.append(StepRecord(step_id=make_step_id(i, tool, {}), raw_index=i, tool=tool,
+                                  kind="transform" if tool == "transform" else "data", step=f"s{i}",
+                                  state="completed" if i in settled else "pending"))
+        return out
+
     def test_transforms_isolate_data_runs(self):
-        plan = [
-            PlanItem(step="d0", tool="spyfu_get_domain_stats"),
-            PlanItem(step="d1", tool="spyfu_get_domain_stats"),
-            PlanItem(step="t", tool="transform", instruction="synthesize"),
-            PlanItem(step="d2", tool="spyfu_get_domain_stats"),
-        ]
-        segments = split_segments(plan, set())
+        steps = self._steps(["spyfu_get_domain_stats", "spyfu_get_domain_stats", "transform",
+                             "spyfu_get_domain_stats"])
+        segments = split_segments(steps)
         assert [kind for kind, _ in segments] == ["data", "transform", "data"]
-        assert [i for i, _ in segments[0][1]] == [0, 1]
-        assert [i for i, _ in segments[2][1]] == [3]
+        assert [s.raw_index for s in segments[0][1]] == [0, 1]
+        assert [s.raw_index for s in segments[2][1]] == [3]
 
     def test_completed_steps_are_left_out(self):
-        plan = [PlanItem(step=f"d{i}", tool="spyfu_get_domain_stats") for i in range(3)]
-        segments = split_segments(plan, {0, 1})
-        assert [i for i, _ in segments[0][1]] == [2]
+        steps = self._steps(["spyfu_get_domain_stats"] * 3, settled={0, 1})
+        segments = split_segments(steps)
+        assert [s.raw_index for s in segments[0][1]] == [2]
 
 
 class TestRunbookEffortField:
@@ -261,7 +268,7 @@ class TestFailureSemantics:
         failed = {s["step"] for s in result.skipped_steps}
         assert {"bad-0", "bad-2"} <= failed
         checkpoint = json.loads((tmp_path / "runs" / "p5" / "checkpoint.json").read_text())
-        assert checkpoint["counters"]["data_calls"] == 2  # only the good ones counted
+        assert checkpoint["stats"]["data_calls"] == 2  # only the good ones counted
 
     async def test_on_error_skip_inside_worker(
         self, para_runbooks: Path, tmp_path: Path, fake_llm: FakeLLM
@@ -307,6 +314,12 @@ class TestResume:
         prowl = FakeProwl()
         runs = tmp_path / "runs"
         (runs / "p8").mkdir(parents=True)
+        # A legitimate v1 run: completed steps have their raw artifacts. It is
+        # migrated to v2 on load and only the never-run steps execute.
+        plan = _data_plan(4)["plan"]
+        (runs / "p8" / "raw").mkdir()
+        for i in (0, 1):
+            (runs / "p8" / "raw" / f"{i:02d}_{plan[i]['tool']}.json").write_text("{}")
         (runs / "p8" / "checkpoint.json").write_text(json.dumps({
             "run_id": "p8",
             "runbook": "para-deep",

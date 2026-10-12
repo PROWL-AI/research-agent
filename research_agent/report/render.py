@@ -35,7 +35,9 @@ def _stats_rows(stats: dict[str, Any]) -> list[tuple[str, str]]:
     for key, label in (
         ("data_calls", "Data tool calls"),
         ("claims", "Ledger claims"),
-        ("cost_usd", "Cost (USD)"),
+        ("cost_usd", "Server-reported cost (USD)"),
+        ("spend_usd", "Tool spend incl. estimates (USD)"),
+        ("cost_source", "Cost source"),
         ("duration_s", "Duration (s)"),
         ("lint_issues_after", "Lint issues (final)"),
     ):
@@ -124,17 +126,17 @@ def render_report_html(
 
 def render_run(run_dir: Path) -> Path:
     store = ArtifactStore(run_dir)
-    checkpoint = store.load_checkpoint()
+    try:
+        checkpoint = store.load_checkpoint()
+    except ValueError as exc:  # a checkpoint that needs attention, or corrupt
+        raise RenderError(f"run at {run_dir}: {exc}") from exc
     if checkpoint is None:
         raise RenderError(f"run at {run_dir} has no checkpoint.json")
     report_path = run_dir / "report.md"
     if not report_path.is_file():
         raise RenderError(f"run at {run_dir} has no report.md")
     ledger = Ledger.load(run_dir / "ledger.json")
-    stats = dict(checkpoint.stats)
-    stats.setdefault("data_calls", checkpoint.counters.get("data_calls", 0))
-    if checkpoint.counters.get("cost_usd") is not None:
-        stats.setdefault("cost_usd", checkpoint.counters["cost_usd"])
+    stats = {**checkpoint.stats, **checkpoint.live_stats()}
     html_text = render_report_html(
         report_path.read_text(encoding="utf-8"),
         ledger,

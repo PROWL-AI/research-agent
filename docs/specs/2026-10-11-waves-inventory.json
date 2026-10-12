@@ -1,7 +1,7 @@
 {
   "schema": "task-pipeline/waves-inventory/1",
   "topic": "research-agent — close every open item in its final form",
-  "measured_at": "2026-10-11 (re-measured after wave 1)",
+  "measured_at": "2026-10-12 (re-measured after wave 2)",
   "measured_on": "c0dfb6e8be132c961f50c030c8b352f1d1d27dc3",
   "measurement": {
     "suite": ".venv/bin/python -m pytest tests/ -q → 328 passed",
@@ -131,7 +131,7 @@
       "id": "B-024",
       "title": "Contract probes live outside tests/ (deep probes in docs/reports, resume probes only in prowl-app); move each into tests/ as its fix lands, keep the diagnostic cut",
       "source": "docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py; prowl-app probe_research_resume.py",
-      "status": "in-flight — KA-06 contracts in tests/ (675e769); remaining probes move with waves 2–3",
+      "status": "in-flight — KA-03..06/10..12 contracts in tests/ (waves 1-2); KA-07..09 move with wave 3",
       "area": "tests",
       "node": "N-DOCS",
       "blocked_by": [],
@@ -169,7 +169,7 @@
       "id": "KA-03",
       "title": "Step identity is a position in a re-filtered plan; a catalog/allowlist change makes an unexecuted step look complete",
       "source": "research_agent/agent/orchestrator.py:340; subagent.py:126-128,188; evidence/store.py:72,89",
-      "status": "open — probe red at c0dfb6e",
+      "status": "closed",
       "area": "state",
       "node": "N-STATE",
       "blocked_by": [
@@ -177,13 +177,14 @@
       ],
       "closable_in_one_pass": true,
       "wave": 2,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — wave 2 (); immutable step ids, plan validated once"
     },
     {
       "id": "KA-04",
       "title": "Never-started tail after a hard failure (and budget-stopped steps) are appended to completed_steps",
       "source": "research_agent/agent/subagent.py:166-171,194-205,219-227",
-      "status": "open — probe red at c0dfb6e",
+      "status": "closed",
       "area": "state",
       "node": "N-STATE",
       "blocked_by": [
@@ -191,13 +192,14 @@
       ],
       "closable_in_one_pass": true,
       "wave": 2,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — wave 2 (); never-started steps stay pending"
     },
     {
       "id": "KA-05",
       "title": "Completion is appended after the save; a crash leaves raw+claims on disk with the step not completed and resume re-dispatches",
       "source": "research_agent/agent/subagent.py:250-261; orchestrator.py:586-594",
-      "status": "open — probe red at c0dfb6e",
+      "status": "closed",
       "area": "state",
       "node": "N-STATE",
       "blocked_by": [
@@ -206,13 +208,14 @@
       ],
       "closable_in_one_pass": true,
       "wave": 2,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — wave 2 (); durable order, crash test at every write"
     },
     {
       "id": "KA-10",
       "title": "Raw-save or extraction failure still ends complete (invented raw_path, swallowed extraction error)",
       "source": "research_agent/agent/subagent.py:249-267; orchestrator.py:363,588-591",
-      "status": "open — probe red at c0dfb6e",
+      "status": "closed",
       "area": "state",
       "node": "N-STATE",
       "blocked_by": [
@@ -221,49 +224,53 @@
       ],
       "closable_in_one_pass": true,
       "wave": 2,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — wave 2 (); typed evidence outcome, evidence_incomplete"
     },
     {
       "id": "B-006",
       "title": "save_markdown is non-atomic and an OSError escapes _execute_transform, failing the whole run",
       "source": "research_agent/evidence/store.py:87-96",
-      "status": "open",
+      "status": "closed",
       "area": "state",
       "node": "N-STATE",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 2,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — wave 2; atomic save_markdown, raw-write failure typed"
     },
     {
       "id": "B-008",
       "title": "A failed transform is not persisted until the next segment saves",
       "source": "research_agent/agent/orchestrator.py:579-585",
-      "status": "open",
+      "status": "closed",
       "area": "state",
       "node": "N-STATE",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 2,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — wave 2; failed transform saved immediately"
     },
     {
       "id": "B-025",
       "title": "raw_ref is absolute under the service and CWD-relative under CLI/MCP — not portable, blocks quote-to-raw checks",
       "source": "research_agent/agent/orchestrator.py:684-697; evidence/store.py",
-      "status": "open",
+      "status": "closed",
       "area": "state",
       "node": "N-STATE",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 2,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — wave 2; run-dir-relative raw_ref"
     },
     {
       "id": "KA-11",
       "title": "The first known server cost drops all earlier estimates from the budget check",
       "source": "research_agent/agent/orchestrator.py:642-648; subagent.py:234-248",
-      "status": "open — probe red at c0dfb6e",
+      "status": "closed",
       "area": "cost",
       "node": "N-COST",
       "blocked_by": [
@@ -271,13 +278,14 @@
       ],
       "closable_in_one_pass": true,
       "wave": 2,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — wave 2 (); attempt ledger: actual + estimates"
     },
     {
       "id": "KA-12",
       "title": "A billed failure's cost is never persisted; resume re-dispatches past the limit",
       "source": "research_agent/prowl_client.py:180-206; agent/subagent.py:190-230; orchestrator.py:306-310,370",
-      "status": "open — probe red at c0dfb6e",
+      "status": "closed",
       "area": "cost",
       "node": "N-COST",
       "blocked_by": [
@@ -285,7 +293,8 @@
       ],
       "closable_in_one_pass": true,
       "wave": 2,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — wave 2 (); billed failure cost persisted and restored"
     },
     {
       "id": "KA-07",
@@ -647,6 +656,21 @@
       "closable_in_one_pass": false,
       "wave": null,
       "release": "program"
+    },
+    {
+      "id": "B-032",
+      "title": "Server-side dedupe of a same-key resend is unverified offline (Prowl retry window, 15 min default); CORE-14",
+      "source": "wave-2 product certification; prowl-app persistence/wallet.py retry window",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [
+        "FD-13",
+        "KA-01"
+      ],
+      "closable_in_one_pass": false,
+      "wave": 6,
+      "release": "this"
     }
   ]
 }

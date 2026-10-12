@@ -50,7 +50,10 @@ def _make_run(tmp_path: Path, run_id: str, report_md: str) -> Path:
     )
     ledger.save()
     checkpoint = Checkpoint(run_id=run_id, runbook="mini-teardown")
-    checkpoint.counters["data_calls"] = 1
+    from research_agent.evidence.store import AttemptRecord
+
+    checkpoint.attempts = [AttemptRecord(attempt_id=f"a{i}", step_id=f"s{i}", outcome="ok",
+                                         cost_basis="actual", actual_usd=0.0) for i in range(1)]
     (run_dir / "checkpoint.json").write_text(checkpoint.model_dump_json())
     return run_dir
 

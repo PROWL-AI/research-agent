@@ -106,7 +106,7 @@ async def test_run_wait_false_job_handle_then_status_and_report(
 
     status = await srv.research_get_status("mcp-job")
     assert status["status"] == "complete"
-    assert status["completed_steps"] == [0]
+    assert len(status["completed_steps"]) == 1 and status["completed_steps"][0].startswith("s-")
     assert status["counters"]["data_calls"] == 1
     assert status["duration_s"] is not None
 
@@ -147,7 +147,10 @@ def test_cli_status_and_report_parity(wired, fake_llm, tmp_path, monkeypatch, ca
 
     store = ArtifactStore(tmp_path / "runs" / "cli-run")
     checkpoint = Checkpoint(run_id="cli-run", runbook="mini-teardown")
-    checkpoint.counters["data_calls"] = 3
+    from research_agent.evidence.store import AttemptRecord
+
+    checkpoint.attempts = [AttemptRecord(attempt_id=f"a{i}", step_id=f"s{i}", outcome="ok",
+                                         cost_basis="actual", actual_usd=0.0) for i in range(3)]
     store.save_checkpoint(checkpoint)
     (tmp_path / "runs" / "cli-run" / "report.md").write_text("# CLI report\n")
 

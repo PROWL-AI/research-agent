@@ -41,7 +41,7 @@ from research_agent.config import Config, ConfigError
 from research_agent.events import emit
 from research_agent.evidence import terminal
 from research_agent.evidence.runlock import is_locked_elsewhere, reconcile_orphans
-from research_agent.evidence.store import ArtifactStore, validate_run_id
+from research_agent.evidence.store import ArtifactStore, CheckpointMigrationError, validate_run_id
 from research_agent.llm import LLMClient
 from research_agent.prowl_client import ProwlClient
 from research_agent.runbook import RunbookError, get_runbook, list_runbooks
@@ -181,6 +181,10 @@ async def research_run(
         existing = await asyncio.to_thread(
             ArtifactStore(_runs_root() / run_id).load_checkpoint
         )
+    except CheckpointMigrationError as exc:
+        raise ValueError(
+            f"run '{run_id}' needs attention: {exc} — it is not resumed; start a new run_id"
+        ) from exc
     except ValueError as exc:
         raise ValueError(f"run '{run_id}' checkpoint corrupt: {exc}") from exc
     if existing is not None and existing.runbook != runbook:
@@ -279,10 +283,31 @@ def _pre_checkpoint_status(run_id: str, task: asyncio.Task) -> dict[str, Any]:
         "active": not task.done(),
         "has_checkpoint": False,
         "planned_steps": 0,
+        "step_counts": {},
         "completed_steps": [],
         "skipped_steps": [],
         "counters": {},
         "duration_s": None,
+    }
+
+
+def _needs_attention_status(run_id: str, exc: Exception) -> dict[str, Any]:
+    """A version-1 checkpoint that cannot be migrated without guessing: the
+    run is reported, its report stays readable, and it is never resumed."""
+    import json as _json
+
+    raw: dict[str, Any] = {}
+    try:
+        raw = _json.loads((_runs_root() / run_id / "checkpoint.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        pass
+    return {
+        "run_id": run_id, "runbook": raw.get("runbook"), "status": "needs_attention",
+        "partial": bool(raw.get("partial")), "stop_reason": str(exc)[:300],
+        "terminal_code": None, "orphaned": False, "active": False,
+        "has_checkpoint": True, "planned_steps": len(raw.get("plan") or []),
+        "step_counts": {}, "completed_steps": [], "skipped_steps": [],
+        "counters": {}, "duration_s": None,
     }
 
 
@@ -291,8 +316,11 @@ def _status_dict(run_id: str) -> dict[str, Any]:
     validate_run_id(run_id)
     try:
         checkpoint = ArtifactStore(_runs_root() / run_id).load_checkpoint()
+    except CheckpointMigrationError as exc:
+        # Readable, never resumed: the run's files stay as they are.
+        return _needs_attention_status(run_id, exc)
     except ValueError as exc:
-        log.error("run %s checkpoint corrupt, quarantined: %s", run_id, exc)
+        log.error("run %s checkpoint corrupt: %s", run_id, exc)
         raise ValueError(f"run '{run_id}' checkpoint corrupt: {exc}") from exc
     if checkpoint is None:
         task = _TASKS.get(run_id)
@@ -323,7 +351,8 @@ def _status_dict(run_id: str) -> dict[str, Any]:
         "orphaned": orphaned,
         "active": active,
         "has_checkpoint": True,
-        "planned_steps": len(checkpoint.plan),
+        "planned_steps": checkpoint.planned_steps,
+        "step_counts": checkpoint.step_counts(),
         "completed_steps": checkpoint.completed_steps,
         "skipped_steps": checkpoint.skipped_steps,
         "counters": checkpoint.counters,
@@ -361,7 +390,9 @@ async def research_get_report(run_id: str) -> dict[str, Any]:
         ),
         "status": status,
     }
-    if status["status"] not in ("complete", "partial"):
+    if status["status"] == "needs_attention":
+        result["checkpoint_status"] = f"needs_attention: {status['stop_reason']}"
+    elif status["status"] not in ("complete", "partial"):
         # report.md exists but the checkpoint never reached a terminal state —
         # the file may be mid-write (or the run orphaned mid-write).
         result["checkpoint_status"] = f"{status['status']} (report may be mid-write)"

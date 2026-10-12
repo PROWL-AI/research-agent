@@ -15,7 +15,7 @@ from research_agent.evidence.store import ArtifactStore
 from research_agent.agent.orchestrator import Orchestrator, build_brief
 from research_agent.config import Config, ConfigError
 from research_agent.llm import LLMClient, LLMError
-from research_agent.prowl_client import ProwlClient, ProwlError, _call_timeout
+from research_agent.prowl_client import ProwlClient, ProwlError, ToolCallError, _call_timeout
 from research_agent.runbook import get_runbook, list_runbooks
 from .store import Store, Conflict, digest, now
 
@@ -58,18 +58,27 @@ class ObservedProwl(ProwlClient):
         return await session.call_tool(name, arguments or {}, read_timeout_seconds=_call_timeout(),
                                        meta={"traceparent": trace} if trace else None)
 
-    async def _invoke(self, prowl_tool, arguments):
+    async def _invoke(self, prowl_tool, arguments, *, record=None):
         # Metadata lookups are observable but excluded from paid usage receipts.
         if prowl_tool != "prowl_call_tool":
-            return await super()._invoke(prowl_tool, arguments)
+            return await super()._invoke(prowl_tool, arguments, record=record)
+        # Local refusals before anything is sent are definite (and free): a
+        # resume must not treat them as calls that may have been charged.
         if len(self.store.calls(self.job["id"])) >= 256:
-            raise ProwlError("Service call limit reached (256)")
-        call = self.store.start_call(self.job["id"], "tool", arguments.get("tool_name", prowl_tool), scrub(arguments.get("params", {})))
+            refused = ToolCallError("Service call limit reached (256); nothing was sent")
+            refused.cost_usd = 0.0
+            raise refused
+        try:
+            call = self.store.start_call(self.job["id"], "tool", arguments.get("tool_name", prowl_tool), scrub(arguments.get("params", {})))
+        except Exception as exc:  # noqa: BLE001 — journal unavailable: do not dispatch
+            refused = ToolCallError(f"Call journal unavailable ({type(exc).__name__}); nothing was sent")
+            refused.cost_usd = 0.0
+            raise refused from exc
         start = time.monotonic()
         index = len(self.call_log)
         result, status = None, "failed"
         try:
-            result = await super()._invoke(prowl_tool, arguments)
+            result = await super()._invoke(prowl_tool, arguments, record=record)
             status = "completed"
             return result
         except asyncio.CancelledError:

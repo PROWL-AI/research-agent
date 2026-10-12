@@ -8,17 +8,21 @@ Objective: close every open item of this agent in its final form, in waves
 - Plan: [`specs/2026-10-11-waves-canvas.md`](specs/2026-10-11-waves-canvas.md) — target state, seams,
   waves with exit criteria, §7a wave status, operator questions (§8).
 - Inventory: [`specs/2026-10-11-waves-inventory.json`](specs/2026-10-11-waves-inventory.json)
-  (`python3 scripts/plan/assign_waves.py --check`; 38 of 48 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
-- **Wave 1 closed** at `583f1d1` (build `675e769`): run-lock ownership (KA-06, B-009, B-010),
-  terminal_code, structured events, honest docs, CORE scenarios, nightly CI file.
-  Suite 370 passed; deep probes 7 failed / 5 passed (KA-07…KA-12 open).
-- Installed service still runs `891fbc9`: reinstall after the next wave so reconciliation
-  under the lock applies there; client sessions started before wave 1 run old stdio code.
-- **Exact next task:** [`specs/waves/W2-T1-checkpoint-v2-attempt-ledger.md`](specs/waves/W2-T1-checkpoint-v2-attempt-ledger.md)
-  (KA-03/04/05/10/11/12), then the wave-2 close pass (three blind tiers; the seam tier also
-  re-reads wave 1's fix round).
-- Operator decisions pending (canvas §8): Q1 merge policy, Q2 dashboard kit, Q4 USD 15,
-  Q5 host update, Q6 history rewrite. Q3 closed from sources (agents issue keys via Observatory).
+  (`python3 scripts/plan/assign_waves.py --check`; 30 of 49 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
+- **Wave 1 closed** (merged to `main` by PR #1): run-lock ownership (KA-06, B-009, B-010),
+  terminal_code, structured events, honest docs, CORE scenarios, nightly CI.
+- **Wave 2 closed** on branch `wip/wave2-checkpoint-v2` (PR #2): checkpoint schema 2 — immutable
+  step ids, step states, durable evidence order, attempt ledger as the budget source, v1→v2
+  migration with `needs_attention` (KA-03/04/05/10/11/12, B-006, B-008, B-025). Crash injection
+  at every durable write (`tests/test_durability.py`). Suite 402 passed; deep probes 4 failed
+  (KA-07/08/09 + the superseded cwd-relative control) / 8 passed.
+- **Upgrade is one-way per run dir** (checkpoint.v1.json kept): restart stdio client sessions and
+  reinstall the Fabric service (still `891fbc9`) before resuming runs a v2 build has touched —
+  scheduled for wave 5.
+- **Exact next task:** [`specs/waves/W3-T1-ledger-v2-evidence-truth.md`](specs/waves/W3-T1-ledger-v2-evidence-truth.md)
+  (KA-07/08/09, B-007), then the wave-3 close pass (its seam tier also re-reads wave 2's fix round).
+- Operator decisions (canvas §8) answered 2026-10-12: Q1 PR-per-wave merges, Q2 kit in wave 5,
+  Q4 USD 15, Q5 host update at wave 6, Q6 no history rewrite. Q3 closed from sources.
 - Cross-agent: B-001 (model profiles, waits on Fabric T1–T3), B-020 (with the Fabric plan
   owner), B-026 (fixed upstream in Observatory, awaiting its release).
 

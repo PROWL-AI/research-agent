@@ -256,12 +256,12 @@ def _cmd_status(run_id: str) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(f"run {status['run_id']} ({status['runbook']}): {status['status']}")
-    # Skipped steps are also recorded in completed_steps (their post-failure
-    # chunk-mates) — subtract them or the count overstates real progress.
-    skipped_idx = {entry.get("index") for entry in status["skipped_steps"]}
-    completed = sum(1 for i in status["completed_steps"] if i not in skipped_idx)
+    completed = len(status["completed_steps"])
     print(f"  steps:    {completed}/{status['planned_steps']} completed, "
-          f"{len(status['skipped_steps'])} skipped")
+          f"{len(status['skipped_steps'])} disclosed (not run, skipped or incomplete)")
+    counts = {k: v for k, v in (status.get("step_counts") or {}).items() if v}
+    if counts:
+        print(f"  states:   {counts}")
     print(f"  counters: {status['counters']}")
     if status["duration_s"] is not None:
         print(f"  duration: {status['duration_s']}s")
@@ -341,7 +341,7 @@ def _cmd_export(run_id: str, fmt: str) -> int:
 
     try:
         out_path = render_run(run_dir)
-    except RenderError as exc:
+    except (RenderError, ValueError) as exc:  # incl. a checkpoint that needs attention
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(out_path)
@@ -353,6 +353,18 @@ def _parse_days(text: str) -> timedelta:
     if not match:
         raise ValueError(f"--older-than expects '<N>d' (e.g. 30d), got '{text}'")
     return timedelta(days=int(match.group(1)))
+
+
+def _checkpoint_age_source(run_dir: Path) -> tuple[str | None, str]:
+    """(created_at, status) for pruning — read from the raw JSON, so a run whose
+    checkpoint cannot be migrated is still dated (and prunable)."""
+    import json
+
+    try:
+        data = json.loads((run_dir / "checkpoint.json").read_text(encoding="utf-8"))
+        return data.get("created_at") or data.get("updated_at"), str(data.get("status") or "?")
+    except (OSError, ValueError, AttributeError):
+        return None, "?"
 
 
 def _cmd_prune(older_than: str, keep_last: int, yes: bool) -> int:
@@ -376,17 +388,14 @@ def _cmd_prune(older_than: str, keep_last: int, yes: bool) -> int:
     dated: list[tuple[Path, datetime, str]] = []
     skipped: list[tuple[Path, str]] = []
     for run_dir in sorted(p for p in runs_root.iterdir() if p.is_dir()):
-        try:
-            checkpoint = ArtifactStore(run_dir).load_checkpoint()
-        except Exception:
-            checkpoint = None
-        if checkpoint is None:
+        created_text, status = _checkpoint_age_source(run_dir)
+        if created_text is None:
             skipped.append((run_dir, "no readable checkpoint, age unknown"))
             continue
-        created = datetime.fromisoformat(checkpoint.created_at)
+        created = datetime.fromisoformat(created_text)
         if created.tzinfo is None:
             created = created.replace(tzinfo=timezone.utc)
-        dated.append((run_dir, created, checkpoint.status))
+        dated.append((run_dir, created, status))
 
     protected = {path for path, _, _ in sorted(dated, key=lambda row: row[1], reverse=True)[:keep_last]}
     candidates: list[tuple[Path, timedelta, str]] = []
