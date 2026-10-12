@@ -348,6 +348,11 @@ only the REQ table, this canvas and the repository and rules whether the system 
 
 ## 8. Operator decisions (one batch)
 
+**Answered 2026-10-12** — the operator: «да все твои рекомендованные решения делаем». Q1 yes
+(PR to `main` per wave, merged by the agent after the close pass), Q2 yes (dashboard kit in
+wave 5), Q4 USD 15 for wave 6, Q5 yes (host update at wave 6), Q6 forward fix only (no history
+rewrite). Q3 was closed from the sources. These are decisions, not assumptions.
+
 Recorded in [`docs/evidence/backlog.md`](../evidence/backlog.md); a go that leaves one unanswered takes
 the recommendation as **assumed**, and the waves that depend on it name it.
 
@@ -365,6 +370,7 @@ the recommendation as **assumed**, and the waves that depend on it name it.
 | Date | Change | Why |
 |---|---|---|
 | 2026-10-11 | canvas created from the wave-0 survey at `c0dfb6e` | first cut |
+| 2026-10-12 | Operator answered Q1–Q6 with the recommendations | canvas §8 |
 | 2026-10-11 | Wave 1 closed (`583f1d1`); W2 packet is next; one runs root for CLI and stdio (W1-F1 item 9) | close pass |
 | 2026-10-11 | Wave-1 certification: private estate names and home paths removed from public docs (forward fix; pushed history keeps them — operator decision); non-loopback callers treated as T2 until T1 enrollment is provable | product tier finding on `675e769` |
 | 2026-10-11 | FD-12 scoped by trust tier (token optional on loopback, required beyond it); FD-13 moved to wave 5 as agent work; Q3 closed | ADR-0144 amendment 4 (`19ad05ca`); operator rule on key issuing (global instructions, 2026-10-11) |
