@@ -246,3 +246,37 @@ class HeldRunLock:
 
 def hold_run_lock(run_dir: Path) -> HeldRunLock:
     return HeldRunLock(run_dir)
+
+
+class ScriptedClient:
+    """A real ProwlClient whose only synthetic part is the network boundary
+    (`_rpc`): billing parsing, refusal envelopes and per-key costs are the
+    production code's. Built lazily so conftest does not import the MCP stack
+    at collection time."""
+
+    def __new__(cls, payloads, prices=None, catalog=None):
+        from mcp.types import CallToolResult
+
+        from research_agent.prowl_client import ProwlClient
+
+        class _Scripted(ProwlClient):
+            def __init__(self):
+                super().__init__(api_key="test", mcp_url="http://unused.invalid")
+                self.payloads = iter(payloads)
+                self.dispatched = 0
+                self.keys: list[str | None] = []
+                self.tool_prices = dict(prices or {"spyfu_get_domain_stats": 0.4})
+                self._catalog = list(catalog or ["spyfu_get_domain_stats", "dataforseo_bl_summary"])
+
+            async def list_tools(self):
+                return list(self._catalog)
+
+            async def tool_info(self, name):
+                return {"name": name, "input_schema": {"type": "object"}}
+
+            async def _rpc(self, name, arguments, retry=True):
+                self.dispatched += 1
+                self.keys.append((arguments or {}).get("idempotency_key"))
+                return CallToolResult(content=[], structuredContent=next(self.payloads))
+
+        return _Scripted()

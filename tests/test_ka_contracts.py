@@ -786,3 +786,249 @@ def test_write_terminal_leaves_a_foreign_runbook_alone_and_never_raises(tmp_path
     monkeypatch.setattr(mine, "save_checkpoint", broken)
     Orchestrator._write_terminal(mine, "mini-teardown", status="failed", partial=None,
                                  stop_reason="boom", code="error")  # must not raise
+
+
+# ── Wave 2 (W2-T1): step identity, step states, durability, attempt ledger ───
+# Ported from the deep-audit probes (KA-10/11/12) and the prowl-app resume
+# probes (KA-03/04/05). Assertions on v1 `completed_steps` are translated to
+# v2 step states with the same intent; each translation is named inline.
+
+from research_agent.agent.orchestrator import PlanItem  # noqa: E402
+from research_agent.agent.subagent import WorkerContext, run_worker  # noqa: E402
+from research_agent.evidence.ledger import Ledger  # noqa: E402
+from research_agent.evidence.store import StepRecord, make_step_id  # noqa: E402
+
+from conftest import ScriptedClient  # noqa: E402
+
+
+def _v1_run(run_dir, *, plan, completed, raw_for=None, skipped=None, counters=None, status="interrupted"):
+    """A version-1 run directory as the old code left it."""
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "raw").mkdir(exist_ok=True)
+    for i in (completed if raw_for is None else raw_for):
+        (run_dir / "raw" / f"{i:02d}_{plan[i]['tool']}.json").write_text("{}")
+    (run_dir / "checkpoint.json").write_text(json.dumps({
+        "run_id": run_dir.name, "runbook": "mini-teardown", "status": status,
+        "brief": {"competitors": ["a.com"]}, "plan": plan, "completed_steps": completed,
+        "skipped_steps": skipped or [], "counters": counters or {"data_calls": len(completed)},
+    }))
+
+
+def _records(*tools):
+    return [StepRecord(step_id=make_step_id(i, t, {}), raw_index=i, tool=t, step=f"s{i}")
+            for i, t in enumerate(tools)]
+
+
+async def test_ka03_catalog_change_does_not_skip_an_unexecuted_step(patched_runbooks, tmp_path):
+    # Probe: completed_steps=[0] and the done tool left the catalog. Translation:
+    # the v1 run has its step-0 raw (a legitimate v1 run), so it migrates.
+    plan = [{"step": "done", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "a.com"}},
+            {"step": "pending", "tool": "dataforseo_bl_summary", "arguments": {"target": "a.com"}}]
+    _v1_run(tmp_path / "resume", plan=plan, completed=[0])
+    prowl = FakeProwl(catalog=["dataforseo_bl_summary"])
+    await Orchestrator(prowl, FakeLLM(), tmp_path).run("mini-teardown", {}, run_id="resume")
+    assert [c["name"] for c in prowl.tool_calls] == ["dataforseo_bl_summary"]
+
+
+async def test_ka03_v2_catalog_change_excludes_by_id_and_shifts_nothing(patched_runbooks, tmp_path):
+    store = ArtifactStore(tmp_path / "v2")
+    steps = _records("spyfu_get_domain_stats", "dataforseo_bl_summary", "spyfu_get_domain_stats")
+    steps[2].arguments = {"domain": "c.com"}
+    store.save_checkpoint(Checkpoint(run_id="v2", runbook="mini-teardown", status="interrupted",
+                                     brief={"competitors": ["a.com"]}, steps=steps))
+    prowl = FakeProwl(catalog=["dataforseo_bl_summary"])  # spyfu vanished
+    result = await Orchestrator(prowl, FakeLLM(), tmp_path).run("mini-teardown", {}, run_id="v2")
+    states = [s.state for s in store.load_checkpoint().steps]
+    assert states == ["excluded", "completed", "excluded"]
+    assert [c["name"] for c in prowl.tool_calls] == ["dataforseo_bl_summary"]
+    assert result.status == "partial"  # a catalog change is a disclosed omission
+
+
+async def test_ka04_unstarted_steps_after_failure_remain_resumable(tmp_path):
+    # Probe: `1 not in completed_steps`. Translation: step 1 stays `pending`,
+    # the failed step is `failed` (resumable), never `completed`.
+    prowl = FakeProwl()
+    prowl.fail_on.add("spyfu_get_domain_stats")
+    steps = _records("spyfu_get_domain_stats", "dataforseo_bl_summary")
+    checkpoint = Checkpoint(run_id="stopped", runbook="mini-teardown", steps=steps)
+    orch = type("O", (), {"prowl": prowl, "_budget_stop_reason": staticmethod(lambda *_: None)})()
+    ctx = WorkerContext(orch, checkpoint, ArtifactStore(tmp_path), Ledger(tmp_path / "ledger.json"), None)
+    await run_worker(0, steps, ctx)
+    assert [s.state for s in steps] == ["failed", "pending"]
+    assert len(prowl.tool_calls) == 1
+
+
+async def test_ka05_completed_step_is_persisted_before_worker_returns(tmp_path):
+    # Probe: disk completed_steps == memory. Translation: the step's state on
+    # disk is `completed` with its raw ref the moment the worker returns.
+    prowl = FakeProwl()
+    steps = _records("spyfu_get_domain_stats")
+    checkpoint = Checkpoint(run_id="crash", runbook="mini-teardown", steps=steps)
+    store = ArtifactStore(tmp_path)
+    orch = type("O", (), {"prowl": prowl, "_budget_stop_reason": staticmethod(lambda *_: None)})()
+
+    async def extract(*_):
+        return 0
+
+    ctx = WorkerContext(orch, checkpoint, store, Ledger(tmp_path / "ledger.json"), None, extract)
+    await run_worker(0, steps, ctx)
+    saved = store.load_checkpoint().steps[0]
+    assert saved.state == steps[0].state == "completed"
+    assert saved.raw_ref and store.resolve(saved.raw_ref).is_file()
+
+
+@pytest.mark.parametrize("fault", ["raw_write", "extraction"])
+async def test_ka10_evidence_failure_cannot_report_complete(wired, monkeypatch, fault):
+    llm = FakeLLM()
+    llm.plan_payload = steps()
+    llm.claims_payload = {"claims": [{"claim": "Observed value 42", "value": 42, "unit": "items",
+                                      "subject": "example.com metric"}]}
+    orch = Orchestrator(FakeProwl(), llm, runs_root=wired)
+    if fault == "raw_write":
+        def fail_write(*args):
+            raise OSError("synthetic raw artifact write failure")
+        monkeypatch.setattr(ArtifactStore, "save_raw", fail_write)
+    else:
+        async def fail_extract(*args):
+            raise RuntimeError("synthetic extractor failure")
+        monkeypatch.setattr(orch, "_extract_claims", fail_extract)
+    result = await orch.run("mini-teardown", BRIEF, run_id=fault)
+    assert result.status == "partial"
+    assert result.terminal_code == "evidence_incomplete"
+    step = ArtifactStore(wired / fault).load_checkpoint().steps[0]
+    assert step.state == ("failed" if fault == "raw_write" else "raw_saved")
+    ledger = Ledger.load(wired / fault / "ledger.json")
+    assert all(ArtifactStore(wired / fault).resolve(c.raw_ref).is_file() for c in ledger.claims)
+
+
+async def test_ka10_resume_finishes_extraction_from_saved_raw_without_paying(wired, monkeypatch):
+    llm = FakeLLM()
+    llm.plan_payload = steps()
+    llm.claims_payload = {"claims": [{"claim": "Observed value 42", "value": 42, "unit": "items",
+                                      "subject": "example.com metric"}]}
+    first = Orchestrator(FakeProwl(), llm, runs_root=wired)
+
+    async def fail_extract(*args):
+        raise RuntimeError("synthetic extractor failure")
+
+    monkeypatch.setattr(first, "_extract_claims", fail_extract)
+    await first.run("mini-teardown", BRIEF, run_id="refinish")
+    prowl = FakeProwl()
+    result = await Orchestrator(prowl, llm, runs_root=wired).run("mini-teardown", BRIEF, run_id="refinish")
+    assert prowl.tool_calls == []  # the raw was paid for and saved
+    assert result.status == "complete"
+    assert len(Ledger.load(wired / "refinish" / "ledger.json").claims) == 1
+
+
+async def test_ka11_known_cost_does_not_discard_previous_estimates(wired):
+    client = ScriptedClient([
+        {"rows": [{"value": 42}]},
+        {"rows": [{"value": 42}], "billing": {"actual_cost_usd": 0.3}},
+        {"rows": [{"value": 42}], "billing": {"actual_cost_usd": 0.1}},
+    ])
+    llm = FakeLLM()
+    llm.plan_payload = steps(3)
+    result = await Orchestrator(client, llm, runs_root=wired).run("mini-usd", BRIEF, run_id="mixed-cost")
+    # Before call three: estimated first call .4 + known second .3 > budget .5.
+    assert client.dispatched == 2
+    assert result.stats["cost_source"] == "mixed"
+    assert result.stats["spend_usd"] == pytest.approx(0.7)
+
+
+async def test_ka12_billed_failure_cost_survives_resume(wired):
+    client = ScriptedClient([{"success": False, "error_class": "upstream_error",
+                              "billing": {"actual_cost_usd": 0.6}}])
+    llm = FakeLLM()
+    llm.plan_payload = steps()
+    result = await Orchestrator(client, llm, runs_root=wired).run("mini-usd", BRIEF, run_id="billed-failure")
+    assert result.status == "partial"
+    assert result.stats["cost_usd"] == pytest.approx(0.6)
+    fresh = ScriptedClient([{"rows": [], "billing": {"actual_cost_usd": 0.6}}])
+    resumed = await Orchestrator(fresh, llm, runs_root=wired).run("mini-usd", BRIEF, run_id="billed-failure")
+    assert fresh.dispatched == 0
+    assert resumed.terminal_code == "budget_usd"
+
+
+async def test_control_success_persists_evidence_with_a_portable_raw_ref(wired):
+    llm = FakeLLM()
+    llm.plan_payload = steps()
+    llm.claims_payload = {"claims": [{"claim": "Observed value", "value": 42, "unit": "items"}]}
+    result = await Orchestrator(FakeProwl(), llm, runs_root=wired).run("mini-teardown", BRIEF, run_id="control")
+    ledger = Ledger.load(wired / "control" / "ledger.json")
+    assert result.status == "complete" and len(ledger.claims) == 1
+    assert ledger.claims[0].raw_ref.startswith("raw/")  # run-dir-relative (B-025)
+    assert ArtifactStore(wired / "control").resolve(ledger.claims[0].raw_ref).is_file()
+
+
+async def test_outcome_unknown_attempt_is_resent_with_the_same_key(wired):
+    store = ArtifactStore(wired / "unknown")
+    record = _records("spyfu_get_domain_stats")[0]
+    record.state = "dispatching"  # the process died mid-call
+    checkpoint = Checkpoint(run_id="unknown", runbook="mini-teardown", status="running",
+                            brief={"competitors": ["a.com"]}, steps=[record])
+    from research_agent.evidence.store import AttemptRecord
+
+    key = f"unknown:{record.step_id}:1"
+    checkpoint.attempts.append(AttemptRecord(attempt_id=f"{record.step_id}#1", step_id=record.step_id,
+                                             attempt_no=1, idempotency_key=key, estimate_usd=0.1))
+    store.save_checkpoint(checkpoint)
+    prowl = FakeProwl()
+    await Orchestrator(prowl, FakeLLM(), wired).run("mini-teardown", {}, run_id="unknown")
+    assert [c["idempotency_key"] for c in prowl.tool_calls] == [key]
+
+
+async def test_refused_attempt_retries_with_a_new_attempt_number(wired):
+    prowl = FakeProwl()
+    prowl.fail_on.add(TOOL)
+    llm = FakeLLM()
+    llm.plan_payload = steps()
+    await Orchestrator(prowl, llm, runs_root=wired).run("mini-teardown", BRIEF, run_id="retry")
+    prowl.fail_on.clear()
+    await Orchestrator(prowl, llm, runs_root=wired).run("mini-teardown", BRIEF, run_id="retry")
+    keys = [c["idempotency_key"] for c in prowl.tool_calls]
+    assert [k.rsplit(":", 1)[1] for k in keys] == ["1", "2"]
+
+
+def test_migration_refuses_a_plan_refiltered_by_a_resume(tmp_path):
+    from research_agent.evidence.store import CheckpointMigrationError
+
+    plan = [{"step": "a", "tool": "spyfu_get_domain_stats"}, {"step": "b", "tool": "dataforseo_bl_summary"}]
+    _v1_run(tmp_path / "regrown", plan=plan, completed=[0], skipped=[
+        {"index": 1, "step": "b", "tool": "dataforseo_bl_summary", "reason": "not in live catalog",
+         "kind": "plan_drop"}])
+    with pytest.raises(CheckpointMigrationError, match="re-filtered"):
+        ArtifactStore(tmp_path / "regrown").load_checkpoint()
+
+
+def test_migration_refuses_a_raw_artifact_of_another_tool(tmp_path):
+    from research_agent.evidence.store import CheckpointMigrationError
+
+    plan = [{"step": "a", "tool": "spyfu_get_domain_stats"}]
+    _v1_run(tmp_path / "shifted", plan=plan, completed=[0], raw_for=[])
+    (tmp_path / "shifted" / "raw" / "00_dataforseo_bl_summary.json").write_text("{}")
+    with pytest.raises(CheckpointMigrationError, match="shifted"):
+        ArtifactStore(tmp_path / "shifted").load_checkpoint()
+
+
+def test_migration_refuses_a_completed_step_without_evidence(tmp_path):
+    from research_agent.evidence.store import CheckpointMigrationError
+
+    plan = [{"step": "a", "tool": "spyfu_get_domain_stats"}]
+    _v1_run(tmp_path / "lost", plan=plan, completed=[0], raw_for=[])
+    with pytest.raises(CheckpointMigrationError, match="evidence may have been lost"):
+        ArtifactStore(tmp_path / "lost").load_checkpoint()
+
+
+def test_migration_maps_budget_and_tail_skips_to_pending_and_keeps_cost(tmp_path):
+    plan = [{"step": f"s{i}", "tool": "spyfu_get_domain_stats", "arguments": {"d": i}} for i in range(4)]
+    plan[2]["on_error_skip"] = True
+    _v1_run(tmp_path / "mapped", plan=plan, completed=[0, 1, 2, 3], raw_for=[0], skipped=[
+        {"index": 1, "step": "s1", "tool": "t", "reason": "max_tool_calls=2", "kind": "runtime_skip"},
+        {"index": 2, "step": "s2", "tool": "t", "reason": "upstream 500", "kind": "runtime_skip"},
+        {"index": 3, "step": "s3", "tool": "t", "reason": "step 's0' failed: boom", "kind": "runtime_skip"},
+    ], counters={"data_calls": 1, "attempted_calls": 3, "cost_usd": 0.45})
+    checkpoint = ArtifactStore(tmp_path / "mapped").load_checkpoint()
+    assert [s.state for s in checkpoint.steps] == ["completed", "pending", "skipped_on_error", "pending"]
+    assert checkpoint.counters["attempted_calls"] == 3
+    assert checkpoint.spend_usd("tool") == pytest.approx(0.45)
+    assert checkpoint.migrated_from == 1

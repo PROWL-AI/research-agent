@@ -202,9 +202,13 @@ def _new_attempt(ctx: WorkerContext, record: StepRecord) -> AttemptRecord:
     checkpoint = ctx.checkpoint
     previous = [a for a in checkpoint.attempts if a.step_id == record.step_id]
     if record.state == OUTCOME_UNKNOWN and previous:
-        attempt_no = previous[-1].attempt_no  # same key: the server may have run it
-    else:
-        attempt_no = (previous[-1].attempt_no + 1) if previous else 1
+        # The same logical attempt, re-sent with the same key so the server can
+        # replay it: one record, counted once against the budget. A cost it
+        # already reported is kept.
+        attempt = previous[-1]
+        attempt.outcome, attempt.ended_at = "pending", None
+        return attempt
+    attempt_no = (previous[-1].attempt_no + 1) if previous else 1
     estimate, _ = _estimate_usd(ctx, record.tool)
     attempt = AttemptRecord(
         attempt_id=f"{record.step_id}#{len(previous) + 1}", step_id=record.step_id,
@@ -253,7 +257,12 @@ async def extract_step(ctx: WorkerContext, record: StepRecord, result: Any | Non
     if result is None:
         text = ctx.store.read_artifact(record.raw_ref, record.raw_sha256)
         result = json.loads(text) if record.raw_ref.endswith(".json") else text
-    ctx.ledger.remove_ids(record.extraction.get("claim_ids") or [])
+    # Claims of an earlier extraction of this step are replaced: found by the
+    # ids the step recorded AND by their raw ref — a crash between the ledger
+    # save and the checkpoint save leaves claims the step never recorded.
+    stale = set(record.extraction.get("claim_ids") or [])
+    stale |= {c.id for c in ctx.ledger.claims if c.raw_ref == record.raw_ref}
+    ctx.ledger.remove_ids(sorted(stale))
     before_ids = {c.id for c in ctx.ledger.claims}
     try:
         added = await ctx.extract_claims(
