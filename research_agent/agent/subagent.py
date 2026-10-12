@@ -210,10 +210,13 @@ def _new_attempt(ctx: WorkerContext, record: StepRecord) -> AttemptRecord:
         return attempt
     attempt_no = (previous[-1].attempt_no + 1) if previous else 1
     estimate, _ = _estimate_usd(ctx, record.tool)
+    # A step migrated from v1 whose dispatch may have reached the server is
+    # first re-sent under its v1 key, so the server can still match it.
+    key = record.legacy_key if (record.legacy_key and not previous) else \
+        f"{checkpoint.run_id}:{record.step_id}:{attempt_no}"
     attempt = AttemptRecord(
         attempt_id=f"{record.step_id}#{len(previous) + 1}", step_id=record.step_id,
-        kind="tool", attempt_no=attempt_no,
-        idempotency_key=f"{checkpoint.run_id}:{record.step_id}:{attempt_no}",
+        kind="tool", attempt_no=attempt_no, idempotency_key=key,
         estimate_usd=estimate,
     )
     checkpoint.attempts.append(attempt)
@@ -227,7 +230,8 @@ def _finish_attempt(ctx: WorkerContext, attempt: AttemptRecord, outcome: str,
     attempt.ended_at = datetime.now(timezone.utc).isoformat()
     if cost is not None:
         attempt.actual_usd, attempt.cost_basis = float(cost), "actual"
-    else:
+    elif attempt.actual_usd is None:
+        # A resend that reports nothing keeps a cost reported earlier.
         _, basis = _estimate_usd(ctx, tool)
         attempt.cost_basis = basis
     emit(log, "attempt.finished", run_id=ctx.checkpoint.run_id, attempt_id=attempt.attempt_id,
@@ -261,7 +265,8 @@ async def extract_step(ctx: WorkerContext, record: StepRecord, result: Any | Non
     # ids the step recorded AND by their raw ref — a crash between the ledger
     # save and the checkpoint save leaves claims the step never recorded.
     stale = set(record.extraction.get("claim_ids") or [])
-    stale |= {c.id for c in ctx.ledger.claims if c.raw_ref == record.raw_ref}
+    raw_name = Path(record.raw_ref).name  # v1 claims carry cwd-relative or absolute refs
+    stale |= {c.id for c in ctx.ledger.claims if c.raw_ref and Path(c.raw_ref).name == raw_name}
     ctx.ledger.remove_ids(sorted(stale))
     before_ids = {c.id for c in ctx.ledger.claims}
     try:
@@ -299,7 +304,8 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
         stop_reason = ctx.orch._budget_stop_reason(ctx.budget, checkpoint)
         if stop_reason is not None:
             for rest in items[position:]:
-                if rest.state not in SETTLED_STATES and rest.state != RAW_SAVED:
+                # outcome_unknown keeps its state so its next send reuses the key.
+                if rest.state not in SETTLED_STATES and rest.state not in (RAW_SAVED, OUTCOME_UNKNOWN):
                     _set_state(checkpoint, rest, SKIPPED_BUDGET, stop_reason)
                     summary.outcomes.append(StepOutcome(step_id=rest.step_id, step=rest.step,
                                                         tool=rest.tool, status="skipped", note=stop_reason))
@@ -329,6 +335,8 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             save_state(checkpoint, ctx.store)
             raise
         except Exception as exc:
+            # A refusal the server (or a local pre-dispatch limit) decided is
+            # definite; a timeout or transport failure may have executed.
             definite = isinstance(exc, ToolCallError)
             _finish_attempt(ctx, attempt, "refused" if definite else "transport_error",
                             _reported_cost(ctx.orch.prowl, attempt.idempotency_key, before, exc), record.tool)
@@ -361,7 +369,11 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
         try:
             record.raw_ref, record.raw_sha256 = ctx.store.save_raw(record.step_id, record.tool, result)
         except Exception as exc:  # noqa: BLE001 — typed into the step
-            _set_state(checkpoint, record, FAILED, f"raw_write: {exc}")
+            # The data was paid for but cannot be kept. An optional step is
+            # skipped (a resume does not pay for it again); a required one is
+            # `failed` and a resume fetches it again — a new, paid call.
+            _set_state(checkpoint, record, SKIPPED_ON_ERROR if record.on_error_skip else FAILED,
+                       f"raw_write: {exc}")
             checkpoint.partial = True
             emit(log, "evidence.incomplete", logging.WARNING, run_id=checkpoint.run_id,
                  step_id=record.step_id, reason="raw_write", error=exc)

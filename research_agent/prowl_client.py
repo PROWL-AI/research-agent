@@ -36,6 +36,10 @@ COST_META_KEYS = ("cost_usd", "cost", "price_usd", "price")
 _WARNING_KEYS = ("billing_warning", "deprecation", "deprecation_warning", "warning")
 
 
+#: JSON-RPC code the MCP SDK uses for a client-side read timeout (HTTP 408).
+_REQUEST_TIMEOUT = 408
+
+
 class ProwlError(Exception):
     #: The billed cost of the failed dispatch, when the server reported one —
     #: a billed failure is still money spent (KA-12).
@@ -43,7 +47,13 @@ class ProwlError(Exception):
 
 
 class ToolCallError(ProwlError):
-    pass
+    """A definite refusal: the call was answered (or never left the process)."""
+
+
+class DispatchOutcomeUnknown(ProwlError):
+    """A billed dispatch whose outcome is unknown — a timeout or a lost reply.
+    The server may have executed and charged it; a retry must re-send the
+    same idempotency key."""
 
 
 @dataclass
@@ -179,6 +189,10 @@ class ProwlClient:
             result = await self._rpc(prowl_tool, arguments, retry=retry)
         except McpError as exc:
             record.error = f"JSON-RPC {exc.error.code}: {exc.error.message}"
+            if prowl_tool == "prowl_call_tool" and exc.error.code == _REQUEST_TIMEOUT:
+                # The SDK reports its own read timeout this way: the request was
+                # sent and may have run server-side.
+                raise DispatchOutcomeUnknown(f"{prowl_tool}: {record.error}") from exc
             raise ToolCallError(f"{prowl_tool}: {record.error}") from exc
         except ProwlError as exc:
             record.error = str(exc)

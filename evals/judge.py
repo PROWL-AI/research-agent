@@ -26,7 +26,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from research_agent.agent.writer import lint_report  # noqa: E402
 from research_agent.evidence.ledger import Ledger  # noqa: E402
-from research_agent.evidence.store import Checkpoint  # noqa: E402
+from research_agent.evidence.store import ArtifactStore, Checkpoint  # noqa: E402
 from research_agent.llm import LLMClient  # noqa: E402
 from research_agent.runbook import Runbook, get_runbook  # noqa: E402
 
@@ -95,7 +95,11 @@ def load_run(run_dir: Path) -> tuple[str, Ledger, Checkpoint, Runbook]:
     if not ledger_path.is_file():
         raise JudgeError(f"{run_dir}: no ledger.json — the run's evidence is missing")
     ledger = Ledger.load(ledger_path)
-    checkpoint = Checkpoint.model_validate_json(checkpoint_path.read_text(encoding="utf-8"))
+    try:
+        # Through the store: a version-1 run is migrated, not read as empty.
+        checkpoint = ArtifactStore(run_dir).load_checkpoint()
+    except ValueError as exc:
+        raise JudgeError(f"{run_dir}: {exc}") from exc
     runbook = get_runbook(checkpoint.runbook)
     return report_md, ledger, checkpoint, runbook
 

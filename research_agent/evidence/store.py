@@ -7,7 +7,8 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from types import MappingProxyType
+from typing import Any, Mapping
 
 from pydantic import BaseModel, Field
 
@@ -93,6 +94,10 @@ class StepRecord(BaseModel):
         default_factory=lambda: {"status": "pending", "error": None, "claim_ids": []}
     )
     attempt_ids: list[str] = Field(default_factory=list)
+    #: The v1 idempotency key (`run:index:tool`) of a step migrated from a v1
+    #: checkpoint whose dispatch may have reached the server; used for the
+    #: step's first resend only.
+    legacy_key: str | None = None
 
 
 class AttemptRecord(BaseModel):
@@ -169,13 +174,21 @@ class Checkpoint(BaseModel):
     def completed_steps(self) -> list[str]:
         return self.completed_step_ids()
 
-    @property
-    def skipped_steps(self) -> list[dict[str, Any]]:
-        """Every step the report must disclose: anything not `completed`, except
-        `pending` steps of a run that has not stopped (they simply run next)."""
+    #: States of a step that is still being worked on while a run is live.
+    _IN_FLIGHT = frozenset({PENDING, DISPATCHING, RAW_SAVED, OUTCOME_UNKNOWN})
+
+    def disclosures(self, final: bool) -> list[dict[str, Any]]:
+        """Steps the report or a status reader must see as missing or not run.
+
+        final=True (the writer, a terminal checkpoint): everything not
+        `completed`, except `pending` steps of a run that did not stop.
+        final=False (a live run): only settled omissions and stops — steps
+        still in flight are progress, not disclosures."""
         disclosed = []
         for s in self.steps:
             if s.state == COMPLETED:
+                continue
+            if not final and s.state in self._IN_FLIGHT and self.stop_reason is None:
                 continue
             if s.state == PENDING:
                 if self.stop_reason is None:
@@ -184,6 +197,10 @@ class Checkpoint(BaseModel):
                 continue
             disclosed.append(self._disclosure(s, s.reason or s.state))
         return disclosed
+
+    @property
+    def skipped_steps(self) -> list[dict[str, Any]]:
+        return self.disclosures(final=self.status != "running")
 
     @staticmethod
     def _disclosure(s: StepRecord, reason: str) -> dict[str, Any]:
@@ -212,18 +229,26 @@ class Checkpoint(BaseModel):
         return "estimate"
 
     @property
-    def counters(self) -> dict[str, Any]:
+    def counters(self) -> Mapping[str, Any]:
+        """Derived from the attempt ledger; read-only (a write would vanish)."""
         tool = self.tool_attempts()
         actual = [a.actual_usd for a in tool if a.actual_usd is not None]
         estimated = [a.estimate_usd or 0.0 for a in tool if a.actual_usd is None]
-        return {
+        return MappingProxyType({
             "data_calls": sum(1 for a in tool if a.outcome == "ok"),
             "attempted_calls": len(tool),
             "cost_usd": round(sum(actual), 6) if actual else None,
             "cost_estimate_usd": round(sum(estimated), 6) if estimated else None,
             "spend_usd": self.spend_usd("tool"),
-            "unknown_cost_attempts": self.unknown_attempts("tool"),
-        }
+            "cost_unknown_attempts": self.unknown_attempts("tool"),
+        })
+
+    def live_stats(self) -> dict[str, Any]:
+        """The stats keys that follow the ledger and the steps — refreshed on
+        every save, so a reader mid-run (or of a migrated run) never sees an
+        earlier attempt's numbers."""
+        counters = dict(self.counters)
+        return {**counters, "cost_source": self.cost_source("tool"), "steps": self.step_counts()}
 
 
 class CheckpointMigrationError(ValueError):
@@ -276,7 +301,19 @@ class ArtifactStore:
 
     def save_checkpoint(self, checkpoint: Checkpoint) -> None:
         checkpoint.updated_at = datetime.now(timezone.utc).isoformat()
+        checkpoint.stats = {**checkpoint.stats, **checkpoint.live_stats()}
         self.run_dir.mkdir(parents=True, exist_ok=True)
+        if checkpoint.migrated_from == 1 and self.checkpoint_path.is_file():
+            # The first save of a migrated run keeps the v1 file beside it: a
+            # rollback to a v1 build reads that, instead of re-planning (and
+            # re-billing) a v2 checkpoint it cannot understand.
+            backup = self.run_dir / "checkpoint.v1.json"
+            if not backup.exists():
+                try:
+                    if int(json.loads(self.checkpoint_path.read_text(encoding="utf-8")).get("schema_version") or 1) < 2:
+                        backup.write_text(self.checkpoint_path.read_text(encoding="utf-8"), encoding="utf-8")
+                except (OSError, ValueError):
+                    pass
         # Atomic: a checkpoint truncated by a crash is an unrecoverable run.
         # allow_nan=False: a NaN counter must fail the write, not persist as
         # an invalid-JSON literal (mode='json' would silently coerce it to
@@ -299,7 +336,13 @@ class ArtifactStore:
             raise ValueError(f"checkpoint is not valid JSON: {exc}") from exc
         if not isinstance(data, dict):
             raise ValueError("checkpoint is not a JSON object")
-        if int(data.get("schema_version") or 1) < SCHEMA_VERSION:
+        version = int(data.get("schema_version") or 1)
+        if version > SCHEMA_VERSION:
+            raise ValueError(
+                f"checkpoint schema_version {version} is newer than this build understands "
+                f"({SCHEMA_VERSION}) — upgrade before reading or resuming this run"
+            )
+        if version < SCHEMA_VERSION:
             from research_agent.evidence.migrate import migrate_v1
 
             return migrate_v1(data, self)

@@ -94,7 +94,11 @@ async def test_every_durable_boundary_is_resumable_without_paying_twice(
         after = store.load_checkpoint()
         dispatched = {key.split(":")[1] for key in (c["idempotency_key"] for c in prowl.tool_calls)}
         assert not (dispatched & saved), (n, dispatched, saved)  # (b)
-        assert after.spend_usd("tool") >= spend_before, n  # (c)
+        assert after.spend_usd("tool") >= spend_before, n  # (c) never lost
+        # (c) never double counted: one logical attempt per data step, also when
+        # an outcome_unknown call was re-sent with its key.
+        data_ids = [s.step_id for s in after.steps if s.kind == "data"]
+        assert all(sum(a.step_id == sid for a in after.attempts) == 1 for sid in data_ids), n
         assert result.status == "complete", (n, result.terminal_code, after.step_counts())  # (d)
         ledger = Ledger.load(runs / "r" / "ledger.json")
         assert len(ledger.claims) == 2, (n, [c.claim for c in ledger.claims])  # replaced, not duplicated

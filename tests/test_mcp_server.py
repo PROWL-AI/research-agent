@@ -147,7 +147,10 @@ def test_cli_status_and_report_parity(wired, fake_llm, tmp_path, monkeypatch, ca
 
     store = ArtifactStore(tmp_path / "runs" / "cli-run")
     checkpoint = Checkpoint(run_id="cli-run", runbook="mini-teardown")
-    checkpoint.counters["data_calls"] = 3
+    from research_agent.evidence.store import AttemptRecord
+
+    checkpoint.attempts = [AttemptRecord(attempt_id=f"a{i}", step_id=f"s{i}", outcome="ok",
+                                         cost_basis="actual", actual_usd=0.0) for i in range(3)]
     store.save_checkpoint(checkpoint)
     (tmp_path / "runs" / "cli-run" / "report.md").write_text("# CLI report\n")
 

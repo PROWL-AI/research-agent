@@ -347,7 +347,7 @@ class TestPromptInjectionIsolation:
         self, fake_prowl: FakeProwl, fake_llm: FakeLLM, tmp_path: Path
     ):
         store = ArtifactStore(tmp_path / "run")
-        raw_path = store.save_raw(0, "tool", {"x": 1})
+        raw_path, _sha = store.save_raw("s-0", "tool", {"x": 1})
         orch = Orchestrator(fake_prowl, fake_llm, runs_root=tmp_path)
         item = PlanItem(step="baseline", tool="spyfu_get_domain_stats")
         ledger = Ledger.load(store.run_dir / "ledger.json")
@@ -366,7 +366,7 @@ class TestEnvelopeHygiene:
         self, fake_prowl: FakeProwl, fake_llm: FakeLLM, tmp_path: Path
     ):
         store = ArtifactStore(tmp_path / "run")
-        raw_path = store.save_raw(0, "tool", {"x": 1})
+        raw_path, _sha = store.save_raw("s-0", "tool", {"x": 1})
         orch = Orchestrator(fake_prowl, fake_llm, runs_root=tmp_path)
         item = PlanItem(step="baseline", tool="spyfu_get_domain_stats")
         ledger = Ledger.load(store.run_dir / "ledger.json")

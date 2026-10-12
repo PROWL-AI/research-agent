@@ -34,6 +34,7 @@ from research_agent.evidence.store import (
     SKIPPED_ON_ERROR,
     ArtifactStore,
     Checkpoint,
+    CheckpointMigrationError,
     StepRecord,
     make_step_id,
 )
@@ -397,7 +398,10 @@ class Orchestrator:
         store: ArtifactStore,
     ) -> RunResult:
         ledger = Ledger.load(store.run_dir / "ledger.json")
-        checkpoint = store.load_checkpoint()
+        try:
+            checkpoint = store.load_checkpoint()
+        except CheckpointMigrationError as exc:
+            raise OrchestratorError(f"run {run_id} needs attention: {exc}") from exc
         if checkpoint is not None and checkpoint.runbook != runbook_name:
             raise OrchestratorError(
                 f"run {run_id} already belongs to runbook '{checkpoint.runbook}'"
@@ -471,7 +475,7 @@ class Orchestrator:
             for s in checkpoint.steps
         )
         checkpoint.partial = checkpoint.partial or unfinished or evidence_incomplete
-        disclosures = checkpoint.skipped_steps
+        disclosures = checkpoint.disclosures(final=True)
 
         outcome, fidelity = await produce_report(
             self.llm, runbook, ledger, brief,
@@ -497,7 +501,7 @@ class Orchestrator:
             "cost_usd": counters["cost_usd"],
             "cost_estimate_usd": counters["cost_estimate_usd"],
             "spend_usd": counters["spend_usd"],
-            "cost_unknown_attempts": counters["unknown_cost_attempts"],
+            "cost_unknown_attempts": counters["cost_unknown_attempts"],
             # server = every attempt reported its cost; mixed = some did;
             # estimate = none did (catalog price or per-call share of max_usd).
             "cost_source": checkpoint.cost_source("tool"),
@@ -640,6 +644,15 @@ class Orchestrator:
         )
         log.info("execution effort=%s workers=%d", effort, n_workers)
 
+        # Paid-for evidence first: a data step whose raw is saved finishes its
+        # extraction before any budget check — extraction spends no tool money,
+        # and a spent budget must not strand it (resume of a crashed run).
+        from research_agent.agent.subagent import extract_step
+
+        for record in checkpoint.steps:
+            if record.kind == "data" and record.state == RAW_SAVED:
+                await extract_step(ctx, record, None)
+
         segments = split_segments(checkpoint.steps)
         for seg_index, (kind, items) in enumerate(segments):
             if checkpoint.stop_reason is not None:
@@ -688,7 +701,9 @@ class Orchestrator:
         state — finishing it costs no tool money."""
         for _, items in segments:
             for record in items:
-                if record.state not in SETTLED_STATES and record.state != RAW_SAVED:
+                # outcome_unknown keeps its state: its next send must reuse the
+                # original idempotency key, whatever stops this attempt.
+                if record.state not in SETTLED_STATES and record.state not in (RAW_SAVED, OUTCOME_UNKNOWN):
                     record.state, record.reason = SKIPPED_BUDGET, reason
 
     async def _execute_transform(

@@ -42,7 +42,10 @@ def _make_run(tmp_path: Path, run_id: str, chart_block: str) -> Path:
     checkpoint = Checkpoint(
         run_id=run_id, runbook="mini-teardown", brief={"competitors": ["a.com", "b.com"]},
     )
-    checkpoint.counters["data_calls"] = 7
+    from research_agent.evidence.store import AttemptRecord
+
+    checkpoint.attempts = [AttemptRecord(attempt_id=f"a{i}", step_id=f"s{i}", outcome="ok",
+                                         cost_basis="actual", actual_usd=0.0) for i in range(7)]
     checkpoint.stats = {"data_calls": 7, "claims": 2, "duration_s": 12.5}
     ArtifactStore(run_dir).save_checkpoint(checkpoint)
     return run_dir

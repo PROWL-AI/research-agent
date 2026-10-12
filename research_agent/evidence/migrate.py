@@ -40,6 +40,7 @@ from research_agent.evidence.store import (
     EXCLUDED,
     FAILED,
     PENDING,
+    RAW_SAVED,
     SKIPPED_ON_ERROR,
     AttemptRecord,
     Checkpoint,
@@ -54,22 +55,28 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 _TRANSFORM_TOOLS = frozenset({"transform", "llm_transform"})
-_RAW_NAME = re.compile(r"^(\d+)_(.+?)(?:_\d+)?\.(json|md)$")
+_RAW_INDEX = re.compile(r"^(\d+)_(.+)\.(?:json|md)$")
 _BUDGET_PREFIXES = ("max_tool_calls=", "max_usd=", "max_minutes=")
 
 
-def _raw_by_index(store: "ArtifactStore") -> dict[int, tuple[str, str]]:
-    """index → (tool or 'transform', run-dir-relative ref) of v1 raw artifacts."""
-    found: dict[int, tuple[str, str]] = {}
+def _raw_by_index(store: "ArtifactStore") -> dict[int, list[tuple[str, str]]]:
+    """index → [(name stem after `NN_`, run-dir-relative ref)] of v1 raw artifacts.
+    The stem is matched against the plan's tool later (a tool name may itself
+    end in `_<digits>`, so it cannot be split off a duplicate suffix here)."""
+    found: dict[int, list[tuple[str, str]]] = {}
     if not store.raw_dir.is_dir():
         return found
     for path in sorted(store.raw_dir.iterdir()):
-        match = _RAW_NAME.match(path.name)
+        match = _RAW_INDEX.match(path.name)
         if match is None:
             continue
-        index, tool = int(match.group(1)), match.group(2)
-        found.setdefault(index, (tool, f"raw/{path.name}"))
+        found.setdefault(int(match.group(1)), []).append((match.group(2), f"raw/{path.name}"))
     return found
+
+
+def _names_tool(stem: str, tool: str) -> bool:
+    """`stem` (e.g. `spyfu_get_domain_stats_1`) is a raw name of `tool`."""
+    return stem == tool or (stem.startswith(tool + "_") and stem[len(tool) + 1:].isdigit())
 
 
 def migrate_v1(data: dict[str, Any], store: "ArtifactStore") -> Checkpoint:
@@ -89,9 +96,14 @@ def _migrate(data: dict[str, Any], store: "ArtifactStore", run_id: str) -> Check
     completed = {int(i) for i in data.get("completed_steps") or []}
     skipped = [s for s in data.get("skipped_steps") or [] if isinstance(s, dict)]
     planned = {(str(item.get("step")), str(item.get("tool"))) for item in plan}
+    # A drop that names a planned item can only come from a later re-filter
+    # against a changed catalog/allowlist; duplicate and transform-cap drops are
+    # planner-time only (the stored plan is already deduplicated and capped).
     regrown = [
         s for s in skipped
-        if s.get("kind") == "plan_drop" and (str(s.get("step")), str(s.get("tool"))) in planned
+        if s.get("kind") == "plan_drop"
+        and (str(s.get("step")), str(s.get("tool"))) in planned
+        and not str(s.get("reason") or "").startswith(("duplicate step", "transform cap"))
     ]
     if regrown:
         raise CheckpointMigrationError(
@@ -112,14 +124,17 @@ def _migrate(data: dict[str, Any], store: "ArtifactStore", run_id: str) -> Check
             tool=tool, arguments=arguments, step=str(item.get("step") or ""),
             instruction=item.get("instruction"), on_error_skip=bool(item.get("on_error_skip")),
         )
-        raw = raws.get(index)
-        if raw is not None:
-            expected = "transform" if kind == "transform" else tool
-            if raw[0] != expected:
-                raise CheckpointMigrationError(
-                    f"run {run_id}: raw artifact {raw[1]} names tool '{raw[0]}' but plan step "
-                    f"{index} is '{expected}' — indexes shifted between attempts"
-                )
+        raw = None
+        expected = "transform" if kind == "transform" else tool
+        candidates = raws.get(index, [])
+        foreign = [ref for stem, ref in candidates if not _names_tool(stem, expected)]
+        if foreign:
+            raise CheckpointMigrationError(
+                f"run {run_id}: raw artifact {foreign[0]} does not belong to plan step {index} "
+                f"('{expected}') — indexes shifted between attempts"
+            )
+        if candidates:
+            raw = (expected, candidates[0][1])
         skip = runtime.get(index)
         reason = str(skip.get("reason") or "") if skip else ""
         hard_tail = reason.startswith("step '") or reason.startswith("worker crash")
@@ -139,8 +154,15 @@ def _migrate(data: dict[str, Any], store: "ArtifactStore", run_id: str) -> Check
                     f"run {run_id}: step {index} ({tool}) is recorded completed but has no raw "
                     "artifact and no skip entry — its evidence may have been lost"
                 )
+        elif raw is not None:
+            # v1 saved checkpoint and ledger BEFORE appending the completion, so
+            # a crash left the latest step of a worker paid for, with its raw on
+            # disk, but not completed. Finish it from the raw — no new dispatch.
+            record.state, record.raw_ref = RAW_SAVED, raw[1]
+            record.reason = "migrated from v1: raw saved, completion not recorded"
         elif skip is not None and reason.startswith("step '") and not record.on_error_skip:
             record.state, record.reason = FAILED, reason
+            record.legacy_key = f"{run_id}:{index}:{tool}"  # it may have reached the server
         steps.append(record)
 
     # Planner-time drops (their index is in the planner's raw output, not in
@@ -167,11 +189,13 @@ def _migrate(data: dict[str, Any], store: "ArtifactStore", run_id: str) -> Check
     else:
         basis, first_actual, first_estimate = "unknown", None, None  # v1 recorded no cost
     attempts = []
+    succeeded = int(counters.get("data_calls", 0) or 0)
     for n in range(attempted):
         first = n == 0
         attempts.append(AttemptRecord(
             attempt_id=f"v1-{n}", step_id="v1:aggregate", kind="tool", attempt_no=n + 1,
-            outcome="ok", cost_basis=basis,
+            # v1 counted successes (data_calls) inside attempts: the rest failed.
+            outcome="ok" if n < succeeded else "refused", cost_basis=basis,
             # The run total sits on the first synthetic attempt; the rest carry
             # zero so the total is counted once and the call count stays right.
             actual_usd=(first_actual if first else (0.0 if basis == "actual" else None)),
