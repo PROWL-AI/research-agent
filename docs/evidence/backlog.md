@@ -13,9 +13,6 @@
 | B-001 | LLM model slots move from env-configured role models to named estate model profiles resolved by the fabric kit; the LLM limit (KA-G01) becomes the profile's key route with an Observatory key and its model allow-list | cross-session request from an estate agent, 2026-10-11 (operator's request); runner and model-profile proposal (private estate document) | M | 2 | 3 | 0 | 6 | waived — revisit: Fabric's ADR, contract DEC CT-05 and the kit resolver (T1–T3) land | — |
 | B-018 | No wiki project card and no agent-estate entry for prowl-research (global rule: read/update before agent planning) | wave-0 survey 2026-10-11 · `operator's projects wiki (private): no card for this agent` | S | 1 | 3 | 0 | 3 | in-flight — wiki card committed locally in the projects vault; push blocked by unrelated vault divergence (vault owner) | wave 1 |
 | B-024 | Contract probes live outside tests/ (deep probes in docs/reports, resume probes only in prowl-app); move each into tests/ as its fix lands, keep the diagnostic cut | wave-0 survey 2026-10-11 · `docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py; prowl-app probe_research_resume.py` | S | 1 | 2 | 0 | 2 | in-flight — KA-06 contracts in tests/ (675e769); remaining probes move with waves 2–3 | wave 1 |
-| B-006 | save_markdown is non-atomic and an OSError escapes _execute_transform, failing the whole run | wave-0 survey 2026-10-11 · `research_agent/evidence/store.py:87-96` | S | 2 | 1 | 0 | 2 | open | wave 2 |
-| B-008 | A failed transform is not persisted until the next segment saves | wave-0 survey 2026-10-11 · `research_agent/agent/orchestrator.py:579-585` | S | 2 | 1 | 0 | 2 | open | wave 2 |
-| B-025 | raw_ref is absolute under the service and CWD-relative under CLI/MCP — not portable, blocks quote-to-raw checks | wave-0 survey 2026-10-11 · `research_agent/agent/orchestrator.py:684-697; evidence/store.py` | S | 2 | 2 | 0 | 4 | open | wave 2 |
 | B-007 | Transform claims (an LLM summary of tool X) corroborate X itself | wave-0 survey 2026-10-11 · `research_agent/evidence/ledger.py:201-203; orchestrator.py:586-589` | S | 3 | 2 | 0 | 6 | open | wave 3 |
 | B-003 | ObservedLLM duplicates LLMClient without retries, max_tokens-scaled timeout or LLMError mapping; one 429 fails a paid service run | wave-0 survey 2026-10-11 · `research_agent/service/runtime.py:91-122; llm.py:144-149` | S | 3 | 2 | 0 | 6 | open | wave 4 |
 | B-004 | ObservedProwl._rpc never reconnects; meta calls lose the client's retry under the service | wave-0 survey 2026-10-11 · `research_agent/service/runtime.py:51-58` | S | 2 | 2 | 0 | 4 | open | wave 4 |
@@ -30,6 +27,7 @@
 | B-023 | audit/kimi-20261010 and feat/fabric-dashboard-20261010 are unmerged; origin/main is still 1dced8e | wave-0 survey 2026-10-11 · `git log main..HEAD` | S | 2 | 3 | 0 | 6 | in-flight — operator approved PR-per-wave merges (2026-10-12) | wave 1 |
 | B-020 | prowl-research has no row in the Fabric delegation-model adoption plan (step 4: callee adopts) | wave-0 survey 2026-10-11 · `Fabric delegation-model adoption plan (estate document)` | S | 2 | 3 | 0 | 6 | open — forwarded to the Fabric plan owner, 2026-10-11 | Fabric delegation plan row (pending) |
 | B-026 | Observatory use_secret.py names prints its ambiguity message one character per line | wave-0 survey 2026-10-11 · `Observatory use_secret.py names` | S | 1 | 3 | 0 | 3 | fixed upstream, awaiting engine release (Observatory owner, 2026-10-11) | Observatory upstream PR #208 |
+| B-032 | Server-side dedupe of a same-key resend is unverified offline (Prowl retry window, 15 min default); CORE-14 | wave-2 product certification 2026-10-12 | S | 3 | 3 | 0 | 9 | open | wave 6 |
 
 Prio = `Sev × Blast + age_bonus` (`age_bonus` 1 past 14 days, 2 past 30).
 
@@ -44,5 +42,8 @@ Prio = `Sev × Blast + age_bonus` (`age_bonus` 1 past 14 days, 2 past 30).
 - **B-016 · BRIEF stops at FD-11; FD-12…FD-14 and every FD status live only in the parent plan and HANDOFF** — closed — 675e769, 2026-10-11
 - **B-030 · Bare research.* tool names are ambiguous across the estate; document addressing by service id prowl-research.default / PROWL-AI/research-agent; no rename (provider contentHash binds names)** — closed — 675e769 + 12df501 (no private names), 2026-10-11
 - **B-031 · No hosted CI workflow in this repository; VERIFICATION 'Hosted CI NOT_RUN' has no workflow behind it. Add a nightly-only workflow (estate policy 23:00 Europe/Warsaw, no push/PR triggers)** — closed — 675e769 (workflow file); hosted run NOT_RUN until it reaches main, 2026-10-11
+- **B-006 · save_markdown is non-atomic and an OSError escapes _execute_transform, failing the whole run** — closed — wave 2; atomic save_markdown, raw-write failure typed, 2026-10-12
+- **B-008 · A failed transform is not persisted until the next segment saves** — closed — wave 2; failed transform saved immediately, 2026-10-12
+- **B-025 · raw_ref is absolute under the service and CWD-relative under CLI/MCP — not portable, blocks quote-to-raw checks** — closed — wave 2; run-dir-relative raw_ref, 2026-10-12
 
 KA-06 closes in the canonical KA plan (prowl-app) with the same commits.

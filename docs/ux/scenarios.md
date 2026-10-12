@@ -175,13 +175,13 @@
 | CORE-02 | Запуск через Fabric `research.run`: исход совпадает с ядром | 4 | UNVERIFIED |
 | CORE-03 | Второй процесс не меняет живой прогон | 1 | PASS@583f1d1 |
 | CORE-04 | Осиротевший прогон → `interrupted` → продолжение | 1, 2 | PASS@0b0347b |
-| CORE-05 | Продолжение после сбоя не платит дважды | 2 | PASS@W2F1 |
-| CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | PASS@W2F1 |
+| CORE-05 | Продолжение после сбоя не платит дважды | 2 | PASS@2bbf566 |
+| CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | PASS@2bbf566 |
 | CORE-07 | Остановка по бюджету LLM | 4 | UNVERIFIED |
 | CORE-08 | Оплаченный сбой входит в бюджет и после продолжения | 2 | PASS@0b0347b |
 | CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | UNVERIFIED |
 | CORE-10 | Конфликт остаётся конфликтом | 3 | UNVERIFIED |
-| CORE-11 | Потеря доказательств → `partial`, не `complete` | 2 | PASS@W2F1 |
+| CORE-11 | Потеря доказательств → `partial`, не `complete` | 2 | PASS@2bbf566 |
 | CORE-12 | Переписать отчёт активного прогона нельзя | 1 | PASS@583f1d1 |
 | CORE-13 | Судья отвергает заведомо плохой отчёт | 6 | UNVERIFIED |
 | CORE-14 | Повторная отправка тем же ключом не оплачивается дважды на сервере | 6 | UNVERIFIED |
@@ -238,7 +238,7 @@
 - **Coverage:** волна 1 (сверка): `test_control_unlocked_orphan_is_reconciled`, `test_reconcile_orphans_reports_what_it_marked_and_skips_active`, `test_reconcile_survives_an_unwritable_run_dir`, `test_cli_status_reconciles_an_orphan_and_prints_terminal`, `test_service_recover_reconciles_its_run_dirs`; волна 2 (продолжение по состояниям шагов): `test_ka03_*`, `test_outcome_unknown_attempt_is_resent_with_the_same_key`, `tests/test_durability.py`
 
 ### CORE-05: Продолжение после сбоя не платит дважды
-- **Status:** PASS@W2F1
+- **Status:** PASS@2bbf566
 - **Actor:** оператор (P-01); вызывающий агент
 - **Trigger:** продолжение прогона, упавшего на любой границе сохранения шага
 - **Preconditions:** для шага уже сохранён raw (`raw_saved`) или попытка отправлена без известного исхода (`dispatching`).
@@ -250,7 +250,7 @@
 - **Coverage:** `tests/test_durability.py::test_every_durable_boundary_is_resumable_without_paying_twice`, `test_ka10_resume_finishes_extraction_from_saved_raw_without_paying`, `test_outcome_unknown_attempt_is_resent_with_the_same_key`, `test_read_timeout_is_outcome_unknown_and_resent_with_the_same_key`, `test_budget_stop_keeps_an_outcome_unknown_step_and_its_key`, `test_raw_saved_step_is_extracted_even_after_the_tool_budget_is_spent`, `test_v1_crash_between_save_and_completion_is_finished_without_paying`, `test_a_run_that_needs_attention_stays_readable_and_is_never_resumed`, `test_migration_refuses_*`
 
 ### CORE-06: Остановка по бюджету: вызовы, USD, минуты
-- **Status:** PASS@W2F1
+- **Status:** PASS@2bbf566
 - **Actor:** оператор (P-01); вызывающий агент
 - **Trigger:** прогон достигает лимита runbook `Budget` по вызовам инструментов, USD или минутам
 - **Preconditions:** лимит меньше, чем требует план.
@@ -310,7 +310,7 @@
 - **Coverage:** —
 
 ### CORE-11: Потеря доказательств → `partial`, не `complete`
-- **Status:** PASS@W2F1
+- **Status:** PASS@2bbf566
 - **Actor:** оператор (P-01); вызывающий агент
 - **Trigger:** запись raw или извлечение шага не удались
 - **Preconditions:** —
