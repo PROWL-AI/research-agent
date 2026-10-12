@@ -256,12 +256,12 @@ def _cmd_status(run_id: str) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(f"run {status['run_id']} ({status['runbook']}): {status['status']}")
-    # Skipped steps are also recorded in completed_steps (their post-failure
-    # chunk-mates) — subtract them or the count overstates real progress.
-    skipped_idx = {entry.get("index") for entry in status["skipped_steps"]}
-    completed = sum(1 for i in status["completed_steps"] if i not in skipped_idx)
+    completed = len(status["completed_steps"])
     print(f"  steps:    {completed}/{status['planned_steps']} completed, "
-          f"{len(status['skipped_steps'])} skipped")
+          f"{len(status['skipped_steps'])} disclosed (not run, skipped or incomplete)")
+    counts = {k: v for k, v in (status.get("step_counts") or {}).items() if v}
+    if counts:
+        print(f"  states:   {counts}")
     print(f"  counters: {status['counters']}")
     if status["duration_s"] is not None:
         print(f"  duration: {status['duration_s']}s")

@@ -126,6 +126,14 @@ class Ledger:
             self.path, json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False)
         )
 
+    def remove_ids(self, claim_ids: list[str]) -> int:
+        """Drop the claims a step's earlier extraction produced (their ids are
+        recorded on the step), so extracting it again replaces, never duplicates."""
+        drop = set(claim_ids)
+        before = len(self.claims)
+        self.claims = [c for c in self.claims if c.id not in drop]
+        return before - len(self.claims)
+
     def _next_id(self) -> str:
         highest = 0
         for claim in self.claims:

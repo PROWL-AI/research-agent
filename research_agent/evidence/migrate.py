@@ -37,6 +37,7 @@ from typing import TYPE_CHECKING, Any
 from research_agent.events import emit
 from research_agent.evidence.store import (
     COMPLETED,
+    EXCLUDED,
     FAILED,
     PENDING,
     SKIPPED_ON_ERROR,
@@ -141,6 +142,19 @@ def _migrate(data: dict[str, Any], store: "ArtifactStore", run_id: str) -> Check
         elif skip is not None and reason.startswith("step '") and not record.on_error_skip:
             record.state, record.reason = FAILED, reason
         steps.append(record)
+
+    # Planner-time drops (their index is in the planner's raw output, not in
+    # `plan`) stay disclosed as excluded steps.
+    for s in skipped:
+        if s.get("kind") != "plan_drop":
+            continue
+        tool = str(s.get("tool") or "?")
+        index = int(s.get("index") or 0)
+        steps.append(StepRecord(
+            step_id=make_step_id(index, tool, {"v1_plan_drop": True}), raw_index=index,
+            tool=tool, step=str(s.get("step") or "?"), state=EXCLUDED,
+            reason=f"plan: {s.get('reason') or 'dropped by the planner check'}",
+        ))
 
     counters = data.get("counters") or {}
     attempted = int(counters.get("attempted_calls", counters.get("data_calls", 0)) or 0)

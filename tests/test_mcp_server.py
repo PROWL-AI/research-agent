@@ -106,7 +106,7 @@ async def test_run_wait_false_job_handle_then_status_and_report(
 
     status = await srv.research_get_status("mcp-job")
     assert status["status"] == "complete"
-    assert status["completed_steps"] == [0]
+    assert len(status["completed_steps"]) == 1 and status["completed_steps"][0].startswith("s-")
     assert status["counters"]["data_calls"] == 1
     assert status["duration_s"] is not None
 

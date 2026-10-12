@@ -58,10 +58,10 @@ class ObservedProwl(ProwlClient):
         return await session.call_tool(name, arguments or {}, read_timeout_seconds=_call_timeout(),
                                        meta={"traceparent": trace} if trace else None)
 
-    async def _invoke(self, prowl_tool, arguments):
+    async def _invoke(self, prowl_tool, arguments, *, record=None):
         # Metadata lookups are observable but excluded from paid usage receipts.
         if prowl_tool != "prowl_call_tool":
-            return await super()._invoke(prowl_tool, arguments)
+            return await super()._invoke(prowl_tool, arguments, record=record)
         if len(self.store.calls(self.job["id"])) >= 256:
             raise ProwlError("Service call limit reached (256)")
         call = self.store.start_call(self.job["id"], "tool", arguments.get("tool_name", prowl_tool), scrub(arguments.get("params", {})))
@@ -69,7 +69,7 @@ class ObservedProwl(ProwlClient):
         index = len(self.call_log)
         result, status = None, "failed"
         try:
-            result = await super()._invoke(prowl_tool, arguments)
+            result = await super()._invoke(prowl_tool, arguments, record=record)
             status = "completed"
             return result
         except asyncio.CancelledError:

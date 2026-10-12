@@ -290,7 +290,7 @@ def test_old_checkpoint_without_terminal_code_loads(tmp_path):
     )
     checkpoint = ArtifactStore(run_dir).load_checkpoint()
     assert checkpoint.terminal_code is None
-    assert checkpoint.schema_version == 1
+    assert checkpoint.migrated_from == 1  # v1 files load through the v1 → v2 migration
 
 
 # ── rewrite_report never writes over a live run ──────────────────────────────

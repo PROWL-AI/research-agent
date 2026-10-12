@@ -51,15 +51,16 @@ class TestFinishedRunIdIsNotReusable:
         orch2 = Orchestrator(fake_prowl, fake_llm, runs_root=tmp_path / "runs")
         resumed = await orch2.run("mini-teardown", {"competitors": ["a.com"]}, run_id="r-part")
 
-        # Only step-0 (the failed one) re-runs; steps 1-2 were completed by
-        # the first attempt and are never re-billed.
+        # Step 0 (the failed one) re-runs. Steps 1-2 never started: they are
+        # runnable, not "completed" (that was KA-04) — here the 2-call budget
+        # (1 failed + 1 resumed attempt) stops them, and they are disclosed.
         assert [c["arguments"]["domain"] for c in fake_prowl.tool_calls] == ["x0.com"]
         checkpoint = json.loads(
             (tmp_path / "runs" / "r-part" / "checkpoint.json").read_text()
         )
-        assert checkpoint["stop_reason"] is None
-        assert 0 in checkpoint["completed_steps"]
-        # Steps 1-2 never produced data, so the run stays honestly partial.
+        states = [s["state"] for s in checkpoint["steps"]]
+        assert states == ["completed", "skipped_budget", "skipped_budget"]
+        assert checkpoint["stop_reason"].startswith("max_tool_calls=")
         assert resumed.status == "partial"
 
 
@@ -87,6 +88,9 @@ class TestCrashResumeClearsStopReason:
             "stop_reason": "worker 0 crashed: boom",
             "counters": {"data_calls": 1, "attempted_calls": 1, "cost_usd": None},
         }))
+        # Step 0 completed for real in the dead attempt: its raw is on disk.
+        (runs / "r-crash" / "raw").mkdir()
+        (runs / "r-crash" / "raw" / "00_spyfu_get_domain_stats.json").write_text("{}")
         orch = Orchestrator(fake_prowl, fake_llm, runs_root=runs)
 
         result = await orch.run("mini-usd", {"competitors": ["a.com"]}, run_id="r-crash")
@@ -94,7 +98,7 @@ class TestCrashResumeClearsStopReason:
         assert len(fake_prowl.tool_calls) == 2  # steps 1 and 2 re-executed
         assert result.status == "complete"
         # The stale crash disclosure for step-1 is gone — it completed.
-        assert all(s["index"] != 1 for s in result.skipped_steps)
+        assert all(s["step"] != "step-1" for s in result.skipped_steps)
         checkpoint = json.loads((runs / "r-crash" / "checkpoint.json").read_text())
         assert checkpoint["stop_reason"] is None
 
@@ -314,9 +318,11 @@ class TestSingleWorkerCrash:
             budget=None,
         )
 
-        summaries = await run_data_segment(
-            [(0, PlanItem(step="s0", tool="spyfu_get_domain_stats"))], ctx, 1
-        )
+        from research_agent.evidence.store import StepRecord
+
+        record = StepRecord(step_id="s-0", raw_index=0, tool="spyfu_get_domain_stats", step="s0")
+        checkpoint.steps = [record]
+        summaries = await run_data_segment([record], ctx, 1)
 
         assert checkpoint.partial is True
         assert "boom" in checkpoint.stop_reason

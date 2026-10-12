@@ -520,7 +520,10 @@ class TestCliHonesty:
 
         fake_status = {
             "run_id": "r3-stat1", "runbook": "mini-teardown", "status": "partial",
-            "completed_steps": [0, 1, 2], "planned_steps": 3,
+            # v2: completed_steps holds only completed step ids — skipped steps
+            # are never in it, so nothing needs subtracting.
+            "completed_steps": ["s-a"], "planned_steps": 3,
+            "step_counts": {"completed": 1, "failed": 2},
             "skipped_steps": [
                 {"index": 1, "step": "s1", "tool": "t", "reason": "failed"},
                 {"index": 2, "step": "s2", "tool": "t", "reason": "failed"},
@@ -533,4 +536,5 @@ class TestCliHonesty:
         )
         assert main(["status", "r3-stat1"]) == 0
         out = capsys.readouterr().out
-        assert "1/3 completed, 2 skipped" in out
+        assert "1/3 completed, 2 disclosed" in out
+        assert "'failed': 2" in out

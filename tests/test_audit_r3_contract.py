@@ -66,11 +66,24 @@ def _seed_checkpoint(
     plan: list[dict] | None = None,
     completed: list[int] | None = None,
 ) -> None:
+    """A version-2 checkpoint as a crashed or finished attempt left it:
+    completed steps carry their saved raw, the rest are pending."""
+    from research_agent.evidence.store import StepRecord, make_step_id
+
     store = ArtifactStore(tmp_path / "runs" / run_id)
     checkpoint = Checkpoint(run_id=run_id, runbook="mini-teardown")
     checkpoint.status = status
-    checkpoint.plan = plan if plan is not None else _two_step_plan()
-    checkpoint.completed_steps = completed or []
+    checkpoint.plan_raw = plan if plan is not None else _two_step_plan()
+    done = set(completed or [])
+    for i, item in enumerate(checkpoint.plan_raw):
+        record = StepRecord(
+            step_id=make_step_id(i, item["tool"], item.get("arguments", {})), raw_index=i,
+            tool=item["tool"], arguments=item.get("arguments", {}), step=item.get("step", ""),
+        )
+        if i in done:
+            record.raw_ref, record.raw_sha256 = store.save_raw(record.step_id, record.tool, {"seed": i})
+            record.state = "completed"
+        checkpoint.steps.append(record)
     checkpoint.brief = {"competitors": ["a.com"]}
     checkpoint.partial = status in ("partial", "interrupted")
     if status == "interrupted":
@@ -117,7 +130,7 @@ class TestRestartResume:
         assert [call["name"] for call in fake_prowl.tool_calls] == ["dataforseo_bl_summary"]
         checkpoint = _checkpoint_on_disk(tmp_path, "r3-resume")
         assert checkpoint["status"] == "complete"
-        assert checkpoint["completed_steps"] == [0, 1]
+        assert [s["state"] for s in checkpoint["steps"]] == ["completed", "completed"]
 
     async def test_failed_run_with_plan_resumes(
         self, wired, fake_prowl: FakeProwl, tmp_path: Path
@@ -145,11 +158,11 @@ class TestRestartResume:
 
         assert result["status"] == "complete"
         keys = [call["idempotency_key"] for call in fake_prowl.tool_calls]
-        # One key per (step index, tool) — stable across a resume re-dispatch.
-        assert sorted(keys) == [
-            "r3-idem:0:spyfu_get_domain_stats",
-            "r3-idem:1:dataforseo_bl_summary",
-        ]
+        # One key per (immutable step id, attempt number) — a re-dispatch of an
+        # outcome-unknown attempt re-sends the same key (KA-03).
+        checkpoint = _checkpoint_on_disk(tmp_path, "r3-idem")
+        expected = [f"r3-idem:{s['step_id']}:1" for s in checkpoint["steps"]]
+        assert sorted(keys) == sorted(expected)
 
     async def test_partial_run_with_plan_resumes(
         self, wired, fake_prowl: FakeProwl, tmp_path: Path
@@ -254,8 +267,9 @@ class TestRefusalEnvelopes:
         checkpoint = _checkpoint_on_disk(tmp_path, "r3-refused")
         assert "validation" in checkpoint["stop_reason"]
         # The refused step is disclosed, not completed: it stays resumable.
-        assert 0 not in checkpoint["completed_steps"]
-        assert checkpoint["skipped_steps"][0]["tool"] == "spyfu_get_domain_stats"
+        step = checkpoint["steps"][0]
+        assert step["state"] == "failed" and step["tool"] == "spyfu_get_domain_stats"
+        assert result["skipped_steps"][0]["tool"] == "spyfu_get_domain_stats"
 
     async def test_insufficient_funds_stops_run_honestly(
         self, wired, fake_prowl: FakeProwl, fake_llm: FakeLLM, tmp_path: Path
@@ -274,7 +288,8 @@ class TestRefusalEnvelopes:
         assert result["status"] == "partial"
         checkpoint = _checkpoint_on_disk(tmp_path, "r3-broke")
         assert "insufficient_funds" in checkpoint["stop_reason"]
-        assert checkpoint["counters"]["data_calls"] == 0
+        assert checkpoint["stats"]["data_calls"] == 0
+        assert [a["outcome"] for a in checkpoint["attempts"]] == ["refused"]
 
 
 class TestCorruptCheckpointQuarantine:
@@ -309,12 +324,19 @@ class TestPromptInjectionIsolation:
     async def test_transform_prompt_wraps_artifacts_untrusted(
         self, fake_prowl: FakeProwl, fake_llm: FakeLLM, tmp_path: Path
     ):
-        store = ArtifactStore(tmp_path / "run")
-        store.save_raw(0, "spyfu_get_domain_stats", {"traffic": 1000})
-        orch = Orchestrator(fake_prowl, fake_llm, runs_root=tmp_path)
-        item = PlanItem(step="synthesize", tool="transform", instruction="sum it up")
+        from research_agent.evidence.store import StepRecord
 
-        await orch._run_transform(item, store)
+        store = ArtifactStore(tmp_path / "run")
+        ref, sha = store.save_raw("s-data", "spyfu_get_domain_stats", {"traffic": 1000})
+        checkpoint = Checkpoint(run_id="run", runbook="mini-teardown", steps=[
+            StepRecord(step_id="s-data", raw_index=0, tool="spyfu_get_domain_stats",
+                       state="completed", raw_ref=ref, raw_sha256=sha),
+        ])
+        orch = Orchestrator(fake_prowl, fake_llm, runs_root=tmp_path)
+        record = StepRecord(step_id="s-t", raw_index=1, kind="transform", tool="transform",
+                            step="synthesize", instruction="sum it up")
+
+        await orch._run_transform(record, checkpoint, store)
 
         call = fake_llm.calls[-1]
         system, user = call["messages"][0]["content"], call["messages"][1]["content"]

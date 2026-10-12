@@ -41,7 +41,8 @@ async def test_budget_max_tool_calls_stops_execution(
         (tmp_path / "runs" / "r1" / "checkpoint.json").read_text()
     )
     assert checkpoint["status"] == "partial"
-    assert checkpoint["counters"]["data_calls"] == 2
+    assert checkpoint["stats"]["data_calls"] == 2
+    assert len(checkpoint["attempts"]) == 2  # the ledger is the source of the count
 
 
 async def test_on_error_skip_continues(
@@ -127,8 +128,8 @@ async def test_resume_skips_completed_steps(
     checkpoint_path = runs / "r6" / "checkpoint.json"
     checkpoint = json.loads(checkpoint_path.read_text())
     checkpoint["status"] = "running"
-    checkpoint["completed_steps"] = [0]
-    checkpoint["counters"] = {"data_calls": 1, "attempted_calls": 1, "cost_usd": None}
+    checkpoint["steps"][1]["state"] = "pending"  # step 0 stays completed
+    checkpoint["attempts"] = checkpoint["attempts"][:1]
     checkpoint_path.write_text(json.dumps(checkpoint))
 
     fake_prowl.tool_calls.clear()
@@ -191,7 +192,7 @@ async def test_transform_step_executes_without_tool_call(
     assert result.stats["data_calls"] == 1
 
     raw_dir = tmp_path / "runs" / "r-t1" / "raw"
-    transform_artifacts = list(raw_dir.glob("01_transform*.md"))
+    transform_artifacts = list(raw_dir.glob("*_transform.md"))
     assert len(transform_artifacts) == 1
     assert transform_artifacts[0].read_text() == fake_llm.transform_text
 
