@@ -174,14 +174,14 @@
 | CORE-01 | Запуск до терминального состояния (CLI, stdio MCP) | 1 | PASS@583f1d1 |
 | CORE-02 | Запуск через Fabric `research.run`: исход совпадает с ядром | 4 | UNVERIFIED |
 | CORE-03 | Второй процесс не меняет живой прогон | 1 | PASS@583f1d1 |
-| CORE-04 | Осиротевший прогон → `interrupted` → продолжение | 1, 2 | UNVERIFIED |
-| CORE-05 | Продолжение после сбоя не платит дважды | 2 | UNVERIFIED |
-| CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | UNVERIFIED |
+| CORE-04 | Осиротевший прогон → `interrupted` → продолжение | 1, 2 | PASS@W2 |
+| CORE-05 | Продолжение после сбоя не платит дважды | 2 | PASS@W2 |
+| CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | PASS@W2 |
 | CORE-07 | Остановка по бюджету LLM | 4 | UNVERIFIED |
-| CORE-08 | Оплаченный сбой входит в бюджет и после продолжения | 2 | UNVERIFIED |
+| CORE-08 | Оплаченный сбой входит в бюджет и после продолжения | 2 | PASS@W2 |
 | CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | UNVERIFIED |
 | CORE-10 | Конфликт остаётся конфликтом | 3 | UNVERIFIED |
-| CORE-11 | Потеря доказательств → `partial`, не `complete` | 2 | UNVERIFIED |
+| CORE-11 | Потеря доказательств → `partial`, не `complete` | 2 | PASS@W2 |
 | CORE-12 | Переписать отчёт активного прогона нельзя | 1 | PASS@583f1d1 |
 | CORE-13 | Судья отвергает заведомо плохой отчёт | 6 | UNVERIFIED |
 
@@ -224,7 +224,7 @@
 - **Coverage:** `test_ka06_non_owner_cannot_mutate_locked_checkpoint[run|startup]`, `test_research_run_wait_false_refuses_a_run_locked_elsewhere`, `tests/test_two_process_lock.py::test_second_process_cannot_write_a_locked_run`
 
 ### CORE-04: Осиротевший прогон → `interrupted` → продолжение
-- **Status:** UNVERIFIED
+- **Status:** PASS@W2
 - **Actor:** оператор (P-01)
 - **Trigger:** процесс прогона убит (сбой, перезагрузка); затем `prowl-research status <run_id>`, старт stdio MCP или восстановление сервиса (`Store.recover`)
 - **Preconditions:** checkpoint в `running`, блокировку никто не держит. Каталог прогонов один для всех команд CLI и stdio MCP: `RESEARCH_RUNS_DIR`, иначе `./runs`; у сервиса — свой `runs/` в корне сервиса.
@@ -234,10 +234,10 @@
 - **Expected result:** сверка берёт `RunLock` без ожидания, помечает прогон `interrupted` под блокировкой; продолжение выполняет только шаги в состояниях `pending`, `outcome_unknown`, `raw_saved` (только извлечение) и `failed` без `on_error_skip`.
 - **Failure outcome:** если блокировка занята — сверка ничего не пишет (событие `run.reconcile.skipped_active`), а статус показывает `active=true`; недоступный для записи каталог не мешает сверке остальных (`run.reconcile.failed`). Чтение статуса само по себе никогда не пишет, кроме этой сверки под блокировкой.
 - **Wave:** 1 (сверка в `interrupted`, N-OWN); 2 (продолжение по сохранённым состояниям шагов, N-STATE)
-- **Coverage:** волна 1 (сверка): `test_control_unlocked_orphan_is_reconciled`, `test_reconcile_orphans_reports_what_it_marked_and_skips_active`, `test_reconcile_survives_an_unwritable_run_dir`, `test_cli_status_reconciles_an_orphan_and_prints_terminal`, `test_service_recover_reconciles_its_run_dirs`; продолжение по состояниям шагов — волна 2
+- **Coverage:** волна 1 (сверка): `test_control_unlocked_orphan_is_reconciled`, `test_reconcile_orphans_reports_what_it_marked_and_skips_active`, `test_reconcile_survives_an_unwritable_run_dir`, `test_cli_status_reconciles_an_orphan_and_prints_terminal`, `test_service_recover_reconciles_its_run_dirs`; волна 2 (продолжение по состояниям шагов): `test_ka03_*`, `test_outcome_unknown_attempt_is_resent_with_the_same_key`, `tests/test_durability.py`
 
 ### CORE-05: Продолжение после сбоя не платит дважды
-- **Status:** UNVERIFIED
+- **Status:** PASS@W2
 - **Actor:** оператор (P-01); вызывающий агент
 - **Trigger:** продолжение прогона, упавшего на любой границе сохранения шага
 - **Preconditions:** для шага уже сохранён raw (`raw_saved`) или попытка отправлена без известного исхода (`dispatching`).
@@ -246,10 +246,10 @@
 - **Expected result:** шаг с сохранённым raw только извлекается заново — **без повторной отправки**; шаг в `dispatching` становится `outcome_unknown` и отправляется с **тем же** ключом идемпотентности `run:step_id:attempt_no`; идентификаторы шагов не сдвигаются, даже если план или каталог инструментов изменились.
 - **Failure outcome:** если инструмент выпал из каталога — помечается `excluded` именно этот шаг, остальные не перенумеровываются; несовместимый v1 checkpoint получает `CheckpointMigrationError` и отчёт `needs_attention`, а не продолжение.
 - **Wave:** 2 (N-STATE, N-COST; KA-03, KA-04, KA-05; тест `CrashAt` на каждой границе)
-- **Coverage:** —
+- **Coverage:** `tests/test_durability.py::test_every_durable_boundary_is_resumable_without_paying_twice`, `test_ka10_resume_finishes_extraction_from_saved_raw_without_paying`, `test_outcome_unknown_attempt_is_resent_with_the_same_key`
 
 ### CORE-06: Остановка по бюджету: вызовы, USD, минуты
-- **Status:** UNVERIFIED
+- **Status:** PASS@W2
 - **Actor:** оператор (P-01); вызывающий агент
 - **Trigger:** прогон достигает лимита runbook `Budget` по вызовам инструментов, USD или минутам
 - **Preconditions:** лимит меньше, чем требует план.
@@ -258,7 +258,7 @@
 - **Expected result:** следующая отправка не происходит; прогон `partial` с `terminal_code` `budget_tools` / `budget_usd` / `budget_minutes`; невыполненные шаги — `skipped_budget` и раскрыты в отчёте; расход считается по журналу попыток (`actual`, иначе `estimate`, неизвестная цена — по оценке, не ноль).
 - **Failure outcome:** продолжение с поднятым бюджетом выполняет `skipped_budget` шаги; без поднятия — не выполняет.
 - **Wave:** 2 (N-COST)
-- **Coverage:** —
+- **Coverage:** `test_budget_stop_maps_to_budget_code`, `test_usd_budget_stop_maps_to_budget_usd_end_to_end`, `test_minutes_budget_stop_maps_to_budget_minutes_end_to_end`, `test_ka11_known_cost_does_not_discard_previous_estimates`
 
 ### CORE-07: Остановка по бюджету LLM
 - **Status:** UNVERIFIED
@@ -273,7 +273,7 @@
 - **Coverage:** —
 
 ### CORE-08: Оплаченный сбой входит в бюджет и после продолжения
-- **Status:** UNVERIFIED
+- **Status:** PASS@W2
 - **Actor:** оператор (P-01)
 - **Trigger:** инструмент вернул ошибку, но провайдер списал стоимость; прогон затем продолжен
 - **Preconditions:** ошибка несёт списанную стоимость (`ProwlError.cost_usd`).
@@ -282,7 +282,7 @@
 - **Expected result:** попытка записана в журнал с исходом и стоимостью в `finally`; после продолжения расход восстанавливается из сохранённых попыток **до** первой отправки, и сбой учитывается в бюджете.
 - **Failure outcome:** если стоимость сбоя теряется или продолжение начинает расход с нуля — дефект (KA-10/KA-12); сценарий `FAIL`.
 - **Wave:** 2 (N-COST; KA-10, KA-12)
-- **Coverage:** —
+- **Coverage:** `test_ka12_billed_failure_cost_survives_resume`
 
 ### CORE-09: `verified` только с цитатой в сохранённом raw или двумя независимыми источниками
 - **Status:** UNVERIFIED
@@ -309,7 +309,7 @@
 - **Coverage:** —
 
 ### CORE-11: Потеря доказательств → `partial`, не `complete`
-- **Status:** UNVERIFIED
+- **Status:** PASS@W2
 - **Actor:** оператор (P-01); вызывающий агент
 - **Trigger:** запись raw или извлечение шага не удались
 - **Preconditions:** —
@@ -318,7 +318,7 @@
 - **Expected result:** шаг не становится `completed`; прогон `partial` с `terminal_code=evidence_incomplete`, если не хватает только доказательств; отчёт раскрывает, каких шагов нет.
 - **Failure outcome:** продолжение повторяет только извлечение, если raw сохранён, без новой оплаты (CORE-05).
 - **Wave:** 2 (N-STATE; B-006, B-008)
-- **Coverage:** —
+- **Coverage:** `test_ka10_evidence_failure_cannot_report_complete[raw_write|extraction]`
 
 ### CORE-12: Переписать отчёт активного прогона нельзя
 - **Status:** PASS@583f1d1

@@ -31,7 +31,7 @@
     },
     "run_id": {
       "type": "string",
-      "description": "Resume or reuse this run id; generated when omitted. A checkpoint in status running/partial/failed/interrupted with a recorded plan resumes from its last completed step; 'complete' is terminal. A run whose lock another process holds (it is live elsewhere) is refused with 'run … is locked by another process'."
+      "description": "Resume or reuse this run id; generated when omitted. A checkpoint in status running/partial/failed/interrupted with a recorded plan resumes by step state: pending and failed steps run, a step whose raw is saved finishes extraction without a new paid call, and a call whose outcome is unknown is re-sent with the same idempotency key; 'complete' is terminal. A run whose lock another process holds (it is live elsewhere) is refused with 'run … is locked by another process'."
     },
     "wait": {
       "type": "boolean",

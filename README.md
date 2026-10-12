@@ -117,11 +117,11 @@ the run stopped (`null` while it is live). The set is closed:
 
 | `terminal_code` | `status` | meaning |
 |---|---|---|
-| `completed` | `complete` (or `partial` on a resume that kept earlier skip disclosures) | every step ran |
+| `completed` | `complete` (or `partial` when a disclosed omission remains, e.g. a step excluded because its tool left the catalog) | every runnable step ran and its evidence was saved |
 | `budget_tools` / `budget_usd` / `budget_minutes` | `partial` | a runbook budget ran out; the report marks what is missing |
 | `budget_llm` | `partial` | LLM-spend budget (reserved; not set yet) |
 | `step_failed` | `partial` | a step failed hard or a worker crashed |
-| `evidence_incomplete` | — | evidence could not be persisted (reserved; not set yet) |
+| `evidence_incomplete` | `partial` | a step's raw could not be written, its claim extraction failed, or a dispatch outcome is unknown; the resume finishes extraction from the saved raw without paying again |
 | `cancelled` | `partial` | any cancellation of the owning task: a caller or service cancel, the service timeout (job error `timeout`), Ctrl-C, a client closing its session or a graceful service shutdown |
 | `error` | `failed` | an exception escaped the run; `stop_reason` carries it |
 | `interrupted` | `interrupted` | the owning process died without a terminal write (a hard kill or crash); written by reconciliation, resumable |
@@ -176,6 +176,12 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
 - Runbooks declare their **tool allowlist** and **budget**
   (`max_tool_calls` / `max_usd` / `max_minutes`). On budget exhaustion the agent
   emits a partial report that marks what is missing — it never fails silently.
+  The budget is read from the run's **attempt ledger**: every dispatched call is
+  recorded before it is sent (so in-flight calls count against `max_tool_calls`),
+  and its cost is stored when it returns or fails — a billed failure costs money
+  too. Spend = server-reported actual costs + estimates for calls without one
+  (the catalog price, else the runbook's per-call share of `max_usd`, never zero);
+  `stats.cost_source` says `server`, `mixed` or `estimate`.
   Budgets cap **Prowl tool calls only**: the agent's own LLM usage (planning,
   claim extraction, transforms, writing, citation repair) is billed by your
   LLM provider on top of `max_usd` — it is metered, not capped, and reported
@@ -186,27 +192,35 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
 ## Current verification and resume limits
 
 The [deep agent audit](docs/reports/2026-10-10-agent-deep-audit/README.md) adds
-seven defects: lifecycle ownership (KA-06 — addressed in wave 1 by the
-run-lock ownership above; certification pending), false evidence verification, hidden artifact/extraction failures and
-budget accounting across mixed receipts/resume.
-Its explicit probes (`PYTHONPATH=tests:. .venv/bin/python -m pytest -q docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py`) are expected to fail until waves 2–3 close KA-07…KA-12; the KA-06 cases and the three controls pass.
+seven defects: lifecycle ownership (KA-06 — wave 1), hidden artifact/extraction
+failures and budget accounting across mixed receipts/resume (KA-10…KA-12 — wave 2),
+and false evidence verification (KA-07…KA-09 — open, wave 3). The ported contracts
+live in `tests/test_ka_contracts.py`. The historical probe file stays as the
+audit's cut: its KA-07/08/09 cases fail until wave 3, and its success control
+asserts a cwd-relative `raw_ref`, which wave 2 replaced with a run-dir-relative one.
 The [2026-10-10 handoff](docs/HANDOFF.md) links the remediation plan and records the audited source revision,
 checks and next repair tasks. The offline suite is `.venv/bin/python -m pytest
 tests/ -q` (network-free); its pass count is a fact about one revision, so it is
 recorded with that revision in the handoff rather than here. A green run does
 not establish live provider quality or Fabric host acceptance.
 
-Resume currently has confirmed gaps: pruning a changed tool catalog can shift
-step indices and skip pending work; a worker failure marks unstarted tail steps
-completed; and a worker writes its checkpoint before adding successful completion.
-These can omit work or replay a previously executed step after a crash. Inspect
-checkpoint, raw artifacts and remaining steps before resuming a paid run. A stable
-caller idempotency key alone does not guarantee exactly-once execution or billing.
-See the handoff for source locations and reproducible acceptance tests.
+Resume works from the checkpoint's step records (schema version 2, wave 2):
+every step has an immutable `step_id` assigned when the plan is made, so a tool
+leaving the catalog excludes that step by id and shifts nothing. A step's state is
+`pending`, `dispatching`, `outcome_unknown`, `raw_saved`, `completed`, `failed`,
+`skipped_on_error`, `skipped_budget` or `excluded`. A resume runs `pending` and
+`failed` steps, finishes `raw_saved` steps from their saved raw **without a new
+paid call**, and re-sends an `outcome_unknown` call with the **same idempotency
+key** (`<run_id>:<step_id>:<attempt>`) so the server can replay it instead of
+billing twice — exactly-once billing still depends on the server honouring that
+key. Version-1 checkpoints are migrated on load; a v1 state that cannot be mapped
+without guessing is refused with a typed error and the run is left for inspection.
+Crash injection at every durable write is covered by `tests/test_durability.py`.
 
-Finance/subscription live acceptance remains unverified. `max_usd` limits the
-Prowl tool-call budget, with concurrent in-flight calls potentially overshooting
-it; it is not a cap on the separate LLM provider spend.
+Finance/subscription live acceptance remains unverified. With several workers,
+the USD check can still overshoot by the in-flight calls' unknown cost (each
+counts at its estimate); `max_usd` is not a cap on the separate LLM provider
+spend.
 
 ## Fabric service and operator dashboard
 

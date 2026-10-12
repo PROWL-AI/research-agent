@@ -370,6 +370,7 @@ the recommendation as **assumed**, and the waves that depend on it name it.
 | Date | Change | Why |
 |---|---|---|
 | 2026-10-11 | canvas created from the wave-0 survey at `c0dfb6e` | first cut |
+| 2026-10-12 | Wave-2 build deviations from §2, decided in code: (1) plan-time `excluded` steps are disclosed but do not make a run `partial` — only `catalog_changed` exclusions do (a planner proposing a non-allowlisted tool is planning noise, not missing research); (2) claim ids stay `C<n>` because the writer's citation lint requires them — a step records the ids it produced and re-extraction replaces by those ids and by `raw_ref`; (3) a same-key resend of an `outcome_unknown` call reuses its attempt record (one logical attempt, counted once) | crash-injection test findings and the writer contract |
 | 2026-10-12 | Operator answered Q1–Q6 with the recommendations | canvas §8 |
 | 2026-10-11 | Wave 1 closed (`583f1d1`); W2 packet is next; one runs root for CLI and stdio (W1-F1 item 9) | close pass |
 | 2026-10-11 | Wave-1 certification: private estate names and home paths removed from public docs (forward fix; pushed history keeps them — operator decision); non-loopback callers treated as T2 until T1 enrollment is provable | product tier finding on `675e769` |

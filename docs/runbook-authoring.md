@@ -50,19 +50,21 @@ Rules:
   scenario, nothing more — lean lookup runbooks may go lower, broad audits a
   few higher. If you need a tool that doesn't exist, that's a
   finding — report it, don't plan around it.
-- Budgets are enforced per step on `max_tool_calls` (every billed
-  `prowl_call_tool` dispatch — failed ones included, the server charges them
-  too) and on `max_minutes` (wall time since the run was created, across
-  resumes). Under worker fan-out the tool-call check is advisory: racing
-  workers can overshoot by at most `workers − 1` calls before the stop
-  lands. `max_usd` is enforced on the server's billing data, falling back to
-  catalog price hints (marked "estimated" in stats) when the server returns
-  none. All three budgets cap **Prowl tool spend only** — the agent's own LLM
-  calls (planning, claim extraction, transforms, writing, citation repair)
-  are metered separately and reported under `stats.llm_usage`; `max_usd` does
-  not bound them. Size budgets for the scenario's real cost, not
-  aspirationally, and give the runbook a drop order for the day the fan-out
-  outgrows them.
+- Budgets are enforced before every dispatch from the run's attempt ledger.
+  `max_tool_calls` counts every dispatched `prowl_call_tool` attempt — failed
+  ones included (the server charges them too), and in-flight ones, because an
+  attempt is recorded before it is sent. `max_minutes` is wall time since the
+  run was created, across resumes. `max_usd` is checked against spend = the
+  server-reported actual cost of each attempt plus an estimate for every
+  attempt without one (the catalog price hint, else `max_usd / max_tool_calls`
+  — never zero); a known cost never discards the other attempts' estimates, and
+  a billed failure's cost survives a resume. Under worker fan-out the USD check
+  can still overshoot by the in-flight calls' unknown cost. All three budgets
+  cap **Prowl tool spend only** — the agent's own LLM calls (planning, claim
+  extraction, transforms, writing, citation repair) are metered separately and
+  reported under `stats.llm_usage`; `max_usd` does not bound them. Size budgets
+  for the scenario's real cost, not aspirationally, and give the runbook a drop
+  order for the day the fan-out outgrows them.
 
 ## Body grammar
 
