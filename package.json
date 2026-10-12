@@ -1,0 +1,1 @@
+{"name":"prowl-research-dashboard-checks","private":true,"scripts":{"test:dashboard":"node scripts/test-dashboard.mjs"},"devDependencies":{"playwright":"1.63.0"}}

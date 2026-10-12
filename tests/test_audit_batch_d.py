@@ -142,9 +142,12 @@ class TestReadmeDocs:
         )
         assert "validate_runbooks.py --online" in authoring
 
-    def test_runs_dir_scoped_to_mcp(self):
+    def test_runs_dir_is_one_root_for_cli_and_mcp(self):
+        # W1-F1: every CLI command and the stdio server share RESEARCH_RUNS_DIR
+        # (the old "MCP server only" split let `run` and `status` see two roots).
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-        assert "MCP server only; the CLI" in readme
+        assert "for the stdio MCP server and\n  every CLI command alike" in readme
+        assert "MCP server only; the CLI" not in readme
 
     def test_subcommands_listed(self):
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")

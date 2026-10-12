@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import re
 import shutil
 import sys
@@ -14,6 +15,12 @@ from pathlib import Path
 from research_agent.config import Config, ConfigError
 from research_agent.evidence.store import validate_run_id
 from research_agent.runbook import RunbookError, list_runbooks
+
+
+def _runs_root() -> Path:
+    """One runs root for every command, the same one the stdio server uses:
+    RESEARCH_RUNS_DIR, else ./runs."""
+    return Path(os.environ.get("RESEARCH_RUNS_DIR", "runs"))
 
 log = logging.getLogger(__name__)
 
@@ -160,26 +167,16 @@ def _parse_input_pairs(extra: list[str]) -> dict[str, object]:
     return inputs
 
 
-def _mark_run_failed(runbook_name: str, run_id: str, exc: Exception) -> None:
-    """Mirror the MCP contract: a crashed run's checkpoint becomes 'failed'
-    with a stop_reason — the CLI has no MCP wrapper doing this for it."""
-    from research_agent.evidence.store import ArtifactStore
+def _reconcile(runs_root: Path) -> None:
+    """Claim runs a crashed process left 'running' (lock free) as interrupted,
+    so a CLI user does not have to start an MCP server to see the truth. Runs
+    whose lock is held elsewhere are live and left alone."""
+    from research_agent.evidence.runlock import reconcile_orphans
 
     try:
-        store = ArtifactStore(Path("runs") / run_id)
-        checkpoint = store.load_checkpoint()
-        # Only a checkpoint this run owns: a precondition failure must not
-        # rewrite another run's terminal state.
-        if (
-            checkpoint is not None
-            and checkpoint.status == "running"
-            and checkpoint.runbook == runbook_name
-        ):
-            checkpoint.status = "failed"
-            checkpoint.stop_reason = str(exc)[:300]
-            store.save_checkpoint(checkpoint)
-    except Exception as mark_exc:  # noqa: BLE001
-        log.warning("could not mark run %s as failed: %s", run_id, mark_exc)
+        reconcile_orphans(runs_root)
+    except OSError as exc:
+        log.warning("reconciliation of %s skipped: %s", runs_root, exc)
 
 
 async def _cmd_run(runbook_name: str, inputs: dict[str, object], run_id: str | None) -> int:
@@ -199,9 +196,10 @@ async def _cmd_run(runbook_name: str, inputs: dict[str, object], run_id: str | N
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    # Generate the id up front (same shape as the orchestrator's) so a crash
-    # below can mark this run's checkpoint failed instead of leaving it
-    # 'running' forever.
+    _reconcile(_runs_root())
+    # Generate the id up front (same shape as the orchestrator's) so every
+    # error message below names the run. The orchestrator itself records a
+    # crashed run's terminal state under the run lock; the CLI only reports.
     run_id = run_id or Orchestrator._new_run_id(runbook_name)
 
     async with ProwlClient(
@@ -212,7 +210,7 @@ async def _cmd_run(runbook_name: str, inputs: dict[str, object], run_id: str | N
         model_cheap=config.llm_model,
         model_strong=config.llm_model_strong,
     ) as llm:
-        orchestrator = Orchestrator(prowl, llm, runs_root=Path("runs"))
+        orchestrator = Orchestrator(prowl, llm, runs_root=_runs_root())
         try:
             result = await orchestrator.run(runbook_name, inputs, run_id=run_id)
         except RunbookError as exc:
@@ -221,14 +219,12 @@ async def _cmd_run(runbook_name: str, inputs: dict[str, object], run_id: str | N
             return 2
         except (OrchestratorError, InputError) as exc:
             print(f"error: {exc}", file=sys.stderr)
-            _mark_run_failed(runbook_name, run_id, exc)
             return 1
         except Exception as exc:
-            print(f"error: run failed: {exc}", file=sys.stderr)
-            _mark_run_failed(runbook_name, run_id, exc)
+            print(f"error: run {run_id} failed: {exc}", file=sys.stderr)
             return 1
 
-    print(f"run {result.run_id}: {result.status}")
+    print(f"run {result.run_id}: {result.status} (terminal: {result.terminal_code})")
     print(f"  report: {result.report_path}")
     print(f"  ledger: {result.ledger_path}")
     print(f"  stats:  {result.stats}")
@@ -253,6 +249,7 @@ def _cmd_status(run_id: str) -> int:
         return 2
     from research_agent.mcp_server import _status_dict
 
+    _reconcile(_runs_root())
     try:
         status = _status_dict(run_id)
     except ValueError as exc:
@@ -270,6 +267,8 @@ def _cmd_status(run_id: str) -> int:
         print(f"  duration: {status['duration_s']}s")
     if status["stop_reason"]:
         print(f"  stop:     {status['stop_reason']}")
+    if status["terminal_code"]:
+        print(f"  terminal: {status['terminal_code']}")
     return 0
 
 
@@ -279,7 +278,7 @@ def _cmd_report(run_id: str) -> int:
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    report_path = Path("runs") / run_id / "report.md"
+    report_path = _runs_root() / run_id / "report.md"
     if not report_path.is_file():
         print(f"error: no report at {report_path}", file=sys.stderr)
         return 1
@@ -293,6 +292,7 @@ async def _cmd_rewrite(run_id: str) -> int:
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    from research_agent.agent.orchestrator import OrchestratorError
     from research_agent.agent.writer import RewriteError, rewrite_report
     from research_agent.llm import LLMClient
     from research_agent.runbook import RunbookError
@@ -310,8 +310,8 @@ async def _cmd_rewrite(run_id: str) -> int:
         model_strong=config.llm_model_strong,
     ) as llm:
         try:
-            outcome = await rewrite_report(llm, Path("runs"), run_id)
-        except (RewriteError, RunbookError) as exc:
+            outcome = await rewrite_report(llm, _runs_root(), run_id)
+        except (RewriteError, RunbookError, OrchestratorError) as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 1
 
@@ -329,7 +329,7 @@ def _cmd_export(run_id: str, fmt: str) -> int:
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    run_dir = Path("runs") / run_id
+    run_dir = _runs_root() / run_id
     if fmt == "md":
         report_path = run_dir / "report.md"
         if not report_path.is_file():
@@ -355,23 +355,6 @@ def _parse_days(text: str) -> timedelta:
     return timedelta(days=int(match.group(1)))
 
 
-def _lock_held(lock_path: Path) -> bool:
-    """True when another process holds an flock on the run's .lock file."""
-    import fcntl
-
-    try:
-        fd = lock_path.open("r+b")
-    except OSError:
-        return False
-    with fd:
-        try:
-            fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            return True
-        fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
-    return False
-
-
 def _cmd_prune(older_than: str, keep_last: int, yes: bool) -> int:
     try:
         min_age = _parse_days(older_than)
@@ -381,9 +364,10 @@ def _cmd_prune(older_than: str, keep_last: int, yes: bool) -> int:
     if keep_last < 0:
         print("error: --keep-last must be >= 0", file=sys.stderr)
         return 2
+    from research_agent.evidence.runlock import RunLock, is_locked_elsewhere
     from research_agent.evidence.store import ArtifactStore
 
-    runs_root = Path("runs")
+    runs_root = _runs_root()
     if not runs_root.is_dir():
         print("no runs/ directory — nothing to prune")
         return 0
@@ -412,7 +396,7 @@ def _cmd_prune(older_than: str, keep_last: int, yes: bool) -> int:
             skipped.append((run_dir, "protected by --keep-last"))
         elif age < min_age:
             skipped.append((run_dir, f"only {age.days}d old"))
-        elif (run_dir / ".lock").exists() and _lock_held(run_dir / ".lock"):
+        elif is_locked_elsewhere(run_dir):
             # A live lock means a running/interrupted run is still active in
             # another process — deleting its artifacts mid-write is corruption.
             skipped.append((run_dir, f"lock held (status={status})"))
@@ -421,14 +405,41 @@ def _cmd_prune(older_than: str, keep_last: int, yes: bool) -> int:
 
     for run_dir, reason in skipped:
         print(f"skip    {run_dir.name}: {reason}")
+    deleted = 0
     for run_dir, age, status in candidates:
-        print(f"{'delete' if yes else 'would delete'}  {run_dir.name}: {age.days}d old, status={status}")
-        if yes:
-            shutil.rmtree(run_dir)
+        if not yes:
+            print(f"would delete  {run_dir.name}: {age.days}d old, status={status}")
+            continue
+        # Delete under the run lock: a run that started after the probe above
+        # owns its dir now, and its artifacts are not ours to remove.
+        lock = RunLock(run_dir)
+        if not lock.acquire(blocking=False):
+            print(f"skip    {run_dir.name}: lock held (status={status})")
+            continue
+        try:
+            # Rename first, under the lock: a run that reuses this id after the
+            # rename gets a fresh dir and a lock of its own, never our rmtree.
+            tombstone = run_dir.with_name(
+                f".pruning-{run_dir.name}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}"
+            )
+            try:
+                run_dir.rename(tombstone)
+            except OSError as exc:
+                print(f"skip    {run_dir.name}: {exc}")
+                continue
+            print(f"delete  {run_dir.name}: {age.days}d old, status={status}")
+            try:
+                shutil.rmtree(tombstone)
+            except OSError as exc:
+                print(f"skip    {run_dir.name}: tombstone {tombstone.name} not removed: {exc}")
+                continue
+            deleted += 1
+        finally:
+            lock.release()
     if not yes and candidates:
         print(f"\ndry-run: {len(candidates)} run(s) would be deleted — re-run with --yes to delete")
     else:
-        print(f"\n{len(candidates)} run(s) {'deleted' if yes else 'to prune'}")
+        print(f"\n{deleted if yes else len(candidates)} run(s) {'deleted' if yes else 'to prune'}")
     return 0
 
 

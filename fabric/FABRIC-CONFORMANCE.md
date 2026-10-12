@@ -1,3 +1,11 @@
+# Current adapter — revision 5 (2026-10-10)
+
+The active manifest now describes the separate loopback Fabric service, not legacy stdio. Contract pin: `623bf61358c339cb10297807b3f024b5d9f1f327`. Exact tool definitions generate their schemas and manifest via `scripts/build-fabric-manifest.py`. `provider.contentHash` is SHA256 of compact, key-sorted UTF-8 manifest JSON before inserting that contentHash; runtime producer references use the same generated manifest. Installed build commit/digest identifies implementation separately.
+
+Current evidence and open gates: [Fabric handoff](../docs/evidence/fabric-dashboard/HANDOFF.md). Prior receipts below are historical and do not certify revision 5. Admission fixtures remain discovery-only proposals; no charge-capability admission is claimed from their declarations. All declared schemas resolve locally beside the manifest.
+
+---
+
 # Fabric conformance
 
 Contract: `fabric-agent-contract` 0.1.0 at `23f9fda4c05f8a3852246ee98d4f2adf74ed0875`
@@ -70,6 +78,16 @@ The live surface the bundle declares exists and is testable offline:
 `tests/test_audit_batch_c.py` exercise all four tools with mocked MCP/LLM
 surfaces; `python scripts/validate_runbooks.py --offline` passes. These
 receipts assert behavior, not host interop.
+
+## 2026-10-11 — wave 1 (run ownership)
+
+- `capability-output.schema.json`: gains `terminal_code` (closed enum, null while
+  running); `interrupted` now means the owning process exited with its run lock
+  free — a graceful shutdown writes `partial` + `cancelled`.
+  `capability-input.schema.json`: `run_id` states that a run locked by another
+  process is refused. Neither file is referenced by `fabric-agent.json`, so the
+  provider `contentHash` is unchanged. Coverage:
+  `tests/test_ka_contracts.py::test_wait_true_envelope_validates_against_the_published_schema`.
 
 ## Canary binding expectation
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import fcntl
 import json
 import logging
 import os
@@ -18,7 +17,10 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, Field
 
 from research_agent.agent.writer import produce_report
+from research_agent.events import emit
+from research_agent.evidence import terminal
 from research_agent.evidence.ledger import Ledger, _atomic_write_text
+from research_agent.evidence.runlock import RunLock
 from research_agent.evidence.store import ArtifactStore, Checkpoint
 from research_agent.llm import LLMClient
 from research_agent.prowl_client import ProwlClient, ProwlError
@@ -83,6 +85,8 @@ class RunResult(BaseModel):
     ledger_path: str
     skipped_steps: list[dict[str, Any]] = Field(default_factory=list)
     stats: dict[str, Any] = Field(default_factory=dict)
+    #: Why the run stopped — research_agent.evidence.terminal.TERMINAL_CODES.
+    terminal_code: str | None = None
 
 
 def normalize_domain(value: str) -> str:
@@ -222,22 +226,20 @@ Rules:
 """
 
 
-def _acquire_run_lock(run_dir: Path) -> int:
-    """Advisory flock on the run dir, held for the run's whole lifetime.
+def _lock_refused(run_id: str) -> OrchestratorError:
+    emit(log, "run.lock.refused", logging.WARNING, run_id=run_id)
+    return OrchestratorError(f"run {run_id} is locked by another process")
 
-    Two processes (a CLI and an MCP server, or two servers) sharing one
-    runs_root must never execute the same run_dir: counters go
-    last-writer-wins, claim ids duplicate out of _next_id, and calls bill
-    twice. Returns the open fd — closing it releases the lock.
-    """
-    run_dir.mkdir(parents=True, exist_ok=True)
-    fd = os.open(run_dir / ".lock", os.O_RDWR | os.O_CREAT, 0o644)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError as exc:
-        os.close(fd)
-        raise OrchestratorError(f"run {run_dir.name} is locked by another process") from exc
-    return fd
+
+def _acquire_run_lock(run_dir: Path) -> int:
+    """Take the run lock and return its raw descriptor (close it to release).
+
+    Kept for callers that predate `RunLock` (the 2026-10-10 audit probes);
+    new code uses `research_agent.evidence.runlock.RunLock` directly."""
+    lock = RunLock(run_dir)
+    if not lock.acquire(blocking=False):
+        raise _lock_refused(run_dir.name)
+    return lock.detach()
 
 
 class Orchestrator:
@@ -246,10 +248,12 @@ class Orchestrator:
         prowl: ProwlClient,
         llm: LLMClient,
         runs_root: Path | str = "runs",
+        *, max_workers: int | None = None,
     ) -> None:
         self.prowl = prowl
         self.llm = llm
         self.runs_root = Path(runs_root)
+        self.max_workers = max_workers
 
     async def run(
         self,
@@ -257,14 +261,75 @@ class Orchestrator:
         inputs: dict[str, Any],
         run_id: str | None = None,
     ) -> RunResult:
+        """Execute (or resume) one run while holding its lock.
+
+        This method is the only writer of the run's lifecycle state while the
+        run is live: a cancellation or an exception is recorded here, inside
+        the lock, before the lock is released — callers (MCP handlers, CLI,
+        Fabric service) only report. A lock refusal raises before any write.
+        """
         runbook = get_runbook(runbook_name)
         run_id = run_id or self._new_run_id(runbook_name)
         store = ArtifactStore(self.runs_root / run_id)
-        lock_fd = _acquire_run_lock(store.run_dir)
+        lock = RunLock(store.run_dir)
+        if not lock.acquire(blocking=False):
+            raise _lock_refused(run_id)
         try:
-            return await self._run_locked(runbook_name, inputs, run_id, runbook, store)
+            try:
+                return await self._run_locked(runbook_name, inputs, run_id, runbook, store)
+            except asyncio.CancelledError:
+                self._write_terminal(
+                    store, runbook_name, status="partial", partial=True,
+                    stop_reason="cancelled", code=terminal.CANCELLED,
+                )
+                raise
+            except Exception as exc:
+                self._write_terminal(
+                    store, runbook_name, status="failed", partial=None,
+                    stop_reason=str(exc)[:300], code=terminal.ERROR,
+                )
+                raise
         finally:
-            os.close(lock_fd)
+            lock.release()
+
+    @staticmethod
+    def _write_terminal(
+        store: ArtifactStore,
+        runbook_name: str,
+        *,
+        status: str,
+        partial: bool | None,
+        stop_reason: str,
+        code: str,
+    ) -> None:
+        """Record the owner's terminal state for a run that did not reach the
+        writer. Only a checkpoint this run owns and left live is touched: a
+        precondition failure (run already complete, id of another runbook)
+        must not rewrite another run's state, and an attempt that never
+        created a checkpoint leaves none. Never raises — the original
+        exception is what the caller must see."""
+        try:
+            checkpoint = store.load_checkpoint()
+            if (
+                checkpoint is None
+                or checkpoint.status != "running"
+                or checkpoint.runbook != runbook_name
+            ):
+                return
+            checkpoint.status = status
+            if partial is not None:
+                checkpoint.partial = partial
+            checkpoint.stop_reason = stop_reason
+            checkpoint.terminal_code = code
+            store.save_checkpoint(checkpoint)
+        except Exception as write_exc:  # noqa: BLE001
+            log.error("run %s: terminal write failed: %s", store.run_dir.name, write_exc)
+            return
+        emit(
+            log, "run.terminal", logging.WARNING,
+            run_id=checkpoint.run_id, status=checkpoint.status,
+            terminal_code=checkpoint.terminal_code, partial=checkpoint.partial,
+        )
 
     async def _run_locked(
         self,
@@ -320,11 +385,18 @@ class Orchestrator:
                 if entry.get("kind") == "plan_drop" or entry.get("index") in completed
             ]
             checkpoint.stop_reason = None
+            checkpoint.terminal_code = None
             checkpoint.status = "running"
             checkpoint.partial = checkpoint.partial and bool(checkpoint.skipped_steps)
             store.save_checkpoint(checkpoint)
         else:
             checkpoint = Checkpoint(run_id=run_id, runbook=runbook_name, brief=brief)
+            # Persist the run's existence BEFORE planning: a planner or
+            # list_tools failure must not leave get_status answering "unknown
+            # run_id" for an id a caller was handed — and the owner's terminal
+            # write needs a checkpoint to record into.
+            store.save_checkpoint(checkpoint)
+        emit(log, "run.started", run_id=run_id, runbook=runbook_name, resuming=resuming)
         started_monotonic = time.monotonic()
 
         catalog = await self.prowl.list_tools()
@@ -359,6 +431,7 @@ class Orchestrator:
         _atomic_write_text(report_path, outcome.report_md)
         ledger.save()
         checkpoint.status = "partial" if checkpoint.partial else "complete"
+        checkpoint.terminal_code = terminal.code_for_stop_reason(checkpoint.stop_reason)
         stats = {
             "data_calls": checkpoint.counters.get("data_calls", 0),
             "attempted_calls": checkpoint.counters.get(
@@ -390,11 +463,17 @@ class Orchestrator:
             stats["worker_segments"] = checkpoint.stats["worker_segments"]
         checkpoint.stats = stats
         store.save_checkpoint(checkpoint)
+        emit(
+            log, "run.terminal",
+            run_id=run_id, status=checkpoint.status,
+            terminal_code=checkpoint.terminal_code, partial=checkpoint.partial,
+        )
         self._export_html(store.run_dir)
 
         return RunResult(
             run_id=run_id,
             status=checkpoint.status,
+            terminal_code=checkpoint.terminal_code,
             partial=checkpoint.partial,
             report_path=str(report_path),
             ledger_path=str(ledger.path),
@@ -477,7 +556,7 @@ class Orchestrator:
         budget = runbook.meta.budget
         completed = set(checkpoint.completed_steps)
         effort = effort_for(budget.max_tool_calls, runbook.meta.effort)
-        n_workers = 1 if os.environ.get("RESEARCH_NO_SUBAGENTS") else EFFORT_WORKERS[effort]
+        n_workers = self.max_workers if self.max_workers is not None else (1 if os.environ.get("RESEARCH_NO_SUBAGENTS") else EFFORT_WORKERS[effort])
         ctx = WorkerContext(
             orch=self,
             checkpoint=checkpoint,
@@ -627,7 +706,7 @@ class Orchestrator:
             "attempted_calls", checkpoint.counters.get("data_calls", 0)
         )
         if attempted >= budget.max_tool_calls:
-            return f"max_tool_calls={budget.max_tool_calls}"
+            return terminal.budget_stop_text(terminal.BUDGET_TOOLS, budget.max_tool_calls)
         # Elapsed is measured from the checkpoint's creation, not from this
         # process start — otherwise every resume resets the clock and a
         # crashing run outlives max_minutes forever.
@@ -636,14 +715,16 @@ class Orchestrator:
             created = created.replace(tzinfo=timezone.utc)
         elapsed_minutes = (datetime.now(timezone.utc) - created).total_seconds() / 60
         if elapsed_minutes >= budget.max_minutes:
-            return f"max_minutes={budget.max_minutes}"
+            return terminal.budget_stop_text(terminal.BUDGET_MINUTES, budget.max_minutes)
         cost = self.prowl.cost_usd
         if cost is None:
             cost = checkpoint.counters.get("cost_estimate_usd")
             if cost is not None and cost >= budget.max_usd:
-                return f"max_usd={budget.max_usd} (estimated from catalog prices)"
+                return terminal.budget_stop_text(
+                    terminal.BUDGET_USD, budget.max_usd, note="estimated from catalog prices"
+                )
         elif cost >= budget.max_usd:
-            return f"max_usd={budget.max_usd}"
+            return terminal.budget_stop_text(terminal.BUDGET_USD, budget.max_usd)
         return None
 
     async def _extract_claims(

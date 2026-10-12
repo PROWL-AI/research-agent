@@ -100,7 +100,8 @@ class TestRestartResume:
 
         checkpoint = _checkpoint_on_disk(tmp_path, "r3-orphan")
         assert checkpoint["status"] == "interrupted"
-        assert checkpoint["stop_reason"] == "server restarted before completion"
+        assert checkpoint["stop_reason"] == "process exited before completion"
+        assert checkpoint["terminal_code"] == "interrupted"
 
     async def test_interrupted_run_resumes_via_research_run(
         self, wired, fake_prowl: FakeProwl, tmp_path: Path

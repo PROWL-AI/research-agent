@@ -208,3 +208,41 @@ Template `test`. Required sections:
 def patched_runbooks(monkeypatch, mini_runbooks_dir):
     monkeypatch.setattr("research_agent.runbook.RUNBOOKS_DIR", mini_runbooks_dir)
     return mini_runbooks_dir
+
+
+@pytest.fixture(autouse=True)
+def strict_events(monkeypatch):
+    """Every test runs research_agent.events in strict mode: a credential-like
+    field key is a ValueError, not a silently dropped field."""
+    monkeypatch.setenv("RESEARCH_EVENTS_STRICT", "1")
+
+
+class HeldRunLock:
+    """A run lock held by "another owner", taken with raw fcntl so tests do not
+    depend on the RunLock implementation they are checking. flock locks belong
+    to an open file description, so a second open in this same process is
+    refused exactly as a second process would be."""
+
+    def __init__(self, run_dir: Path) -> None:
+        import os
+
+        run_dir.mkdir(parents=True, exist_ok=True)
+        self._fd: int | None = os.open(run_dir / ".lock", os.O_RDWR | os.O_CREAT, 0o644)
+
+    def __enter__(self) -> "HeldRunLock":
+        import fcntl
+
+        assert self._fd is not None
+        fcntl.flock(self._fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        import os
+
+        if self._fd is not None:
+            os.close(self._fd)
+            self._fd = None
+
+
+def hold_run_lock(run_dir: Path) -> HeldRunLock:
+    return HeldRunLock(run_dir)

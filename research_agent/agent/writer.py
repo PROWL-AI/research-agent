@@ -463,10 +463,34 @@ async def produce_report(
 async def rewrite_report(
     llm: LLMClient, runs_root: Path, run_id: str
 ) -> WriterOutcome:
+    """Re-run only the writer over a finished run's ledger.
+
+    Takes the run lock first: a run that is live in any process is its own
+    owner's to write, so a held lock is a typed refusal with no write. The
+    lock is held for the whole rewrite, so a run cannot start under it."""
+    from research_agent.evidence.runlock import RunLock
+
+    run_dir = Path(runs_root) / run_id
+    if not run_dir.is_dir():
+        raise RewriteError(f"run '{run_id}' has no checkpoint at {run_dir}")
+    lock = RunLock(run_dir)
+    if not lock.acquire(blocking=False):
+        # Lazy: the orchestrator imports this module at load time.
+        from research_agent.agent.orchestrator import OrchestratorError
+        from research_agent.events import emit
+
+        emit(log, "run.rewrite.refused", logging.WARNING, run_id=run_id)
+        raise OrchestratorError(f"run {run_id} is active; rewrite refused")
+    try:
+        return await _rewrite_locked(llm, run_dir, run_id)
+    finally:
+        lock.release()
+
+
+async def _rewrite_locked(llm: LLMClient, run_dir: Path, run_id: str) -> WriterOutcome:
     from research_agent.evidence.store import ArtifactStore
     from research_agent.runbook import get_runbook
 
-    run_dir = Path(runs_root) / run_id
     store = ArtifactStore(run_dir)
     checkpoint = store.load_checkpoint()
     if checkpoint is None:

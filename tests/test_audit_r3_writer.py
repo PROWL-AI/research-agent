@@ -454,22 +454,31 @@ class TestCliHonesty:
     def test_run_llm_error_marks_checkpoint_failed_and_exits_1(
         self, patched_runbooks, monkeypatch, capsys, tmp_path
     ):
+        # W1-T1: the failed write moved from the CLI (_mark_run_failed, gone)
+        # into Orchestrator.run, under the run lock — so the crash is raised
+        # inside the real orchestrator here instead of replacing run().
         from research_agent.__main__ import main
+
+        class _CatalogStub(_StubProwl):
+            cost_usd = None
+
+            async def list_tools(self):
+                return ["spyfu_get_domain_stats"]
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("PROWL_API_KEY", "p")
         monkeypatch.setenv("RESEARCH_LLM_API_KEY", "l")
-        monkeypatch.setattr("research_agent.prowl_client.ProwlClient", _StubProwl)
+        monkeypatch.setattr("research_agent.prowl_client.ProwlClient", _CatalogStub)
         store = ArtifactStore(tmp_path / "runs" / "r3-fail1")
         store.save_checkpoint(
             Checkpoint(run_id="r3-fail1", runbook="mini-teardown",
                        brief={"competitors": ["a.com"]})
         )
 
-        async def boom(self, runbook_name, inputs, run_id=None):
+        async def boom(self, runbook, brief, catalog):
             raise LLMError("provider blew up", retryable=False)
 
-        monkeypatch.setattr("research_agent.agent.orchestrator.Orchestrator.run", boom)
+        monkeypatch.setattr("research_agent.agent.orchestrator.Orchestrator._plan", boom)
 
         assert main(["run", "mini-teardown", "--run-id", "r3-fail1",
                      "--competitors", "a.com"]) == 1
@@ -477,6 +486,7 @@ class TestCliHonesty:
         checkpoint = json.loads((tmp_path / "runs" / "r3-fail1" / "checkpoint.json").read_text())
         assert checkpoint["status"] == "failed"
         assert "provider blew up" in checkpoint["stop_reason"]
+        assert checkpoint["terminal_code"] == "error"
 
     def test_precondition_error_does_not_rewrite_finished_checkpoint(
         self, patched_runbooks, monkeypatch, tmp_path
@@ -493,19 +503,20 @@ class TestCliHonesty:
         done.status = "complete"
         ArtifactStore(tmp_path / "runs" / "r3-done1").save_checkpoint(done)
 
-        async def boom(self, runbook_name, inputs, run_id=None):
-            raise OrchestratorError(f"run r3-done1 already finished with status 'complete'")
-
-        monkeypatch.setattr("research_agent.agent.orchestrator.Orchestrator.run", boom)
-
+        monkeypatch.delenv("RESEARCH_RUNS_DIR", raising=False)
+        # The real orchestrator refuses the finished run before planning; the
+        # guard under test is its precondition check, not a stub's.
         assert main(["run", "mini-teardown", "--run-id", "r3-done1",
                      "--competitors", "a.com"]) == 1
         checkpoint = json.loads((tmp_path / "runs" / "r3-done1" / "checkpoint.json").read_text())
         assert checkpoint["status"] == "complete"
         assert checkpoint["stop_reason"] is None
 
-    def test_status_excludes_skipped_steps_from_completed(self, monkeypatch, capsys):
+    def test_status_excludes_skipped_steps_from_completed(self, monkeypatch, capsys, tmp_path):
         from research_agent.__main__ import main
+
+        # CLI status reconciles its runs root first: point it at an empty one.
+        monkeypatch.setenv("RESEARCH_RUNS_DIR", str(tmp_path / "runs"))
 
         fake_status = {
             "run_id": "r3-stat1", "runbook": "mini-teardown", "status": "partial",
@@ -515,6 +526,7 @@ class TestCliHonesty:
                 {"index": 2, "step": "s2", "tool": "t", "reason": "failed"},
             ],
             "counters": {}, "duration_s": None, "stop_reason": "budget",
+            "terminal_code": "budget_tools",
         }
         monkeypatch.setattr(
             "research_agent.mcp_server._status_dict", lambda run_id: fake_status

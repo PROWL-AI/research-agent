@@ -6,3 +6,5 @@ __pycache__/
 .ruff_cache/
 runs/
 .env
+
+node_modules/

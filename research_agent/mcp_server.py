@@ -1,8 +1,16 @@
-"""FastMCP server: the live surface the Fabric bundle declares (stdio).
+"""FastMCP stdio server: the legacy local MCP surface.
+
+The Fabric bundle does NOT point here: `fabric-agent.json` declares the HTTP
+service (`research_agent.service`, connection `http://127.0.0.1:18764/mcp`).
+This stdio server stays for local MCP clients that launch a process.
 
 Tools: research.run, research.list_runbooks, research.get_status,
 research.get_report. Keys (PROWL_API_KEY / LLM keys) are read from the
 server process env; only research.run needs them.
+
+Run lifecycle state is written only by the run's owner — the process holding
+the run's lock (`Orchestrator.run`). The handlers here report outcomes; the
+startup reconciliation takes each run's lock before marking it interrupted.
 
 Runs live under RESEARCH_RUNS_DIR (default ./runs relative to the server
 process CWD — set it explicitly in the MCP client config when the host
@@ -25,11 +33,15 @@ from mcp.server.fastmcp import FastMCP
 from research_agent.agent.orchestrator import (
     InputError,
     Orchestrator,
+    OrchestratorError,
     RunResult,
     build_brief,
 )
 from research_agent.config import Config, ConfigError
-from research_agent.evidence.store import ArtifactStore, Checkpoint, validate_run_id
+from research_agent.events import emit
+from research_agent.evidence import terminal
+from research_agent.evidence.runlock import is_locked_elsewhere, reconcile_orphans
+from research_agent.evidence.store import ArtifactStore, validate_run_id
 from research_agent.llm import LLMClient
 from research_agent.prowl_client import ProwlClient
 from research_agent.runbook import RunbookError, get_runbook, list_runbooks
@@ -99,52 +111,32 @@ def _validate_run_request(runbook: str, inputs: dict[str, Any]) -> None:
 async def _execute_run(
     runbook: str, inputs: dict[str, Any], run_id: str, trace_id: str | None
 ) -> RunResult:
+    """Run one job and report its outcome. Writes nothing itself.
+
+    The checkpoint — created before planning, and every terminal state of a
+    run that got as far as taking its lock (cancelled → partial, exception →
+    failed) — is written by `Orchestrator.run` under the run lock. A lock
+    refusal writes nothing. A failure BEFORE the orchestrator is reached
+    (config, client construction or connection) leaves no checkpoint at all:
+    get_status then answers from the in-process task while it is still known
+    (see `_status_dict`), and "unknown run_id" after that."""
     token = TRACE_ID.set(trace_id)
     try:
-        log.info("run %s starting (runbook=%s)", run_id, runbook)
-        # Persist the run's existence BEFORE planning: a planner/list_tools
-        # failure must not leave get_status answering "unknown run_id" for an
-        # id this server just handed out.
-        store = ArtifactStore(_runs_root() / run_id)
-        if await asyncio.to_thread(store.load_checkpoint) is None:
-            await asyncio.to_thread(
-                store.save_checkpoint, Checkpoint(run_id=run_id, runbook=runbook)
-            )
+        emit(log, "mcp.run.accepted", run_id=run_id, runbook=runbook)
         config = _config_from_env()
         async with _make_prowl(config) as prowl, _make_llm(config) as llm:
             orchestrator = Orchestrator(prowl, llm, runs_root=_runs_root())
             result = await orchestrator.run(runbook, inputs, run_id=run_id)
-        log.info("run %s finished: %s", run_id, result.status)
+        emit(
+            log, "mcp.run.finished", run_id=run_id,
+            status=result.status, terminal_code=result.terminal_code,
+        )
         return result
     except asyncio.CancelledError:
-        # Cancellation is a typed partial outcome, not a ghost "running"
-        # checkpoint: whatever evidence was gathered stays on disk.
-        checkpoint = await asyncio.to_thread(
-            ArtifactStore(_runs_root() / run_id).load_checkpoint
-        )
-        if checkpoint is not None and checkpoint.status == "running":
-            checkpoint.status = "partial"
-            checkpoint.partial = True
-            checkpoint.stop_reason = "cancelled"
-            await asyncio.to_thread(store.save_checkpoint, checkpoint)
-        log.warning("run %s cancelled", run_id)
+        emit(log, "mcp.run.cancelled", logging.WARNING, run_id=run_id)
         raise
     except Exception as exc:
-        # Mark failed only a checkpoint this run owns: a precondition failure
-        # (e.g. run_id of an already-finished run) must not rewrite another
-        # run's terminal state.
-        checkpoint = await asyncio.to_thread(
-            ArtifactStore(_runs_root() / run_id).load_checkpoint
-        )
-        if (
-            checkpoint is not None
-            and checkpoint.status == "running"
-            and checkpoint.runbook == runbook
-        ):
-            checkpoint.status = "failed"
-            checkpoint.stop_reason = str(exc)[:300]
-            await asyncio.to_thread(store.save_checkpoint, checkpoint)
-        log.error("run %s failed: %s", run_id, exc)
+        emit(log, "mcp.run.failed", logging.ERROR, run_id=run_id, error=str(exc))
         raise
     finally:
         TRACE_ID.reset(token)
@@ -158,6 +150,7 @@ def _result_envelope(result: RunResult) -> dict[str, Any]:
         "ledger_path": result.ledger_path,
         "stats": result.stats,
         "skipped_steps": result.skipped_steps,
+        "terminal_code": result.terminal_code,
     }
 
 
@@ -177,6 +170,10 @@ async def research_run(
         raise ValueError(f"research.run requires server-side keys: {exc}") from exc
 
     run_id = validate_run_id(run_id) if run_id else _new_run_id(runbook)
+    # Reject a live duplicate before disk I/O can yield and let its task finish.
+    # The second check below still protects two concurrent new submissions.
+    if run_id in _TASKS and not _TASKS[run_id].done():
+        raise ValueError(f"run '{run_id}' is already running in this server process")
     # A finished run_id on disk must be rejected before scheduling: the
     # orchestrator would refuse it anyway, and letting the failure surface
     # mid-task risks clobbering the finished run's checkpoint.
@@ -202,6 +199,12 @@ async def research_run(
             f"run '{run_id}' already finished with status 'complete' — "
             "choose a new run_id"
         )
+    # A run another process owns (a CLI run, another server) must be refused
+    # here, synchronously: with wait=false the orchestrator's own refusal would
+    # only reach this server's log, and the caller would be told "running".
+    if await asyncio.to_thread(is_locked_elsewhere, _runs_root() / run_id):
+        emit(log, "run.lock.refused", level=logging.WARNING, run_id=run_id, surface="mcp")
+        raise OrchestratorError(f"run {run_id} is locked by another process")
     # running-without-a-live-task / partial / failed / interrupted with a
     # recorded plan: the orchestrator resumes from the checkpoint and
     # re-executes only the steps that never completed. Without a plan the run
@@ -252,7 +255,39 @@ async def research_list_runbooks() -> list[dict[str, Any]]:
     ]
 
 
+def _pre_checkpoint_status(run_id: str, task: asyncio.Task) -> dict[str, Any]:
+    """Status of a run this server accepted whose orchestrator never created a
+    checkpoint (still constructing clients, or it failed / was cancelled
+    before taking the run lock). Read from the in-process task — nothing is
+    written; once the task is pruned the id answers "unknown run_id"."""
+    status, partial, stop_reason, code = "running", False, None, None
+    if task.done():
+        if task.cancelled():
+            status, partial, stop_reason, code = "partial", True, "cancelled", terminal.CANCELLED
+        else:
+            exc = task.exception()
+            if exc is not None:
+                status, stop_reason, code = "failed", str(exc)[:300], terminal.ERROR
+    return {
+        "run_id": run_id,
+        "runbook": None,
+        "status": status,
+        "partial": partial,
+        "stop_reason": stop_reason,
+        "terminal_code": code,
+        "orphaned": False,
+        "active": not task.done(),
+        "has_checkpoint": False,
+        "planned_steps": 0,
+        "completed_steps": [],
+        "skipped_steps": [],
+        "counters": {},
+        "duration_s": None,
+    }
+
+
 def _status_dict(run_id: str) -> dict[str, Any]:
+    """Status of a run from its checkpoint. A read: it never writes."""
     validate_run_id(run_id)
     try:
         checkpoint = ArtifactStore(_runs_root() / run_id).load_checkpoint()
@@ -260,6 +295,9 @@ def _status_dict(run_id: str) -> dict[str, Any]:
         log.error("run %s checkpoint corrupt, quarantined: %s", run_id, exc)
         raise ValueError(f"run '{run_id}' checkpoint corrupt: {exc}") from exc
     if checkpoint is None:
+        task = _TASKS.get(run_id)
+        if task is not None:
+            return _pre_checkpoint_status(run_id, task)
         raise ValueError(f"unknown run_id '{run_id}' (no checkpoint at runs/{run_id})")
     try:
         created = datetime.fromisoformat(checkpoint.created_at)
@@ -269,15 +307,22 @@ def _status_dict(run_id: str) -> dict[str, Any]:
         duration_s = None
     # A checkpoint left 'running' with no live task behind it (e.g. the server
     # restarted mid-run) is orphaned, not in progress.
+    # Liveness is the run lock, not this process's task table: a run another
+    # process is executing is active, never orphaned.
     task = _TASKS.get(run_id)
-    orphaned = checkpoint.status == "running" and (task is None or task.done())
+    live_here = task is not None and not task.done()
+    active = live_here or is_locked_elsewhere(_runs_root() / run_id)
+    orphaned = checkpoint.status == "running" and not active
     return {
         "run_id": run_id,
         "runbook": checkpoint.runbook,
         "status": checkpoint.status,
         "partial": checkpoint.partial,
         "stop_reason": checkpoint.stop_reason,
+        "terminal_code": checkpoint.terminal_code,
         "orphaned": orphaned,
+        "active": active,
+        "has_checkpoint": True,
         "planned_steps": len(checkpoint.plan),
         "completed_steps": checkpoint.completed_steps,
         "skipped_steps": checkpoint.skipped_steps,
@@ -288,7 +333,10 @@ def _status_dict(run_id: str) -> dict[str, Any]:
 
 @mcp.tool(name="research.get_status")
 async def research_get_status(run_id: str) -> dict[str, Any]:
-    """Status of a run from its checkpoint: steps, counters, duration."""
+    """Status of a run: from its checkpoint (steps, counters, duration, terminal_code,
+    active = some process holds the run lock), or — before a checkpoint exists — from
+    this server's in-process job (has_checkpoint=false: still starting, or failed /
+    cancelled before it took the run lock)."""
     return await asyncio.to_thread(_status_dict, run_id)
 
 
@@ -320,34 +368,16 @@ async def research_get_report(run_id: str) -> dict[str, Any]:
     return result
 
 
-def _reconcile_orphaned_runs() -> None:
-    """Mark checkpoints left 'running' by a previous server process as interrupted.
+def _reconcile_orphaned_runs() -> list[str]:
+    """Startup reconciliation of this server's runs root.
 
-    'interrupted' is not terminal: research.run accepts the run_id again and
-    the orchestrator resumes from the recorded plan — a restart must not force
-    the caller to pay for a fresh run."""
-    root = _runs_root()
-    if not root.is_dir():
-        return
-    for run_dir in sorted(root.iterdir()):
-        if not run_dir.is_dir():
-            continue
-        store = ArtifactStore(run_dir)
-        try:
-            checkpoint = store.load_checkpoint()
-        except ValueError as exc:
-            # One corrupt checkpoint must not stop the server from starting.
-            log.error("run dir %s has a corrupt checkpoint, skipping: %s", run_dir.name, exc)
-            continue
-        if checkpoint is not None and checkpoint.status == "running":
-            checkpoint.status = "interrupted"
-            checkpoint.partial = True
-            checkpoint.stop_reason = "server restarted before completion"
-            store.save_checkpoint(checkpoint)
-            log.warning(
-                "run %s marked interrupted: server restarted before completion",
-                checkpoint.run_id,
-            )
+    Delegates to `reconcile_orphans`: a 'running' checkpoint whose lock is
+    free (its owner exited) becomes 'interrupted'; one whose lock is held — a
+    live CLI run, another server — is left alone. 'interrupted' is not
+    terminal: research.run accepts the run_id again and the orchestrator
+    resumes from the recorded plan — a restart must not force the caller to
+    pay for a fresh run."""
+    return reconcile_orphans(_runs_root())
 
 
 def serve() -> None:

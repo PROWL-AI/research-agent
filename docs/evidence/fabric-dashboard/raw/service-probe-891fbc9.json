@@ -1,0 +1,166 @@
+{
+  "descriptor": "~/Library/Application Support/ai.passioncode.fabric/services/prowl-research.default.json",
+  "results": [
+    {
+      "rule": "descriptor.valid",
+      "verdict": "PASS",
+      "evidence": "~/Library/Application Support/ai.passioncode.fabric/services/prowl-research.default.json"
+    },
+    {
+      "rule": "descriptor.private",
+      "verdict": "PASS",
+      "evidence": "mode 600"
+    },
+    {
+      "rule": "descriptor.port-claim",
+      "verdict": "PASS",
+      "evidence": "port 18764 is unique"
+    },
+    {
+      "rule": "well-known.answers",
+      "verdict": "PASS",
+      "evidence": "HTTP 200"
+    },
+    {
+      "rule": "well-known.fast",
+      "verdict": "PASS",
+      "evidence": "median 53.9 ms"
+    },
+    {
+      "rule": "well-known.shape",
+      "verdict": "PASS",
+      "evidence": "protocol, build, status, degraded, surfaces"
+    },
+    {
+      "rule": "well-known.identity",
+      "verdict": "PASS",
+      "evidence": "answers as prowl-research.default"
+    },
+    {
+      "rule": "well-known.ready-means-healthy",
+      "verdict": "PASS",
+      "evidence": "status degraded, 2 degraded"
+    },
+    {
+      "rule": "network.host-check",
+      "verdict": "PASS",
+      "evidence": "HTTP 403"
+    },
+    {
+      "rule": "network.origin-check",
+      "verdict": "PASS",
+      "evidence": "HTTP 403"
+    },
+    {
+      "rule": "network.cross-site-check",
+      "verdict": "PASS",
+      "evidence": "HTTP 403"
+    },
+    {
+      "rule": "network.loopback-only",
+      "verdict": "PASS",
+      "evidence": "127.0.0.1:18764"
+    },
+    {
+      "rule": "auth.token-file",
+      "verdict": "PASS",
+      "evidence": "~/Library/Application Support/prowl-research/host.token is 0600 and owned by you"
+    },
+    {
+      "rule": "events.requires-token",
+      "verdict": "PASS",
+      "evidence": "HTTP 401 without a token"
+    },
+    {
+      "rule": "events.page",
+      "verdict": "PASS",
+      "evidence": "3 event(s), cursor '3'"
+    },
+    {
+      "rule": "usage.requires-token",
+      "verdict": "PASS",
+      "evidence": "HTTP 401 without a token"
+    },
+    {
+      "rule": "usage.report",
+      "verdict": "PASS",
+      "evidence": "0 day(s), unknown cost kept null"
+    },
+    {
+      "rule": "login.single-use",
+      "verdict": "PASS",
+      "evidence": "first redeem HTTP 302 (cookie ok), second HTTP 403"
+    },
+    {
+      "rule": "interop.manifest-link",
+      "verdict": "PASS",
+      "evidence": "~/.local/share/prowl-research/releases/891fbc995cb3/source/fabric-agent.json names prowl-research.default"
+    },
+    {
+      "rule": "interop.well-known-capabilities",
+      "verdict": "PASS",
+      "evidence": "5 listed, all in the manifest"
+    },
+    {
+      "rule": "interop.mcp-own-auth",
+      "verdict": "PASS",
+      "evidence": "the MCP surface refuses the host's token (HTTP 401 from /mcp), as auth: own says"
+    },
+    {
+      "rule": "interop.output-schema-object",
+      "verdict": "NOT_RUN",
+      "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+    },
+    {
+      "rule": "interop.tools-match",
+      "verdict": "NOT_RUN",
+      "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+    },
+    {
+      "rule": "interop.job-tools",
+      "verdict": "NOT_RUN",
+      "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+    },
+    {
+      "rule": "interop.unknown-job",
+      "verdict": "NOT_RUN",
+      "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+    },
+    {
+      "rule": "interop.trace-propagation",
+      "verdict": "NOT_RUN",
+      "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+    },
+    {
+      "rule": "interop.events-trace",
+      "verdict": "PASS",
+      "evidence": "0 of 3 events traced, every pair whole"
+    },
+    {
+      "rule": "state.outside-code",
+      "verdict": "PASS",
+      "evidence": "~/Library/Application Support/prowl-research is not inside a repository"
+    },
+    {
+      "rule": "lifecycle.instance-lock",
+      "verdict": "PASS",
+      "evidence": "held by the running service"
+    },
+    {
+      "rule": "lifecycle.plist",
+      "verdict": "PASS",
+      "evidence": "chat.prowl.research.plist: RunAtLoad, KeepAlive, no secrets"
+    },
+    {
+      "rule": "lifecycle.priority",
+      "verdict": "PASS",
+      "evidence": "chat.prowl.research.plist: scheduled as a standard process"
+    },
+    {
+      "rule": "lifecycle.one-copy",
+      "verdict": "PASS",
+      "evidence": "launchd pid 40509, answering pid 40509"
+    }
+  ],
+  "failed": 0
+}

@@ -1,0 +1,5 @@
+
+> test:dashboard
+> node scripts/test-dashboard.mjs
+
+{"browser":"Playwright WebKit","viewports":["1440x1000","390x844"],"checks":["empty","approval","tutorial","steps","table","report","fixture-spend-exclusion","chains","dirty-settings","settings-diff","search-empty","mobile-no-overflow","offline-keeps-snapshot"],"pageErrors":[],"status":"PASS"}
