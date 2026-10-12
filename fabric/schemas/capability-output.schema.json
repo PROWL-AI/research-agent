@@ -27,13 +27,14 @@
     },
     "stats": {
       "type": "object",
-      "description": "data_calls, total_calls, cost_usd, claims, duration_s, lint_issues"
+      "description": "data_calls, attempted_calls, total_calls, cost_usd (server-reported), cost_estimate_usd, spend_usd (actual + estimates), cost_unknown_attempts, cost_source (server|mixed|estimate|null), steps (count per step state), claims, duration_s, lint_issues_before/after, llm_usage"
     },
     "skipped_steps": {
       "type": "array",
       "items": {
         "type": "object"
-      }
+      },
+      "description": "Steps the report discloses as not completed: {step_id, index, step, tool, reason, state}."
     },
     "terminal_code": {
       "type": [

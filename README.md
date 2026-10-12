@@ -121,7 +121,7 @@ the run stopped (`null` while it is live). The set is closed:
 | `budget_tools` / `budget_usd` / `budget_minutes` | `partial` | a runbook budget ran out; the report marks what is missing |
 | `budget_llm` | `partial` | LLM-spend budget (reserved; not set yet) |
 | `step_failed` | `partial` | a step failed hard or a worker crashed |
-| `evidence_incomplete` | `partial` | a step's raw could not be written, its claim extraction failed, or a dispatch outcome is unknown; the resume finishes extraction from the saved raw without paying again |
+| `evidence_incomplete` | `partial` | evidence is missing with no other stop: a claim extraction failed (the resume finishes it from the saved raw, no new paid call), or a required step's raw could not be written (the resume fetches it again — a new, paid call; an optional step is `skipped_on_error` instead) |
 | `cancelled` | `partial` | any cancellation of the owning task: a caller or service cancel, the service timeout (job error `timeout`), Ctrl-C, a client closing its session or a graceful service shutdown |
 | `error` | `failed` | an exception escaped the run; `stop_reason` carries it |
 | `interrupted` | `interrupted` | the owning process died without a terminal write (a hard kill or crash); written by reconciliation, resumable |
@@ -135,7 +135,10 @@ refusal is returned synchronously, also for `wait=false`. `get_status` reports
 live owner anywhere). `interrupted` is
 written by reconciliation — at stdio server start, at CLI `run`/`status`, and
 at Fabric service start — and only for a `running` checkpoint whose lock is
-free. `get_status` also reports `has_checkpoint`: `false` while a run accepted
+free. A run whose version-1 checkpoint cannot be migrated without guessing is
+reported with `status: needs_attention` and the reason in `stop_reason`: its report
+stays readable and exportable, it can be pruned, and `research.run` refuses to
+resume it. `get_status` also reports `has_checkpoint`: `false` while a run accepted
 by this server is still starting, or when it failed or was cancelled before it
 took the run lock (the status then comes from the in-process job and
 disappears with it).
@@ -181,7 +184,7 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   and its cost is stored when it returns or fails — a billed failure costs money
   too. Spend = server-reported actual costs + estimates for calls without one
   (the catalog price, else the runbook's per-call share of `max_usd`, never zero);
-  `stats.cost_source` says `server`, `mixed` or `estimate`.
+  `stats.cost_source` says `server`, `mixed`, `estimate`, or `null` before any tool attempt.
   Budgets cap **Prowl tool calls only**: the agent's own LLM usage (planning,
   claim extraction, transforms, writing, citation repair) is billed by your
   LLM provider on top of `max_usd` — it is metered, not capped, and reported
@@ -212,9 +215,30 @@ leaving the catalog excludes that step by id and shifts nothing. A step's state 
 `failed` steps, finishes `raw_saved` steps from their saved raw **without a new
 paid call**, and re-sends an `outcome_unknown` call with the **same idempotency
 key** (`<run_id>:<step_id>:<attempt>`) so the server can replay it instead of
-billing twice — exactly-once billing still depends on the server honouring that
-key. Version-1 checkpoints are migrated on load; a v1 state that cannot be mapped
-without guessing is refused with a typed error and the run is left for inspection.
+billing twice. A client read timeout counts as an unknown outcome, never as a
+refusal, and a budget stop leaves such a step `outcome_unknown` so its key
+survives. **The Prowl server deduplicates a re-sent key only within its retry
+window (15 minutes by default):** a resume after that may be charged again, and
+the re-send is still recorded as one attempt — the budget then undercounts by that
+call. A step migrated from version 1 whose dispatch may have reached the server is
+first re-sent under its v1 key (`<run_id>:<index>:<tool>`). Version-1 checkpoints are migrated on load; a v1 state that cannot be mapped
+without guessing is reported `needs_attention` (above) and never resumed.
+**The upgrade is one-way for a run directory:** the first save of a migrated run
+keeps its v1 file as `checkpoint.v1.json`, but a pre-v2 build reading the new
+`checkpoint.json` re-plans (and re-bills) the run. Restart stdio sessions and
+reinstall the Fabric service before resuming runs a v2 build has touched; a build
+refuses a checkpoint whose `schema_version` is newer than it understands.
+
+**Status and checkpoint shape (schema 2).** `research.get_status` returns
+`completed_steps` as step ids (not indexes), `planned_steps` without excluded
+steps, `step_counts` per state, `skipped_steps` entries carrying `step_id`,
+`index`, `step`, `tool`, `reason` and `state` (while a run is live, steps still in
+flight are not listed), and `counters` with `data_calls`, `attempted_calls`,
+`cost_usd`, `cost_estimate_usd`, `spend_usd` and `cost_unknown_attempts` (the same
+keys appear in a run's `stats`). `stats.cost_source` is `server`, `mixed`,
+`estimate` or `null` (no tool attempt yet). `checkpoint.json` (also what
+`research.artifact.get` serves) holds `plan_raw`, `steps` and `attempts`; it no
+longer persists `plan`, `completed_steps`, `skipped_steps` or `counters`.
 Crash injection at every durable write is covered by `tests/test_durability.py`.
 
 Finance/subscription live acceptance remains unverified. With several workers,
