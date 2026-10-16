@@ -119,13 +119,14 @@
       "id": "B-018",
       "title": "No wiki project card and no agent-estate entry for prowl-research (global rule: read/update before agent planning)",
       "source": "operator's projects wiki (private): no card for this agent",
-      "status": "in-flight — card + estate row in vault commit 870ff961, which is on origin/agent/fabric-harness-report-index-20261013 but not origin/master (vault master diverged 107/101, vault owner), measured 2026-10-16",
+      "status": "closed",
       "area": "knowledge",
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "notes": "vault commit `870ff961` is an ancestor of obsidian-memory-vault `origin/master` `bf2fd5cd`; card `projects/prowl-research/prowl-research.md` and one `prowl-research.default` row in `synthesis/agent-estate.md` present there, measured 2026-10-16"
     },
     {
       "id": "B-024",
