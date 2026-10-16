@@ -586,7 +586,7 @@
       "id": "B-020",
       "title": "prowl-research has no row in the Fabric delegation-model adoption plan (step 4: callee adopts)",
       "source": "Fabric delegation-model adoption plan (estate document)",
-      "status": "open — external ask; no prowl-research row in fabric-agent-contract docs/evidence/adoption.md at d8146cf (2026-10-15); re-asked fabric-agent-contract session 2026-10-16",
+      "status": "in-flight — contract owner (fabric-agent-contract) accepted 2026-10-16: a 2026-10-16 cut of `docs/evidence/adoption.md` adds PROWL-AI/research-agent (pin `623bf61`, DEC-0001…0031; DEC-0039 not in pin → B-021); lands with its PR #113, commit to follow",
       "area": "fabric",
       "node": "N-EXT",
       "blocked_by": [],
