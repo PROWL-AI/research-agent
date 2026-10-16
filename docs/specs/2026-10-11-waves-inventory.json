@@ -119,7 +119,7 @@
       "id": "B-018",
       "title": "No wiki project card and no agent-estate entry for prowl-research (global rule: read/update before agent planning)",
       "source": "operator's projects wiki (private): no card for this agent",
-      "status": "in-flight — wiki card committed locally in the projects vault; push blocked by unrelated vault divergence (vault owner)",
+      "status": "in-flight — card + estate row in vault commit 870ff961, which is on origin/agent/fabric-harness-report-index-20261013 but not origin/master (vault master diverged 107/101, vault owner), measured 2026-10-16",
       "area": "knowledge",
       "node": "N-DOCS",
       "blocked_by": [],
@@ -572,20 +572,21 @@
       "id": "B-023",
       "title": "audit/kimi-20261010 and feat/fabric-dashboard-20261010 are unmerged; origin/main is still 1dced8e",
       "source": "git log main..HEAD",
-      "status": "needs-operator",
+      "status": "closed",
       "area": "integration",
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "needs_operator": "integration policy: PR to main per wave, merged after the wave closes (recommended)",
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "notes": "All three branches are ancestors of origin/main 985db4f (PR #1, PR #2), measured 2026-10-16."
     },
     {
       "id": "B-020",
       "title": "prowl-research has no row in the Fabric delegation-model adoption plan (step 4: callee adopts)",
       "source": "Fabric delegation-model adoption plan (estate document)",
-      "status": "open — external ask",
+      "status": "open — external ask; no prowl-research row in fabric-agent-contract docs/evidence/adoption.md at d8146cf (2026-10-15); re-asked fabric-agent-contract session 2026-10-16",
       "area": "fabric",
       "node": "N-EXT",
       "blocked_by": [],
@@ -598,13 +599,14 @@
       "id": "B-026",
       "title": "Observatory use_secret.py names prints its ambiguity message one character per line",
       "source": "Observatory use_secret.py names",
-      "status": "open — external defect",
+      "status": "closed",
       "area": "external",
       "node": "N-EXT",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": null,
-      "release": "external"
+      "release": "external",
+      "notes": "Installed engine project-observatory 0.24.5 prints the ambiguity message on one line (`use_secret.py names prowl-research | wc -l` = 1), measured 2026-10-16."
     },
     {
       "id": "KA-01",
@@ -671,6 +673,32 @@
       "closable_in_one_pass": false,
       "wave": 6,
       "release": "this"
+    },
+    {
+      "id": "B-033",
+      "title": "This checkout is not a Fabric project: fabric_whoami refuses, so the project board (com.*) and work claims are unreachable",
+      "source": "fabric_whoami 2026-10-16",
+      "status": "open — external",
+      "area": "external",
+      "node": "N-EXT",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "notes": "Operator step in Fabric: + Project → Open a project. Until then the board is this file.",
+      "wave": null,
+      "release": "external"
+    },
+    {
+      "id": "B-034",
+      "title": "Observatory attributes 3 critical leaked-unrotated keys (CIVITAI_API_TOKEN, HF_TOKEN, REPLICATE_API_TOKEN, slot 0xDEV/local, seen 2026-09-14) to this project; none is used by research-agent",
+      "source": "observatory_findings project:prowl-research 2026-10-16",
+      "status": "open — external",
+      "area": "external",
+      "node": "N-EXT",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "notes": "Owner: the 0xDEV/local slot (not this repo). Rotate through Observatory doors and settle with vault.py settle; or re-scope the finding away from prowl-research.",
+      "wave": null,
+      "release": "external"
     }
   ]
 }
