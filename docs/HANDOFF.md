@@ -8,7 +8,7 @@ Objective: close every open item of this agent in its final form, in waves
 - Plan: [`specs/2026-10-11-waves-canvas.md`](specs/2026-10-11-waves-canvas.md) — target state, seams,
   waves with exit criteria, §7a wave status, operator questions (§8).
 - Inventory: [`specs/2026-10-11-waves-inventory.json`](specs/2026-10-11-waves-inventory.json)
-  (`python3 scripts/plan/assign_waves.py --check`; 21 of 64 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
+  (`python3 scripts/plan/assign_waves.py --check`; 20 of 64 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
 - **Wave 1 closed** (merged to `main` by PR #1): run-lock ownership (KA-06, B-009, B-010),
   terminal_code, structured events, honest docs, CORE scenarios, nightly CI.
 - **Wave 2 closed** on branch `wip/wave2-checkpoint-v2` (PR #2): checkpoint schema 2 — immutable
@@ -47,9 +47,9 @@ Objective: close every open item of this agent in its final form, in waves
   (41/41). Three certification rounds; their fixes also closed two wave-5 seam findings (a replayed resume
   returns its job; an operator resume stays the operator's act and records the chain's owner, `chainOwner`). Evidence:
   `evidence/judge-calibration/README.md`. The LLM key is issued into vault `prowl-research-agent` (B-042).
-- **Exact next task:** PR wave 6's offline half to `main`, merge, reinstall from the merge with
-  `python3 scripts/install-fabric-service.py --vault-project prowl-research-agent` (LLM key only; the service stays
-  degraded for Prowl), re-run `check_service.py` (B-044 under normal load). Then B-045 (status-tag check).
+- **Wave 6 offline half merged** (PR #6, `d868706`) and installed from the merge with the LLM key
+  (vault `prowl-research-agent`): adapter probe 30 PASS / 8 NOT_RUN / 0 FAIL; health degraded for Prowl only.
+- **Exact next task:** B-045 (status-tag check in the judge), then B-046/B-047 (judge rule edges, test gaps).
 - **Human gate (one line):** the live judge calibration — the operator runs
   `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
   in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or authorises live flags for
