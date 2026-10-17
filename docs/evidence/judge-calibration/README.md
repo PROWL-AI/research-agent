@@ -8,8 +8,8 @@ model's agreement with labels, then with a person on real runs — is the live h
 
 | Gate | Result | Evidence |
 |---|---|---|
-| A lenient model (0.95 on every dimension) fails every planted-defect fixture (in-sample, author-written) | PASS — 5 / 5 planted fail, 3 / 3 honest pass | [offline run](offline-calibration.log); `tests/test_judge_calibration.py` |
-| Each defence is load-bearing | 41 / 41 planted mutations killed | [mutations](mutations.log); `python scripts/mutation_check.py` |
+| A lenient model (0.95 on every dimension) fails every planted-defect fixture (in-sample, author-written) | PASS — 6 / 6 planted fail, 3 / 3 honest pass | [offline run](offline-calibration.log); `tests/test_judge_calibration.py` |
+| Each defence is load-bearing | 42 / 42 planted mutations killed | [mutations](mutations.log); `python scripts/mutation_check.py` |
 | The judge's own spend is checked by estimate before each call and recorded beside the run | PASS (offline, mocked provider) | `test_the_judge_spend_is_recorded_beside_the_run_not_in_it`, `test_the_judge_refuses_to_spend_above_its_ceiling` |
 | A model that does not answer is a judge error (exit 2), and the judge needs no Prowl key | PASS (offline, unreachable provider) | `test_the_judge_needs_no_prowl_key_and_a_model_failure_is_exit_2` |
 | The checks on real reports | surveyed, see below | [survey](local-runs-survey.json); `python evals/survey_runs.py` |
@@ -24,7 +24,6 @@ model a judging of the largest local report estimates at about USD 0.004.
 ## What the checks do not catch (named, not vetoed)
 
 - An uncited figure: it lowers `citation_accuracy` through the lint cap; it is not a veto.
-- A claim the ledger holds as `assumed` labelled `VERIFIED` in the report (CORE-09): no check yet — B-045.
 - A wrong figure that happens to equal another bare number a cited claim carries, or one inside a
   sentence the writer marked "derived": the checks read figures and the derived mark, not meaning.
 - A conflict cited under a heading or list lead-in that is a conflict register (the bracketed tag
@@ -48,8 +47,8 @@ non-numeric co-citation no longer silences the value check, and "impartial" no l
 heading ("## 10. Source Log", as the runbooks number it) is provenance again, a claim stored in a
 scaled unit (value 12, unit "million USD") matches "$12M", and "partially" discloses a partial run.
 
-What remains — 25 `conflict_hidden`, 10 `quote_not_in_ledger`, 2 `value_mismatch` — was read: the
+What remains — 86 `status_mislabel`, 25 `conflict_hidden`, 10 `quote_not_in_ledger`, 2 `value_mismatch` — was read. The status mislabels (B-045 check) are citations the reports tag `VERIFIED` whose claims schema 2 holds as `assumed`: 79 were verified in schema 1 by the extractor's own "verbatim" flag with no quote (KA-08), 6 are single-source claims without a quote, 1 is a conflict. the
 conflict hits cite claims the ledger groups as conflicting, mostly in one run whose pre-schema-2
 subjects lumped different quantities together (a ledger-side cause, not the writer's); the quotations
 are ad copy and user quotes the ledger never recorded verbatim; one mismatch cites a claim about
-another quantity, the other quotes ad copy as "2M+ teams" where the cited claim records "3,000,000+". A new live run is the test of the current writer — the live half of KA-G02.
+another quantity, the other quotes ad copy as "2M+ teams" where the cited claim records "3,000,000+". Of the rest: — the live half of KA-G02.

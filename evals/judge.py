@@ -257,6 +257,23 @@ _SOURCE_LOG_HEADING_RE = re.compile(r"^#+\s*(?:\d+[.)]\s*)?(?:\*\*)?source log(?
 _DERIVED_RE = re.compile(r"\bderived\b(?!\s+from\b)", re.IGNORECASE)
 
 
+#: A status tag right after a citation block: "[C17] (VERIFIED)", "[C1, C2] VERIFIED (single source)".
+_TAGGED_CITATION_RE = re.compile(r"(\[[^\]]*?\bC\d+[^\]]*?\])\s*\(?\s*VERIFIED\b")
+
+
+def _status_mislabels(report_md: str, claims: dict[str, Any]) -> list[tuple[str, str]]:
+    """(claim id, line) for each citation tagged VERIFIED whose claim the ledger
+    does not hold as verified (CORE-09: the writer must not call a claim
+    VERIFIED that the ledger marks otherwise)."""
+    found = []
+    for line in report_md.splitlines():
+        for match in _TAGGED_CITATION_RE.finditer(line):
+            for ref in (f"C{n}" for n in _CITATION_ID_RE.findall(match.group(1))):
+                if ref in claims and claims[ref].status.value != "verified":
+                    found.append((ref, line))
+    return found
+
+
 def _conflict_scopes(report_md: str) -> list[tuple[str, bool]]:
     """Each line with whether CONFLICT is disclosed for it: on the line itself,
     in its section heading, or in the lead-in of the list it belongs to (the
@@ -368,6 +385,8 @@ def code_defects(report_md: str, ledger: Ledger, checkpoint: Checkpoint) -> list
       not carry the writer's upper-case CONFLICT tag, under a heading or list
       lead-in that is not a conflict register (`_conflict_scopes`; rows under a
       "Source log" heading excepted);
+    - status_mislabel — a citation tagged VERIFIED whose claim the ledger does
+      not hold as verified (CORE-09);
     - partial_undisclosed — a partial run that does not say "partial" before its
       first section (`writer.partial_disclosed`, the rule the orchestrator
       enforces on report.md).
@@ -383,6 +402,8 @@ def code_defects(report_md: str, ledger: Ledger, checkpoint: Checkpoint) -> list
 
     for ref in lint_report(report_md, ledger).missing_refs:
         add("missing_ref", ref, f"[{ref}] is not in the ledger")
+    for ref, line in _status_mislabels(report_md, claims):
+        add("status_mislabel", ref, line)
     for line, disclosed in _conflict_scopes(report_md):
         if disclosed:
             continue

@@ -388,3 +388,20 @@ def test_the_installer_dry_run_exits_2_when_the_install_would_refuse(tmp_path, m
     with pytest.raises(SystemExit) as exited:
         inst.main()
     assert exited.value.code == 2
+
+
+# ── B-045: the status tag must match the ledger ────────────────────────────────
+
+def test_a_verified_tag_on_an_unverified_claim_is_a_defect(tmp_path):
+    ledger = _ledger(tmp_path, TRAFFIC)  # assumed: its quote was never checked against a stored raw
+    assert ledger.claims[0].status.value == "assumed"
+    assert _kinds("# R\n\nTraffic is 150,000 visits [C1] (VERIFIED).\n", ledger) == ["status_mislabel"]
+    assert _kinds("# R\n\nTraffic is 150,000 visits [C1] VERIFIED (single source).\n", ledger) == ["status_mislabel"]
+    assert _kinds("# R\n\nTraffic is 150,000 visits [C1] (ASSUMED, ±40%).\n", ledger) == []
+    assert _kinds("# R\n\nTraffic is 150,000 visits [C1] [UNVERIFIED].\n", ledger) == []
+
+
+def test_a_verified_tag_on_a_verified_claim_is_fine(tmp_path):
+    ledger = _ledger(tmp_path, TRAFFIC)
+    ledger.claims[0].status = type(ledger.claims[0].status)("verified")
+    assert _kinds("# R\n\nTraffic is 150,000 visits [C1] (VERIFIED).\n", ledger) == []

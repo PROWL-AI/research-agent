@@ -7,4 +7,5 @@ $ python evals/calibrate.py
   invented-quote         label fail verdict FAIL  total 0.95  defects quote_not_in_ledger
   partial-undisclosed    label fail verdict FAIL  total 0.95  defects partial_undisclosed
   value-mismatch         label fail verdict FAIL  total 0.95  defects value_mismatch
-{"model": "lenient fake (0.95 on every dimension)", "fixtures": 8, "agreement": 1.0, "missed": [], "false_alarms": [], "errors": [], "judge_spend_usd": null}
+  verified-mislabel      label fail verdict FAIL  total 0.95  defects status_mislabel
+{"model": "lenient fake (0.95 on every dimension)", "fixtures": 9, "agreement": 1.0, "missed": [], "false_alarms": [], "errors": [], "judge_spend_usd": null}
