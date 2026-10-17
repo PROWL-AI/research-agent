@@ -860,25 +860,27 @@
       "id": "B-046",
       "title": "Judge rules: (CONFLICT) register form not accepted; bare m/b/k unit read as scale",
       "source": "W6 close verification 2026-10-18",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — feat/b046-b047 (2026-10-18)"
     },
     {
       "id": "B-047",
       "title": "Test gaps: chain-owner resume/cancel e2e, who() label, installer message, impartial mutant",
       "source": "W6 close verification 2026-10-18",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — feat/b046-b047 (2026-10-18)"
     }
   ]
 }

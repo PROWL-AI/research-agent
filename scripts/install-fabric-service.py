@@ -85,8 +85,9 @@ def slot_check(project):
     try:missing=missing_slots(project)
     except subprocess.CalledProcessError as exc:
         return [],list(SLOTS),f'vault {project}: the slot check failed (exit {exc.returncode}); resolve the folder in Observatory first'
-    except FileNotFoundError:
-        return [],list(SLOTS),'project-observatory is not on PATH; install Project Observatory first'
+    except FileNotFoundError as exc:
+        # project-observatory itself, or the interpreter its engine is installed with
+        return [],list(SLOTS),f'cannot run the Observatory vault check ({exc.filename or exc}); install or repair Project Observatory first'
     held=[s for s in SLOTS if s not in missing]
     problem=None if held else f"vault {project}/prod holds none of {', '.join(SLOTS)}: issue them through Observatory's doors first"
     return held,missing,problem

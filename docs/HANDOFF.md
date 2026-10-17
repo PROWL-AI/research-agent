@@ -8,7 +8,7 @@ Objective: close every open item of this agent in its final form, in waves
 - Plan: [`specs/2026-10-11-waves-canvas.md`](specs/2026-10-11-waves-canvas.md) — target state, seams,
   waves with exit criteria, §7a wave status, operator questions (§8).
 - Inventory: [`specs/2026-10-11-waves-inventory.json`](specs/2026-10-11-waves-inventory.json)
-  (`python3 scripts/plan/assign_waves.py --check`; 19 of 64 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
+  (`python3 scripts/plan/assign_waves.py --check`; 17 of 64 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
 - **Wave 1 closed** (merged to `main` by PR #1): run-lock ownership (KA-06, B-009, B-010),
   terminal_code, structured events, honest docs, CORE scenarios, nightly CI.
 - **Wave 2 closed** on branch `wip/wave2-checkpoint-v2` (PR #2): checkpoint schema 2 — immutable
@@ -44,12 +44,12 @@ Objective: close every open item of this agent in its final form, in waves
   every NOT_RUN named in VERIFICATION § Wave 5. B-037 closed (the pre-wave-3 build no longer runs).
 - **W6-T1 offline half** (branch `feat/wave6-acceptance`): code-proven defects veto the judge, the judge's
   spend is metered into `<run>/judge-ledger.json`, `evals/calibrate.py` + planted fixtures, `scripts/mutation_check.py`
-  (42/42). Three certification rounds; their fixes also closed two wave-5 seam findings (a replayed resume
+  (46/46). Three certification rounds; their fixes also closed two wave-5 seam findings (a replayed resume
   returns its job; an operator resume stays the operator's act and records the chain's owner, `chainOwner`). Evidence:
   `evidence/judge-calibration/README.md`. The LLM key is issued into vault `prowl-research-agent` (B-042).
 - **Wave 6 offline half merged** (PR #6, `d868706`) and installed from the merge with the LLM key
   (vault `prowl-research-agent`): adapter probe 30 PASS / 8 NOT_RUN / 0 FAIL; health degraded for Prowl only.
-- **Exact next task:** B-046/B-047 (judge rule edges, test gaps). B-045 closed (status-tag veto).
+- **Exact next task:** nothing offline remains in wave 6: B-045/B-046/B-047 closed. The rest waits on the operator (live judge calibration, host update) and external owners (B-043 `prowl_` key door, KA-G03 hub JWKS, B-020 contract PR, B-033 Fabric project registration). Re-check those at each resume.
 - **Human gate (one line):** the live judge calibration — the operator runs
   `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
   in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or authorises live flags for

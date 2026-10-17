@@ -219,7 +219,10 @@ def _quotations(sentence: str) -> list[str]:
     return found
 
 
-_UNIT_SCALE_RE = re.compile(r"\b(thousand|million|billion|bn|k|m|b)\b", re.IGNORECASE)
+#: A scale in a claim's unit: a word ("million USD"), or a letter beside a currency
+#: ("USD m", "$M", "M USD") — a bare "m" or "b" is metres or bytes, not a scale.
+_UNIT_SCALE_RE = re.compile(r"\b(thousand|million|billion|bn)\b|(?:\b(?:USD|EUR|GBP)\s*|[$€£]\s*)([kmb])\b|\b([kmb])\s*(?:USD|EUR|GBP)\b",
+                            re.IGNORECASE)
 
 
 def _claim_values(claims: list[Any]) -> list[float]:
@@ -233,7 +236,7 @@ def _claim_values(claims: list[Any]) -> list[float]:
             values.append(value)
             unit = _UNIT_SCALE_RE.search(claim.unit or "")
             if unit:
-                word = unit.group(1).lower()
+                word = next(g for g in unit.groups() if g).lower()
                 values.append(value * (_SCALE.get(word) or _LETTER_SCALE[word]))
         else:
             values.extend(n for n, _ in _figures(claim.claim) + _numbers(claim.claim))
@@ -249,10 +252,18 @@ def _numeric(claim: Any) -> float | None:
 
 #: The writer's tag, as it writes it: the upper-case word ("[CONFLICT]", "(CONFLICT)").
 _CONFLICT_TAG_RE = re.compile(r"\bCONFLICT\b")
-#: A register heading or lead-in: the bracketed tag, or the words "conflict register" —
+#: A register heading or lead-in: the tag in brackets or parentheses, or the words "conflict register" —
 #: not a status legend that merely lists CONFLICT among the statuses.
-_CONFLICT_REGISTER_RE = re.compile(r"\[CONFLICT\]|(?i:\bconflicts?\s+register\b)")
+_CONFLICT_REGISTER_RE = re.compile(r"[\[(]CONFLICT[\])]|(?i:\bconflicts?\s+register\b)")
 #: A section named "Source log", numbered or bold as the runbooks write it — not "Source log and findings".
+#: A status legend names two or more statuses ("(VERIFIED) checked · (CONFLICT) disagree"): not a register.
+_STATUS_WORD_RE = re.compile(r"\b(?:VERIFIED|ASSUMED|CONFLICT|UNVERIFIED)\b")
+
+
+def _register(text: str) -> bool:
+    return _CONFLICT_REGISTER_RE.search(text) is not None and len(set(_STATUS_WORD_RE.findall(text))) < 2
+
+
 _SOURCE_LOG_HEADING_RE = re.compile(r"^#+\s*(?:\d+[.)]\s*)?(?:\*\*)?source log(?:\*\*)?\s*[:.]?\s*$", re.IGNORECASE)
 _DERIVED_RE = re.compile(r"\bderived\b(?!\s+from\b)", re.IGNORECASE)
 
@@ -291,8 +302,8 @@ def _conflict_scopes(report_md: str) -> list[tuple[str, bool]]:
         bullet = bool(re.match(r"^([-*+]|\d+[.)])\s", stripped)) or stripped.startswith("|")
         if stripped and not bullet:
             lead_in = stripped
-        disclosed = (_CONFLICT_TAG_RE.search(stripped) is not None or _CONFLICT_REGISTER_RE.search(heading) is not None
-                     or (bullet and _CONFLICT_REGISTER_RE.search(lead_in) is not None)
+        disclosed = (_CONFLICT_TAG_RE.search(stripped) is not None or _register(heading)
+                     or (bullet and _register(lead_in))
                      or _SOURCE_LOG_HEADING_RE.match(heading) is not None)
         out.append((line, disclosed))  # a blank line keeps the lead-in: "Register:\n\n- C1 …"
     return out
