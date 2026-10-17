@@ -219,14 +219,22 @@ def _quotations(sentence: str) -> list[str]:
     return found
 
 
+_UNIT_SCALE_RE = re.compile(r"\b(thousand|million|billion|bn|k|m|b)\b", re.IGNORECASE)
+
+
 def _claim_values(claims: list[Any]) -> list[float]:
-    """What the cited claims carry: a numeric value, else the numbers in the
-    claim's own text (a non-numeric claim can still state a figure)."""
+    """What the cited claims carry: a numeric value (also scaled by its unit —
+    value 12, unit "million USD" is 12,000,000), else the numbers in the claim's
+    own text (a non-numeric claim can still state a figure)."""
     values: list[float] = []
     for claim in claims:
         value = _numeric(claim)
         if value is not None:
             values.append(value)
+            unit = _UNIT_SCALE_RE.search(claim.unit or "")
+            if unit:
+                word = unit.group(1).lower()
+                values.append(value * (_SCALE.get(word) or _LETTER_SCALE[word]))
         else:
             values.extend(n for n, _ in _figures(claim.claim) + _numbers(claim.claim))
     return values
@@ -241,9 +249,11 @@ def _numeric(claim: Any) -> float | None:
 
 #: The writer's tag, as it writes it: the upper-case word ("[CONFLICT]", "(CONFLICT)").
 _CONFLICT_TAG_RE = re.compile(r"\bCONFLICT\b")
-#: A register heading or lead-in: the tag, or the words "conflict register".
-_CONFLICT_REGISTER_RE = re.compile(r"\bCONFLICT\b|(?i:\bconflicts?\s+register\b)")
-_SOURCE_LOG_HEADING_RE = re.compile(r"^#+\s*source log\s*$", re.IGNORECASE)
+#: A register heading or lead-in: the bracketed tag, or the words "conflict register" —
+#: not a status legend that merely lists CONFLICT among the statuses.
+_CONFLICT_REGISTER_RE = re.compile(r"\[CONFLICT\]|(?i:\bconflicts?\s+register\b)")
+#: A section named "Source log", numbered or bold as the runbooks write it — not "Source log and findings".
+_SOURCE_LOG_HEADING_RE = re.compile(r"^#+\s*(?:\d+[.)]\s*)?(?:\*\*)?source log(?:\*\*)?\s*[:.]?\s*$", re.IGNORECASE)
 _DERIVED_RE = re.compile(r"\bderived\b(?!\s+from\b)", re.IGNORECASE)
 
 

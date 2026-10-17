@@ -10,8 +10,8 @@ const title = j => j.request.kind==='tutorial'?'Знакомство с Prowl Re
 // Who asked: a verified delegation (DEC-0039) names the principal and the agent acting for it;
 // the panel is the operator; anything else is what the caller declared, and is labelled so.
 const who = j => j.delegation?`${esc(j.delegation.principal)} <span class="subtle">через ${esc(j.delegation.caller||'агента')}</span>`
- :j.via==='dashboard'?'Оператор (панель)'+(j.chainOwner?` <span class="subtle">· продолжает цепочку ${esc(j.chainOwner.principal)}</span>`:''):j.request.context?.requester?`${esc(j.request.context.requester)} <span class="subtle">(заявлено)</span>`
- :j.via==='mcp'?'Агент с токеном сервиса':'Не указан';
+ :(j.via==='dashboard'?'Оператор (панель)':j.request.context?.requester?`${esc(j.request.context.requester)} <span class="subtle">(заявлено)</span>`
+ :j.via==='mcp'?'Агент с токеном сервиса':'Не указан')+(j.chainOwner?` <span class="subtle">· продолжает цепочку ${esc(j.chainOwner.principal)}</span>`:'');
 const attribution = j => j.delegation?`Проверено по токену делегирования (${esc(j.delegation.tier||'T2')}, ключ ${esc(j.delegation.kid||'—')}). Допуск в Fabric hub не подтверждён.`
  :j.via==='dashboard'?'Создан в панели оператором, вошедшим через Fabric Dashboards.':'Контекст передан вызывающей стороной и не проверен токеном делегирования.';
 const json = v => `<pre>${esc(JSON.stringify(v,null,2))}</pre>`;

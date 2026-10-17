@@ -44,8 +44,8 @@ Objective: close every open item of this agent in its final form, in waves
   every NOT_RUN named in VERIFICATION § Wave 5. B-037 closed (the pre-wave-3 build no longer runs).
 - **W6-T1 offline half** (branch `feat/wave6-acceptance`): code-proven defects veto the judge, the judge's
   spend is metered into `<run>/judge-ledger.json`, `evals/calibrate.py` + planted fixtures, `scripts/mutation_check.py`
-  (26/26). Fix round after the seam and product certifications also fixed two wave-5 seam findings (a replayed
-  resume returns its job; an operator resume keeps the chain's delegation). Evidence:
+  (41/41). Three certification rounds; their fixes also closed two wave-5 seam findings (a replayed resume
+  returns its job; an operator resume stays the operator's act and records the chain's owner, `chainOwner`). Evidence:
   `evidence/judge-calibration/README.md`. The LLM key is issued into vault `prowl-research-agent` (B-042).
 - **Exact next task:** PR wave 6's offline half to `main`, merge, reinstall from the merge with
   `python3 scripts/install-fabric-service.py --vault-project prowl-research-agent` (LLM key only; the service stays

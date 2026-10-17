@@ -155,7 +155,7 @@ def report_head(report_md: str) -> str:
 def partial_disclosed(report_md: str) -> bool:
     """A partial run's report says so before its first section — the rule the
     judge vetoes on (evals/judge.py) and the orchestrator enforces."""
-    return re.search(r"\bpartial\b", report_head(report_md), re.IGNORECASE) is not None
+    return re.search(r"\bpartial(?:ly)?\b", report_head(report_md), re.IGNORECASE) is not None
 
 
 def disclose_partial(report_md: str, reason: str | None) -> str:

@@ -340,3 +340,51 @@ def test_a_non_numeric_claim_carries_the_figures_in_its_text(tmp_path):
     ledger = _ledger(tmp_path, links)
     assert _kinds("# R\n\nThe rival has 1,200 referring domains [C1].\n", ledger) == []
     assert _kinds("# R\n\nThe rival has 4,000 referring domains [C1].\n", ledger) == ["value_mismatch"]
+
+
+# ── third round ────────────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("heading", ["## 10. Source Log", "## Source log", "### 8) **Source log**"])
+def test_a_numbered_source_log_heading_is_still_provenance(tmp_path, heading):
+    body = f"{heading}\n\n- 300 paid keywords — spyfu [C1], retrieved 2026-10-07."
+    assert _kinds("# R\n\n" + body + "\n", _ledger(tmp_path, *PK)) == []
+
+
+def test_a_claim_stored_in_a_scaled_unit_matches_the_scaled_figure(tmp_path):
+    arr = dict(claim="ARR is 12 million USD", subject="rival arr", value=12, unit="million USD",
+               source_tool="spyfu_get_domain_stats")
+    ledger = _ledger(tmp_path, arr)
+    assert _kinds("# R\n\nARR is $12M [C1].\n", ledger) == []
+    assert _kinds("# R\n\nARR is $40M [C1].\n", ledger) == ["value_mismatch"]
+
+
+def test_partially_is_a_disclosure():
+    from research_agent.agent.writer import partial_disclosed
+
+    assert partial_disclosed("# Teardown\n\nThe run completed partially.\n\n## Summary\n")
+
+
+def test_a_status_legend_above_a_table_is_not_a_register(tmp_path):
+    body = "Statuses: VERIFIED, ASSUMED, CONFLICT.\n\n| Claim | Value |\n|---|---|\n| paid keywords [C1] | 300 |"
+    assert _kinds("# R\n\n" + body + "\n", _ledger(tmp_path, *PK)) == ["conflict_hidden"]
+
+
+def test_the_installer_dry_run_exits_2_when_the_install_would_refuse(tmp_path, monkeypatch):
+    import importlib.util
+
+    script = Path(__file__).resolve().parent.parent / "scripts" / "install-fabric-service.py"
+    spec = importlib.util.spec_from_file_location("inst", script)
+    inst = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(inst)
+
+    def missing_binary(*args, **kw):
+        raise FileNotFoundError("project-observatory")
+
+    monkeypatch.setattr(inst, "command", missing_binary)
+    held, missing, problem = inst.slot_check("folder")
+    assert held == [] and "not on PATH" in problem
+    monkeypatch.setattr(sys, "argv", ["install", "--dry-run", "--vault-project", "folder"])
+    monkeypatch.setattr(inst.sys, "platform", "darwin")
+    with pytest.raises(SystemExit) as exited:
+        inst.main()
+    assert exited.value.code == 2

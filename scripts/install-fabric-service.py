@@ -85,6 +85,8 @@ def slot_check(project):
     try:missing=missing_slots(project)
     except subprocess.CalledProcessError as exc:
         return [],list(SLOTS),f'vault {project}: the slot check failed (exit {exc.returncode}); resolve the folder in Observatory first'
+    except FileNotFoundError:
+        return [],list(SLOTS),'project-observatory is not on PATH; install Project Observatory first'
     held=[s for s in SLOTS if s not in missing]
     problem=None if held else f"vault {project}/prod holds none of {', '.join(SLOTS)}: issue them through Observatory's doors first"
     return held,missing,problem
@@ -105,11 +107,13 @@ def main():
     if a.dry_run:
         base=Path.home()/'.local/share'/ID
         held,missing,problem=slot_check(a.vault_project) if a.vault_project else ([],[],None)
-        argv=launch_argv(str(base/'releases/<commit>/venv/bin/python'),Path.home()/'Library/Application Support'/ID,a.port,
+        try:argv=launch_argv(str(base/'releases/<commit>/venv/bin/python'),Path.home()/'Library/Application Support'/ID,a.port,
                          base/'releases/<commit>/build.json',Path.home()/'Library/Logs'/ID,a.vault_project,held)
+        except FileNotFoundError:argv=None  # no Observatory engine to name; `problem` says so
         print(json.dumps({'argv':argv,'slots':held,
                           'missing':missing,'problem':problem,
                           'keys':'vault-only consumer' if a.vault_project else 'none: the service starts degraded'},indent=2))
+        if problem:raise SystemExit(2)  # the real install would refuse: say so in the exit code too
         return
     held,missing=held_slots(a.vault_project,p) if a.vault_project else ([],[])
     if missing:print(f"warning: vault {a.vault_project}/prod lacks {', '.join(missing)}; the service starts degraded without it",file=sys.stderr)

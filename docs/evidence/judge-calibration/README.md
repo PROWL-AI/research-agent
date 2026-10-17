@@ -9,7 +9,7 @@ model's agreement with labels, then with a person on real runs — is the live h
 | Gate | Result | Evidence |
 |---|---|---|
 | A lenient model (0.95 on every dimension) fails every planted-defect fixture (in-sample, author-written) | PASS — 5 / 5 planted fail, 3 / 3 honest pass | [offline run](offline-calibration.log); `tests/test_judge_calibration.py` |
-| Each defence is load-bearing | 36 / 36 planted mutations killed | [mutations](mutations.log); `python scripts/mutation_check.py` |
+| Each defence is load-bearing | 41 / 41 planted mutations killed | [mutations](mutations.log); `python scripts/mutation_check.py` |
 | The judge's own spend is checked by estimate before each call and recorded beside the run | PASS (offline, mocked provider) | `test_the_judge_spend_is_recorded_beside_the_run_not_in_it`, `test_the_judge_refuses_to_spend_above_its_ceiling` |
 | A model that does not answer is a judge error (exit 2), and the judge needs no Prowl key | PASS (offline, unreachable provider) | `test_the_judge_needs_no_prowl_key_and_a_model_failure_is_exit_2` |
 | The checks on real reports | surveyed, see below | [survey](local-runs-survey.json); `python evals/survey_runs.py` |
@@ -27,8 +27,8 @@ model a judging of the largest local report estimates at about USD 0.004.
 - A claim the ledger holds as `assumed` labelled `VERIFIED` in the report (CORE-09): no check yet — B-045.
 - A wrong figure that happens to equal another bare number a cited claim carries, or one inside a
   sentence the writer marked "derived": the checks read figures and the derived mark, not meaning.
-- A conflict cited under a heading or list lead-in that is a conflict register (the tag `CONFLICT`
-  or the words "conflict register"): that is the disclosure the runbooks require, so a register that
+- A conflict cited under a heading or list lead-in that is a conflict register (the bracketed tag
+  `[CONFLICT]` or the words "conflict register"; a status legend listing CONFLICT is not one): that is the disclosure the runbooks require, so a register that
   mislabels an unrelated claim is not caught.
 
 ## The checks on real reports
@@ -44,7 +44,9 @@ fidelity pass's composite `[UNVERIFIED, C2]`, quoted search phrases, bare number
 first pass loosened: only the upper-case tag or a conflict-register heading or lead-in counts as
 disclosure, "derived from" is not the derived mark, a number inside "$12M" carries no value, a
 non-numeric co-citation no longer silences the value check, and "impartial" no longer reads as
-"partial".
+"partial". A third round restored what the second over-tightened: a numbered or bold "Source log"
+heading ("## 10. Source Log", as the runbooks number it) is provenance again, a claim stored in a
+scaled unit (value 12, unit "million USD") matches "$12M", and "partially" discloses a partial run.
 
 What remains — 25 `conflict_hidden`, 10 `quote_not_in_ledger`, 2 `value_mismatch` — was read: the
 conflict hits cite claims the ledger groups as conflicting, mostly in one run whose pre-schema-2
