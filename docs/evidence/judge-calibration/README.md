@@ -9,7 +9,7 @@ model's agreement with labels, then with a person on real runs — is the live h
 | Gate | Result | Evidence |
 |---|---|---|
 | A lenient model (0.95 on every dimension) fails every planted-defect fixture (in-sample, author-written) | PASS — 6 / 6 planted fail, 4 / 4 honest pass | [offline run](offline-calibration.log); `tests/test_judge_calibration.py` |
-| Each defence is load-bearing | 42 / 42 planted mutations killed | [mutations](mutations.log); `python scripts/mutation_check.py` |
+| Each defence is load-bearing | 46 / 46 planted mutations killed | [mutations](mutations.log); `python scripts/mutation_check.py` |
 | The judge's own spend is checked by estimate before each call and recorded beside the run | PASS (offline, mocked provider) | `test_the_judge_spend_is_recorded_beside_the_run_not_in_it`, `test_the_judge_refuses_to_spend_above_its_ceiling` |
 | A model that does not answer is a judge error (exit 2), and the judge needs no Prowl key | PASS (offline, unreachable provider) | `test_the_judge_needs_no_prowl_key_and_a_model_failure_is_exit_2` |
 | The checks on real reports | surveyed, see below | [survey](local-runs-survey.json); `python evals/survey_runs.py` |
@@ -28,8 +28,9 @@ model a judging of the largest local report estimates at about USD 0.004.
   column, or after the first of two adjacent blocks (`[C2][C1] (VERIFIED)` checks only `[C1]`).
 - A wrong figure that happens to equal another bare number a cited claim carries, or one inside a
   sentence the writer marked "derived": the checks read figures and the derived mark, not meaning.
-- A conflict cited under a heading or list lead-in that is a conflict register (the bracketed tag
-  `[CONFLICT]` or the words "conflict register"; a status legend listing CONFLICT is not one): that is the disclosure the runbooks require, so a register that
+- A conflict cited under a heading or list lead-in that is a conflict register (the tag in brackets or
+  parentheses, `[CONFLICT]` / `(CONFLICT)`, or the words "conflict register"; a status legend listing
+  CONFLICT is not one): that is the disclosure the runbooks require, so a register that
   mislabels an unrelated claim is not caught.
 
 ## The checks on real reports
@@ -48,6 +49,8 @@ non-numeric co-citation no longer silences the value check, and "impartial" no l
 "partial". A third round restored what the second over-tightened: a numbered or bold "Source log"
 heading ("## 10. Source Log", as the runbooks number it) is provenance again, a claim stored in a
 scaled unit (value 12, unit "million USD") matches "$12M", and "partially" discloses a partial run.
+B-046 then accepted the parenthesised `(CONFLICT)` as a register marker and limited unit scaling to scale
+words and a letter beside a currency ("USD m", "$M"), so a claim in metres or bytes is not read as millions.
 
 What remains — 86 `status_mislabel`, 25 `conflict_hidden`, 10 `quote_not_in_ledger`, 2 `value_mismatch` — was
 read. The status mislabels (the B-045 check) are citations the reports tag `VERIFIED` whose claims schema 2

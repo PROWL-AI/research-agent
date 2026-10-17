@@ -441,3 +441,47 @@ def test_a_resume_replayed_with_the_same_key_returns_the_same_job(tmp_path, monk
         assert run_dir_name({"id": "pr-b", "request": {"resumeJobId": "pr-a"}}) == "pr-a"
     finally:
         store.db.close()
+
+
+def test_the_chain_owner_can_resume_and_cancel_an_operator_continuation_and_nobody_else_can(
+        tmp_path, monkeypatch, patched_runbooks):
+    """B-047: FABRIC.md's promise, end to end through the MCP tool layer — the
+    agent that owns a chain may resume and cancel the operator's continuation;
+    another caller is refused with the contract code; approving stays the operator's."""
+    from research_agent.service.delegation import Refused
+    from research_agent.service.protocol import Protocol
+    from research_agent.service.runtime import Runtime
+
+    monkeypatch.setenv("PROWL_API_KEY", "test-not-a-key")
+    monkeypatch.setenv("RESEARCH_LLM_API_KEY", "test-not-a-key")
+    store = Store(tmp_path)
+    rt = Runtime(store)
+    proto = Protocol(rt)
+    alice = {"principal": "urn:person:a", "caller": "caller-a.default", "chain": [], "kid": "k1", "tier": "T2"}
+    bob = dict(alice, caller="caller-b.default")
+    run = {"runbook": "mini-teardown", "inputs": {"competitors": ["example.com"]}}
+    try:
+        handle, _ = proto.call("research.run", dict(run, idempotencyKey="a1"), None, alice)
+        root = handle["job"]["id"]
+        store.transition(root, "failed", "failed", error={"code": "execution-failed", "message": "x"})
+        operator = rt.create(dict(run, kind="research", resumeJobId=root), "op", via="mcp")  # the service's own token
+        store.transition(operator["id"], "failed", "failed", error={"code": "execution-failed", "message": "x"})
+        # alice resumes the operator's continuation, then cancels her own resume
+        handle, _ = proto.call("research.run", dict(run, idempotencyKey="a2", resumeJobId=operator["id"]), None, alice)
+        mine = handle["job"]["id"]
+        assert store.job(mine)["delegation"]["caller"] == "caller-a.default"
+        with pytest.raises(Refused) as refused:
+            proto.call("fabric.job.cancel", {"id": mine}, None, bob)
+        assert refused.value.verdict["code"] == "scope-not-granted"
+        view, _ = proto.call("fabric.job.cancel", {"id": mine}, None, alice)
+        assert store.job(mine)["status"] == "cancelled"
+        # a fresh operator continuation awaiting approval: alice may cancel it, bob may not, nobody approves over MCP
+        pending = rt.create(dict(run, kind="research", resumeJobId=operator["id"]), "op2", via="mcp")
+        with pytest.raises(Refused):
+            proto.call("fabric.job.get", {"id": pending["id"]}, None, bob)
+        with pytest.raises(ValueError, match="operator session"):
+            proto.call("fabric.job.get", {"id": pending["id"], "inputResponses": {"x": "approve"}}, None, alice)
+        proto.call("fabric.job.cancel", {"id": pending["id"]}, None, alice)
+        assert store.job(pending["id"])["status"] == "cancelled"
+    finally:
+        store.db.close()

@@ -382,7 +382,7 @@ def test_the_installer_dry_run_exits_2_when_the_install_would_refuse(tmp_path, m
 
     monkeypatch.setattr(inst, "command", missing_binary)
     held, missing, problem = inst.slot_check("folder")
-    assert held == [] and "not on PATH" in problem
+    assert held == [] and "cannot run the Observatory vault check (project-observatory)" in problem
     monkeypatch.setattr(sys, "argv", ["install", "--dry-run", "--vault-project", "folder"])
     monkeypatch.setattr(inst.sys, "platform", "darwin")
     with pytest.raises(SystemExit) as exited:
@@ -428,3 +428,24 @@ def test_the_word_verified_away_from_a_citation_is_not_a_tag(tmp_path):
     ledger = _ledger(tmp_path, TRAFFIC)
     assert _kinds("# R\n\nTraffic is 150,000 visits [C1]. VERIFIED claims are listed below.\n", ledger) == []
     assert _kinds("# R\n\nStatuses: VERIFIED, ASSUMED, CONFLICT.\n\nTraffic is 150,000 visits [C1].\n", ledger) == []
+
+
+# ── B-046 / B-047 ──────────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("body", [
+    "## Conflicts (CONFLICT)\n\n- 300 paid keywords [C1]\n- 900 paid keywords [C2]",
+    "Sources disagree (CONFLICT):\n\n- 300 paid keywords [C1]\n- 900 paid keywords [C2]",
+])
+def test_the_parenthesised_conflict_tag_marks_a_register_too(tmp_path, body):
+    assert _kinds("# R\n\n" + body + "\n", _ledger(tmp_path, *PK)) == []
+
+
+@pytest.mark.parametrize("unit,sentence,expected", [
+    ("m", "The tower is 12,000,000 tall [C1].", ["value_mismatch"]),  # metres, not millions
+    ("USD m", "ARR is $12M [C1].", []),
+    ("$M", "ARR is $12M [C1].", []),
+    ("b", "The file is 12,000,000,000 big [C1].", ["value_mismatch"]),  # bytes
+])
+def test_only_a_currency_letter_or_scale_word_scales_a_unit(tmp_path, unit, sentence, expected):
+    claim = dict(claim="a measured value of 12", subject="thing", value=12, unit=unit, source_tool="spyfu_get_domain_stats")
+    assert _kinds("# R\n\n" + sentence + "\n", _ledger(tmp_path, claim)) == expected
