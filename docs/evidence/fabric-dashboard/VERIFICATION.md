@@ -34,7 +34,7 @@ Code commit **198a227** (fix round after the three blind certifications of `77a0
 | UX docs | PASS | super-ux 0.60.0 `ux_lint.py`: `OK — docs/ux is consistent` |
 | Delegation, callee side | PASS (offline, test Ed25519 key) | `tests/test_delegation.py` |
 | Host chain (issuer → caller → service) | NOT_RUN — host issuer publishes no JWKS | KA-G03, wave 6 |
-| Installed service on revision 6 | pending the merge | reinstall from the merge commit, then the adapter's `check_service.py`; recorded in [HANDOFF](HANDOFF.md) |
+| Installed service on revision 6 | 29 PASS, 8 NOT_RUN, 1 FAIL — installed from the merge `12ad137` | [service probe](raw/service-probe-12ad137.json), adapter 0.35.0 `check_service.py`, three runs. FAIL `well-known.fast`: median 112–217 ms against 100 ms while the machine's load average was 175–250 (other sessions' processes; in-process the handler answers in 4.4 ms when it gets the CPU) — B-044, re-probe under normal load. NOT_RUN, each with its reason: `configuration.declared` (the service declares no runner/model configuration to the host; its own settings are revisioned in the dashboard); `auth.delegation-declared` (no trusted issuer configured: the hub publishes no JWKS — KA-G03); `interop.output-schema-object`, `interop.tools-match`, `interop.job-tools`, `interop.unknown-job`, `interop.trace-propagation` (MCP `auth: own` refuses the host's token by design, DEC-0024; covered locally by the suite and the contract check above); `board.responder` (no board participation — B-033) |
 
 ## Corrections discovered during verification
 

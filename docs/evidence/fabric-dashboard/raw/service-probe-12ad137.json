@@ -1,0 +1,600 @@
+{
+  "probe": "fabric-agent-adapter 0.35.0 check_service.py prowl-research.default --json",
+  "installed": "12ad13770223c795bd05c0160f0696f4355bb2cb",
+  "machine_load_avg_1m": [
+    175.0,
+    221.42,
+    250.45
+  ],
+  "note": "three runs; in-process handler 4.4–385.9 ms under the same load (CPU contention)",
+  "runs": [
+    {
+      "descriptor": "~/Library/Application Support/ai.passioncode.fabric/services/prowl-research.default.json",
+      "results": [
+        {
+          "rule": "descriptor.valid",
+          "verdict": "PASS",
+          "evidence": "~/Library/Application Support/ai.passioncode.fabric/services/prowl-research.default.json"
+        },
+        {
+          "rule": "descriptor.private",
+          "verdict": "PASS",
+          "evidence": "mode 600"
+        },
+        {
+          "rule": "descriptor.port-claim",
+          "verdict": "PASS",
+          "evidence": "port 18764 is unique"
+        },
+        {
+          "rule": "well-known.answers",
+          "verdict": "PASS",
+          "evidence": "HTTP 200"
+        },
+        {
+          "rule": "well-known.fast",
+          "verdict": "FAIL",
+          "evidence": "median 112.2 ms"
+        },
+        {
+          "rule": "well-known.shape",
+          "verdict": "PASS",
+          "evidence": "protocol, build, status, degraded, surfaces"
+        },
+        {
+          "rule": "configuration.declared",
+          "verdict": "NOT_RUN",
+          "evidence": "the service declares no runner or model configuration"
+        },
+        {
+          "rule": "well-known.identity",
+          "verdict": "PASS",
+          "evidence": "answers as prowl-research.default"
+        },
+        {
+          "rule": "well-known.ready-means-healthy",
+          "verdict": "PASS",
+          "evidence": "status degraded, 2 degraded"
+        },
+        {
+          "rule": "network.host-check",
+          "verdict": "PASS",
+          "evidence": "HTTP 403"
+        },
+        {
+          "rule": "network.origin-check",
+          "verdict": "PASS",
+          "evidence": "HTTP 403"
+        },
+        {
+          "rule": "network.cross-site-check",
+          "verdict": "PASS",
+          "evidence": "HTTP 403"
+        },
+        {
+          "rule": "network.loopback-only",
+          "verdict": "PASS",
+          "evidence": "127.0.0.1:18764"
+        },
+        {
+          "rule": "auth.token-file",
+          "verdict": "PASS",
+          "evidence": "~/Library/Application Support/prowl-research/host.token is 0600 and owned by you"
+        },
+        {
+          "rule": "events.requires-token",
+          "verdict": "PASS",
+          "evidence": "HTTP 401 without a token"
+        },
+        {
+          "rule": "events.page",
+          "verdict": "PASS",
+          "evidence": "5 event(s), cursor '15'"
+        },
+        {
+          "rule": "usage.requires-token",
+          "verdict": "PASS",
+          "evidence": "HTTP 401 without a token"
+        },
+        {
+          "rule": "usage.report",
+          "verdict": "PASS",
+          "evidence": "0 day(s), unknown cost kept null"
+        },
+        {
+          "rule": "dashboard.declared",
+          "verdict": "PASS",
+          "evidence": "minWidth 360, host floor 480, fabric-dashboard-kit@1.1.0; the page itself: check_dashboard_layout.mjs"
+        },
+        {
+          "rule": "login.single-use",
+          "verdict": "PASS",
+          "evidence": "first redeem HTTP 302 (cookie ok), second HTTP 403"
+        },
+        {
+          "rule": "login.session-lifetime",
+          "verdict": "PASS",
+          "evidence": "the session cookie lives at most 7 days (DEC-0039); the server's own bounds are not observable from here"
+        },
+        {
+          "rule": "interop.manifest-link",
+          "verdict": "PASS",
+          "evidence": "~/.local/share/prowl-research/releases/12ad13770223/source/fabric-agent.json names prowl-research.default"
+        },
+        {
+          "rule": "interop.well-known-capabilities",
+          "verdict": "PASS",
+          "evidence": "5 listed, all in the manifest"
+        },
+        {
+          "rule": "auth.delegation-declared",
+          "verdict": "NOT_RUN",
+          "evidence": "the service declares no delegation"
+        },
+        {
+          "rule": "interop.mcp-own-auth",
+          "verdict": "PASS",
+          "evidence": "the MCP surface refuses the host's token (HTTP 401 from /mcp), as auth: own says (DEC-0024)"
+        },
+        {
+          "rule": "interop.output-schema-object",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.tools-match",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.job-tools",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.unknown-job",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.trace-propagation",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.events-trace",
+          "verdict": "PASS",
+          "evidence": "0 of 5 events traced, every pair whole"
+        },
+        {
+          "rule": "board.responder",
+          "verdict": "NOT_RUN",
+          "evidence": "the service declares no board participation (no fabric-project-comms revision in protocols)"
+        },
+        {
+          "rule": "state.outside-code",
+          "verdict": "PASS",
+          "evidence": "~/Library/Application Support/prowl-research is not inside a repository"
+        },
+        {
+          "rule": "lifecycle.instance-lock",
+          "verdict": "PASS",
+          "evidence": "held by the running service"
+        },
+        {
+          "rule": "lifecycle.plist",
+          "verdict": "PASS",
+          "evidence": "chat.prowl.research.plist: RunAtLoad, KeepAlive, no secrets"
+        },
+        {
+          "rule": "lifecycle.supervisor-marker",
+          "verdict": "PASS",
+          "evidence": "chat.prowl.research.plist: FABRIC_SERVICE_SUPERVISOR=launchd, so a copy that finds the lock held backs off"
+        },
+        {
+          "rule": "lifecycle.priority",
+          "verdict": "PASS",
+          "evidence": "chat.prowl.research.plist: scheduled as a standard process"
+        },
+        {
+          "rule": "lifecycle.one-copy",
+          "verdict": "PASS",
+          "evidence": "launchd pid 21577, answering pid 21577"
+        }
+      ],
+      "failed": 1
+    },
+    {
+      "descriptor": "~/Library/Application Support/ai.passioncode.fabric/services/prowl-research.default.json",
+      "results": [
+        {
+          "rule": "descriptor.valid",
+          "verdict": "PASS",
+          "evidence": "~/Library/Application Support/ai.passioncode.fabric/services/prowl-research.default.json"
+        },
+        {
+          "rule": "descriptor.private",
+          "verdict": "PASS",
+          "evidence": "mode 600"
+        },
+        {
+          "rule": "descriptor.port-claim",
+          "verdict": "PASS",
+          "evidence": "port 18764 is unique"
+        },
+        {
+          "rule": "well-known.answers",
+          "verdict": "PASS",
+          "evidence": "HTTP 200"
+        },
+        {
+          "rule": "well-known.fast",
+          "verdict": "FAIL",
+          "evidence": "median 178.8 ms"
+        },
+        {
+          "rule": "well-known.shape",
+          "verdict": "PASS",
+          "evidence": "protocol, build, status, degraded, surfaces"
+        },
+        {
+          "rule": "configuration.declared",
+          "verdict": "NOT_RUN",
+          "evidence": "the service declares no runner or model configuration"
+        },
+        {
+          "rule": "well-known.identity",
+          "verdict": "PASS",
+          "evidence": "answers as prowl-research.default"
+        },
+        {
+          "rule": "well-known.ready-means-healthy",
+          "verdict": "PASS",
+          "evidence": "status degraded, 2 degraded"
+        },
+        {
+          "rule": "network.host-check",
+          "verdict": "PASS",
+          "evidence": "HTTP 403"
+        },
+        {
+          "rule": "network.origin-check",
+          "verdict": "PASS",
+          "evidence": "HTTP 403"
+        },
+        {
+          "rule": "network.cross-site-check",
+          "verdict": "PASS",
+          "evidence": "HTTP 403"
+        },
+        {
+          "rule": "network.loopback-only",
+          "verdict": "PASS",
+          "evidence": "127.0.0.1:18764"
+        },
+        {
+          "rule": "auth.token-file",
+          "verdict": "PASS",
+          "evidence": "~/Library/Application Support/prowl-research/host.token is 0600 and owned by you"
+        },
+        {
+          "rule": "events.requires-token",
+          "verdict": "PASS",
+          "evidence": "HTTP 401 without a token"
+        },
+        {
+          "rule": "events.page",
+          "verdict": "PASS",
+          "evidence": "5 event(s), cursor '15'"
+        },
+        {
+          "rule": "usage.requires-token",
+          "verdict": "PASS",
+          "evidence": "HTTP 401 without a token"
+        },
+        {
+          "rule": "usage.report",
+          "verdict": "PASS",
+          "evidence": "0 day(s), unknown cost kept null"
+        },
+        {
+          "rule": "dashboard.declared",
+          "verdict": "PASS",
+          "evidence": "minWidth 360, host floor 480, fabric-dashboard-kit@1.1.0; the page itself: check_dashboard_layout.mjs"
+        },
+        {
+          "rule": "login.single-use",
+          "verdict": "PASS",
+          "evidence": "first redeem HTTP 302 (cookie ok), second HTTP 403"
+        },
+        {
+          "rule": "login.session-lifetime",
+          "verdict": "PASS",
+          "evidence": "the session cookie lives at most 7 days (DEC-0039); the server's own bounds are not observable from here"
+        },
+        {
+          "rule": "interop.manifest-link",
+          "verdict": "PASS",
+          "evidence": "~/.local/share/prowl-research/releases/12ad13770223/source/fabric-agent.json names prowl-research.default"
+        },
+        {
+          "rule": "interop.well-known-capabilities",
+          "verdict": "PASS",
+          "evidence": "5 listed, all in the manifest"
+        },
+        {
+          "rule": "auth.delegation-declared",
+          "verdict": "NOT_RUN",
+          "evidence": "the service declares no delegation"
+        },
+        {
+          "rule": "interop.mcp-own-auth",
+          "verdict": "PASS",
+          "evidence": "the MCP surface refuses the host's token (HTTP 401 from /mcp), as auth: own says (DEC-0024)"
+        },
+        {
+          "rule": "interop.output-schema-object",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.tools-match",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.job-tools",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.unknown-job",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.trace-propagation",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.events-trace",
+          "verdict": "PASS",
+          "evidence": "0 of 5 events traced, every pair whole"
+        },
+        {
+          "rule": "board.responder",
+          "verdict": "NOT_RUN",
+          "evidence": "the service declares no board participation (no fabric-project-comms revision in protocols)"
+        },
+        {
+          "rule": "state.outside-code",
+          "verdict": "PASS",
+          "evidence": "~/Library/Application Support/prowl-research is not inside a repository"
+        },
+        {
+          "rule": "lifecycle.instance-lock",
+          "verdict": "PASS",
+          "evidence": "held by the running service"
+        },
+        {
+          "rule": "lifecycle.plist",
+          "verdict": "PASS",
+          "evidence": "chat.prowl.research.plist: RunAtLoad, KeepAlive, no secrets"
+        },
+        {
+          "rule": "lifecycle.supervisor-marker",
+          "verdict": "PASS",
+          "evidence": "chat.prowl.research.plist: FABRIC_SERVICE_SUPERVISOR=launchd, so a copy that finds the lock held backs off"
+        },
+        {
+          "rule": "lifecycle.priority",
+          "verdict": "PASS",
+          "evidence": "chat.prowl.research.plist: scheduled as a standard process"
+        },
+        {
+          "rule": "lifecycle.one-copy",
+          "verdict": "PASS",
+          "evidence": "launchd pid 21577, answering pid 21577"
+        }
+      ],
+      "failed": 1
+    },
+    {
+      "descriptor": "~/Library/Application Support/ai.passioncode.fabric/services/prowl-research.default.json",
+      "results": [
+        {
+          "rule": "descriptor.valid",
+          "verdict": "PASS",
+          "evidence": "~/Library/Application Support/ai.passioncode.fabric/services/prowl-research.default.json"
+        },
+        {
+          "rule": "descriptor.private",
+          "verdict": "PASS",
+          "evidence": "mode 600"
+        },
+        {
+          "rule": "descriptor.port-claim",
+          "verdict": "PASS",
+          "evidence": "port 18764 is unique"
+        },
+        {
+          "rule": "well-known.answers",
+          "verdict": "PASS",
+          "evidence": "HTTP 200"
+        },
+        {
+          "rule": "well-known.fast",
+          "verdict": "FAIL",
+          "evidence": "median 216.8 ms"
+        },
+        {
+          "rule": "well-known.shape",
+          "verdict": "PASS",
+          "evidence": "protocol, build, status, degraded, surfaces"
+        },
+        {
+          "rule": "configuration.declared",
+          "verdict": "NOT_RUN",
+          "evidence": "the service declares no runner or model configuration"
+        },
+        {
+          "rule": "well-known.identity",
+          "verdict": "PASS",
+          "evidence": "answers as prowl-research.default"
+        },
+        {
+          "rule": "well-known.ready-means-healthy",
+          "verdict": "PASS",
+          "evidence": "status degraded, 2 degraded"
+        },
+        {
+          "rule": "network.host-check",
+          "verdict": "PASS",
+          "evidence": "HTTP 403"
+        },
+        {
+          "rule": "network.origin-check",
+          "verdict": "PASS",
+          "evidence": "HTTP 403"
+        },
+        {
+          "rule": "network.cross-site-check",
+          "verdict": "PASS",
+          "evidence": "HTTP 403"
+        },
+        {
+          "rule": "network.loopback-only",
+          "verdict": "PASS",
+          "evidence": "127.0.0.1:18764"
+        },
+        {
+          "rule": "auth.token-file",
+          "verdict": "PASS",
+          "evidence": "~/Library/Application Support/prowl-research/host.token is 0600 and owned by you"
+        },
+        {
+          "rule": "events.requires-token",
+          "verdict": "PASS",
+          "evidence": "HTTP 401 without a token"
+        },
+        {
+          "rule": "events.page",
+          "verdict": "PASS",
+          "evidence": "5 event(s), cursor '15'"
+        },
+        {
+          "rule": "usage.requires-token",
+          "verdict": "PASS",
+          "evidence": "HTTP 401 without a token"
+        },
+        {
+          "rule": "usage.report",
+          "verdict": "PASS",
+          "evidence": "0 day(s), unknown cost kept null"
+        },
+        {
+          "rule": "dashboard.declared",
+          "verdict": "PASS",
+          "evidence": "minWidth 360, host floor 480, fabric-dashboard-kit@1.1.0; the page itself: check_dashboard_layout.mjs"
+        },
+        {
+          "rule": "login.single-use",
+          "verdict": "PASS",
+          "evidence": "first redeem HTTP 302 (cookie ok), second HTTP 403"
+        },
+        {
+          "rule": "login.session-lifetime",
+          "verdict": "PASS",
+          "evidence": "the session cookie lives at most 7 days (DEC-0039); the server's own bounds are not observable from here"
+        },
+        {
+          "rule": "interop.manifest-link",
+          "verdict": "PASS",
+          "evidence": "~/.local/share/prowl-research/releases/12ad13770223/source/fabric-agent.json names prowl-research.default"
+        },
+        {
+          "rule": "interop.well-known-capabilities",
+          "verdict": "PASS",
+          "evidence": "5 listed, all in the manifest"
+        },
+        {
+          "rule": "auth.delegation-declared",
+          "verdict": "NOT_RUN",
+          "evidence": "the service declares no delegation"
+        },
+        {
+          "rule": "interop.mcp-own-auth",
+          "verdict": "PASS",
+          "evidence": "the MCP surface refuses the host's token (HTTP 401 from /mcp), as auth: own says (DEC-0024)"
+        },
+        {
+          "rule": "interop.output-schema-object",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.tools-match",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.job-tools",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.unknown-job",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.trace-propagation",
+          "verdict": "NOT_RUN",
+          "evidence": "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)"
+        },
+        {
+          "rule": "interop.events-trace",
+          "verdict": "PASS",
+          "evidence": "0 of 5 events traced, every pair whole"
+        },
+        {
+          "rule": "board.responder",
+          "verdict": "NOT_RUN",
+          "evidence": "the service declares no board participation (no fabric-project-comms revision in protocols)"
+        },
+        {
+          "rule": "state.outside-code",
+          "verdict": "PASS",
+          "evidence": "~/Library/Application Support/prowl-research is not inside a repository"
+        },
+        {
+          "rule": "lifecycle.instance-lock",
+          "verdict": "PASS",
+          "evidence": "held by the running service"
+        },
+        {
+          "rule": "lifecycle.plist",
+          "verdict": "PASS",
+          "evidence": "chat.prowl.research.plist: RunAtLoad, KeepAlive, no secrets"
+        },
+        {
+          "rule": "lifecycle.supervisor-marker",
+          "verdict": "PASS",
+          "evidence": "chat.prowl.research.plist: FABRIC_SERVICE_SUPERVISOR=launchd, so a copy that finds the lock held backs off"
+        },
+        {
+          "rule": "lifecycle.priority",
+          "verdict": "PASS",
+          "evidence": "chat.prowl.research.plist: scheduled as a standard process"
+        },
+        {
+          "rule": "lifecycle.one-copy",
+          "verdict": "PASS",
+          "evidence": "launchd pid 21577, answering pid 21577"
+        }
+      ],
+      "failed": 1
+    }
+  ]
+}
