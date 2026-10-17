@@ -205,19 +205,21 @@ class Runtime:
         existing = self.store.replay(request, key, delegation)
         if existing is not None:
             return existing
-        run_dir = None
+        run_dir = chain_owner = None
         if request.get("resumeJobId"):
             run_dir = self._check_resumable(request, delegation)
-            if delegation is None:
-                # An operator's resume of a delegated job stays visible to the
-                # agent that owns the chain.
-                delegation = self.store.job(request["resumeJobId"]).get("delegation")
+            previous = self.store.job(request["resumeJobId"])
+            # Who owns the chain: the principal of its first delegated job. An
+            # operator's resume stays the operator's act (delegation None) and
+            # stays visible to that agent through chainOwner.
+            chain_owner = previous.get("chainOwner") or previous.get("delegation")
         if request["kind"] != "tutorial":
             try:
                 Config.from_env(require_llm=request["kind"] == "research")
             except ConfigError as exc:
                 raise ValueError("Provider credentials are not connected. Use the tutorial or configure the supervised service through Observatory.") from exc
-        return self.store.create(request, key, child_trace(trace), delegation=delegation, run_dir=run_dir, via=via)[0]
+        return self.store.create(request, key, child_trace(trace), delegation=delegation, run_dir=run_dir, via=via,
+                                 chain_owner=chain_owner)[0]
 
     def _check_resumable(self, request, delegation=None):
         """B-039: a resume continues an ENDED, unfinished research job's run and

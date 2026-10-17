@@ -315,7 +315,12 @@ async def test_rewrite_spends_from_the_run_ledger_and_refuses_without_budget(pat
     await rewrite_report(_client(cheap), runs, "rw", max_llm_usd=5.0)
     after = store.load_checkpoint()
     assert after.spend_usd("llm") > before and after.stats["llm_budget"]["max_llm_usd"] == 5.0
-    assert (runs / "rw" / "report.md").read_text().startswith("# Report")
+    rewritten = (runs / "rw" / "report.md").read_text()
+    assert rewritten.startswith("# Report")
+    # the run stays partial (its research stopped on the cap): the rewrite says so too
+    from research_agent.agent.writer import partial_disclosed
+
+    assert after.partial and partial_disclosed(rewritten)
 
 
 async def test_a_refused_longer_draft_ships_the_paid_truncated_one(patched_runbooks, tmp_path):

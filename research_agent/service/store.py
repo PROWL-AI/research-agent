@@ -106,7 +106,7 @@ class Store:
         return json.loads(row[1])
 
     def create(self, request: dict, request_key: str, trace: str | None = None, delegation: dict | None = None,
-               run_dir: str | None = None, via: str = "mcp"):
+               run_dir: str | None = None, via: str = "mcp", chain_owner: dict | None = None):
         request_hash = digest(request)
         request_key = self.namespaced_key(request_key, delegation)
         with self.db:
@@ -127,7 +127,10 @@ class Store:
                        runDir=run_dir,
                        # Which door the request came through: "dashboard" (the operator's
                        # signed-in panel) or "mcp" (an agent with a token).
-                       via=via)
+                       via=via,
+                       # The principal and caller that own a resume chain (B-039): an
+                       # operator's continuation stays visible to them; not a delegation.
+                       chainOwner=chain_owner)
             job["proposal"] = {"digest": digest({"id": job_id, "request": request, "config": job["config"]}),
                                "expiresAt": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat().replace("+00:00", "Z")}
             self.db.execute("INSERT INTO jobs VALUES(?,?,?,?)", (job_id, request_key, request_hash, json.dumps(job)))

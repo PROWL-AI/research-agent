@@ -38,7 +38,7 @@ from research_agent.agent.writer import (  # noqa: E402
 from research_agent.evidence.ledger import Ledger  # noqa: E402
 from research_agent.evidence.source import is_llm_answer, is_transform  # noqa: E402
 from research_agent.evidence.store import ArtifactStore, Checkpoint  # noqa: E402
-from research_agent.evidence.store import AttemptRecord  # noqa: E402
+from research_agent.evidence.store import AttemptRecord, CheckpointWriteError  # noqa: E402
 from research_agent.llm import LLMBudgetExceeded, LLMClient, LLMError, LlmMeter  # noqa: E402
 from research_agent.runbook import Runbook, get_runbook  # noqa: E402
 
@@ -219,11 +219,32 @@ def _quotations(sentence: str) -> list[str]:
     return found
 
 
+def _claim_values(claims: list[Any]) -> list[float]:
+    """What the cited claims carry: a numeric value, else the numbers in the
+    claim's own text (a non-numeric claim can still state a figure)."""
+    values: list[float] = []
+    for claim in claims:
+        value = _numeric(claim)
+        if value is not None:
+            values.append(value)
+        else:
+            values.extend(n for n, _ in _figures(claim.claim) + _numbers(claim.claim))
+    return values
+
+
 def _numeric(claim: Any) -> float | None:
     try:
         return float(str(claim.value).replace(",", "")) if claim.value is not None else None
     except ValueError:
         return None
+
+
+#: The writer's tag, as it writes it: the upper-case word ("[CONFLICT]", "(CONFLICT)").
+_CONFLICT_TAG_RE = re.compile(r"\bCONFLICT\b")
+#: A register heading or lead-in: the tag, or the words "conflict register".
+_CONFLICT_REGISTER_RE = re.compile(r"\bCONFLICT\b|(?i:\bconflicts?\s+register\b)")
+_SOURCE_LOG_HEADING_RE = re.compile(r"^#+\s*source log\s*$", re.IGNORECASE)
+_DERIVED_RE = re.compile(r"\bderived\b(?!\s+from\b)", re.IGNORECASE)
 
 
 def _conflict_scopes(report_md: str) -> list[tuple[str, bool]]:
@@ -239,11 +260,13 @@ def _conflict_scopes(report_md: str) -> list[tuple[str, bool]]:
             heading, lead_in = stripped, ""
             out.append((line, True))
             continue
-        bullet = bool(re.match(r"^([-*+]|\d+[.)]|\|)\s", stripped))
+        # list items and table rows (separator rows included) belong to the lead-in above them
+        bullet = bool(re.match(r"^([-*+]|\d+[.)])\s", stripped)) or stripped.startswith("|")
         if stripped and not bullet:
             lead_in = stripped
-        disclosed = ("CONFLICT" in stripped.upper() or "CONFLICT" in heading.upper()
-                     or (bullet and "CONFLICT" in lead_in.upper()) or "source log" in heading.lower())
+        disclosed = (_CONFLICT_TAG_RE.search(stripped) is not None or _CONFLICT_REGISTER_RE.search(heading) is not None
+                     or (bullet and _CONFLICT_REGISTER_RE.search(lead_in) is not None)
+                     or _SOURCE_LOG_HEADING_RE.match(heading) is not None)
         out.append((line, disclosed))  # a blank line keeps the lead-in: "Register:\n\n- C1 …"
     return out
 
@@ -275,9 +298,12 @@ def _figures(sentence: str) -> list[tuple[float, bool]]:
 
 
 def _numbers(sentence: str) -> list[tuple[float, bool]]:
-    """Every bare number in a sentence (outside citations and dates)."""
+    """Bare numbers in a sentence — outside citations, dates and metric figures
+    (a number inside "$12M" is 12 million, not 12)."""
     text = _DATE_RE.sub(" ", _CITATION_BLOCK_RE.sub(" ", sentence))
-    return [(float(m.group(0).replace(",", "")), False) for m in _LEADING_NUMBER_RE.finditer(text)]
+    spans = [m.span() for rx in (_NUMBER_RE, _SCALED_RE) for m in rx.finditer(text)]
+    return [(float(m.group(0).replace(",", "")), False) for m in _LEADING_NUMBER_RE.finditer(text)
+            if not any(a <= m.start() < b for a, b in spans)]
 
 
 def _matches(figure: tuple[float, bool], value: float) -> bool:
@@ -326,10 +352,12 @@ def code_defects(report_md: str, ledger: Ledger, checkpoint: Checkpoint) -> list
       cites (`_backed`);
     - value_mismatch — a sentence citing only numeric claims states a metric
       figure, and no number in it is any cited claim's value (1 % tolerance);
-      a figure marked "derived" (the writer's rule) is exempt;
-    - conflict_hidden — a claim in status conflict is cited on a line whose
-      line, section heading or register lead-in does not say CONFLICT
-      (`_conflict_scopes`; Source-log rows excepted);
+      a figure marked "derived" (the writer's rule; "derived from" is not the
+      mark) is exempt; a non-numeric claim carries the numbers in its text;
+    - conflict_hidden — a claim in status conflict is cited on a line that does
+      not carry the writer's upper-case CONFLICT tag, under a heading or list
+      lead-in that is not a conflict register (`_conflict_scopes`; rows under a
+      "Source log" heading excepted);
     - partial_undisclosed — a partial run that does not say "partial" before its
       first section (`writer.partial_disclosed`, the rule the orchestrator
       enforces on report.md).
@@ -358,12 +386,12 @@ def code_defects(report_md: str, ledger: Ledger, checkpoint: Checkpoint) -> list
         quotations = _quotations(sentence)
         if quotations and not any(_backed(q, c) for q in quotations for c in cited):
             add("quote_not_in_ledger", cited[0].id, sentence)
-        values = [_numeric(c) for c in cited]
+        values = _claim_values(cited)
         figures = _figures(sentence)
         # A metric figure (the writer lint's definition) none of the cited values
-        # matches — any number in the sentence may carry the value ("interest
-        # 36 [C18]"), and a figure marked "derived" is the writer's computed one.
-        if (figures and None not in values and "derived" not in sentence.lower()
+        # matches — a bare number may carry the value ("interest 36 [C18]"), and a
+        # figure marked "derived" (not "derived from") is the writer's computed one.
+        if (figures and values and not _DERIVED_RE.search(sentence)
                 and not any(_matches(f, v) for f in figures + _numbers(sentence) for v in values)):
             add("value_mismatch", cited[0].id, sentence)
     if checkpoint.partial and not partial_disclosed(report_md):
@@ -506,6 +534,8 @@ async def judge_run(
     except LLMError as exc:
         # The model did not answer: a judge failure (exit 2), never a FAIL.
         raise JudgeError(f"judge model call failed: {exc}") from exc
+    except CheckpointWriteError as exc:
+        raise JudgeError(f"judge ledger could not be written: {exc}") from exc
     finally:
         if meter is not None:
             llm.meter = previous

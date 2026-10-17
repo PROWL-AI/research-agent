@@ -74,3 +74,11 @@ def test_a_folder_with_some_slots_launches_degraded_and_one_with_none_is_refused
         assert "holds none" in str(exc)
     else:
         raise AssertionError("a folder with no slot must be refused")
+
+
+def test_a_dry_run_reports_a_folder_problem_instead_of_refusing(tmp_path, monkeypatch):
+    inst = _installer()
+    _, engine = _engine(tmp_path)
+    monkeypatch.setattr(inst, "command", lambda *a, **kw: str(engine) if a[0] == "project-observatory" else "")
+    held, missing, problem = inst.slot_check("folder")
+    assert held == [] and missing == list(inst.SLOTS) and "holds none" in problem

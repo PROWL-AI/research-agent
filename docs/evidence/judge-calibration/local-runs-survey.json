@@ -19,7 +19,8 @@
   "claims": 222,
   "partial": false,
   "defects": {
-   "quote_not_in_ledger": 7
+   "quote_not_in_ledger": 7,
+   "value_mismatch": 1
   }
  },
  {

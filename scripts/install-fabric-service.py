@@ -78,13 +78,21 @@ def launch_argv(python,data,port,build,logs,vault_project,slots=SLOTS):
     return (vault_consumer(vault_project,slots)+serve) if vault_project else serve
 
 
-def held_slots(project,p):
-    """The slots to launch with: those the folder holds. A missing one leaves the
-    service degraded (it says which provider is absent); none at all is refused."""
+def slot_check(project):
+    """(held, missing, problem): the slots to launch with — those the folder holds.
+    A missing one leaves the service degraded (it says which provider is absent);
+    `problem` names why an install must not proceed (none held, check failed)."""
     try:missing=missing_slots(project)
-    except subprocess.CalledProcessError as exc:p.error(f'vault {project}: the slot check failed (exit {exc.returncode}); resolve the folder in Observatory first')
+    except subprocess.CalledProcessError as exc:
+        return [],list(SLOTS),f'vault {project}: the slot check failed (exit {exc.returncode}); resolve the folder in Observatory first'
     held=[s for s in SLOTS if s not in missing]
-    if not held:p.error(f"vault {project}/prod holds none of {', '.join(SLOTS)}: issue them through Observatory's doors first")
+    problem=None if held else f"vault {project}/prod holds none of {', '.join(SLOTS)}: issue them through Observatory's doors first"
+    return held,missing,problem
+
+
+def held_slots(project,p):
+    held,missing,problem=slot_check(project)
+    if problem:p.error(problem)
     return held,missing
 
 
@@ -96,11 +104,11 @@ def main():
     if sys.platform!='darwin': p.error('This installer supports macOS launchd; manual foreground serve is portable.')
     if a.dry_run:
         base=Path.home()/'.local/share'/ID
-        held,missing=held_slots(a.vault_project,p) if a.vault_project else ([],[])
+        held,missing,problem=slot_check(a.vault_project) if a.vault_project else ([],[],None)
         argv=launch_argv(str(base/'releases/<commit>/venv/bin/python'),Path.home()/'Library/Application Support'/ID,a.port,
                          base/'releases/<commit>/build.json',Path.home()/'Library/Logs'/ID,a.vault_project,held)
         print(json.dumps({'argv':argv,'slots':held,
-                          'missing':missing,
+                          'missing':missing,'problem':problem,
                           'keys':'vault-only consumer' if a.vault_project else 'none: the service starts degraded'},indent=2))
         return
     held,missing=held_slots(a.vault_project,p) if a.vault_project else ([],[])

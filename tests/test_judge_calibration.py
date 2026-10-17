@@ -274,3 +274,69 @@ def test_a_run_that_turns_partial_after_the_writer_says_so():
 ])
 def test_bare_numbers_carry_values_and_derived_figures_are_exempt(tmp_path, sentence, expected):
     assert _kinds("# R\n\n" + sentence + "\n", _ledger(tmp_path, TRAFFIC)) == expected
+
+
+# ── second fix round: what a substring used to let through ────────────────────
+
+@pytest.mark.parametrize("body", [
+    "## Channel conflict and pricing\n\nThe rival bids on 300 paid keywords [C1].",
+    "Two channels are conflicting here. The rival bids on 300 paid keywords [C1].",
+    "## Source log and key findings\n\n- The rival bids on 300 paid keywords [C1].",
+])
+def test_the_word_conflict_somewhere_nearby_is_not_disclosure(tmp_path, body):
+    assert _kinds("# R\n\n" + body + "\n", _ledger(tmp_path, *PK)) == ["conflict_hidden"]
+
+
+def test_a_conflict_register_written_as_a_table_is_disclosure(tmp_path):
+    body = "Sources disagree [CONFLICT]:\n\n| Claim | Value |\n|---|---|\n| paid keywords [C1] | 300 |\n| paid keywords [C2] | 900 |"
+    assert _kinds("# R\n\n" + body + "\n", _ledger(tmp_path, *PK)) == []
+
+
+@pytest.mark.parametrize("sentence,expected", [
+    ("Traffic is 420,000 visits, derived from the panel [C1].", ["value_mismatch"]),  # "derived from" is no mark
+    ("Traffic is $150K a month [C1].", []),  # the scale is read: 150K is the claim's 150,000
+])
+def test_derived_from_is_not_the_derived_mark(tmp_path, sentence, expected):
+    assert _kinds("# R\n\n" + sentence + "\n", _ledger(tmp_path, TRAFFIC)) == expected
+
+
+def test_a_number_inside_a_scaled_figure_carries_no_value(tmp_path):
+    staff = dict(claim="the rival employs 12 people", subject="rival staff", value=12, unit="employees",
+                 source_tool="spyfu_get_domain_stats")
+    assert _kinds("# R\n\nThe rival raised $12M [C1].\n", _ledger(tmp_path, staff)) == ["value_mismatch"]
+    assert _kinds("# R\n\nThe rival employs 12 people [C1].\n", _ledger(tmp_path, staff)) == []
+
+
+def test_a_non_numeric_co_citation_does_not_silence_the_value_check(tmp_path):
+    note = dict(claim="the rival focuses on enterprise buyers", subject="rival focus", source_tool="spyfu_get_domain_stats")
+    ledger = _ledger(tmp_path, TRAFFIC, note)
+    assert _kinds("# R\n\nexample.com draws 420,000 visitors [C1, C2].\n", ledger) == ["value_mismatch"]
+    assert _kinds("# R\n\nexample.com draws 150,000 visitors [C1, C2].\n", ledger) == []
+
+
+def test_impartial_is_not_a_partial_disclosure():
+    from research_agent.agent.writer import partial_disclosed
+
+    assert not partial_disclosed("# Impartial review of the rival\n\n## Summary\n")
+    assert partial_disclosed("# Teardown — PARTIAL: evidence only\n")
+
+
+async def test_a_judge_ledger_that_cannot_be_written_is_a_judge_error(tmp_path, monkeypatch):
+    fixture = json.loads((FIXTURES / "honest.json").read_text())
+    run_dir = calibrate.build_run(fixture, tmp_path)
+
+    def broken(self):
+        raise OSError("read-only file system")
+
+    monkeypatch.setattr(judge._JudgeLedger, "save", broken)
+    calls: list = []
+    async with _billing_llm(0.01, calls) as llm:
+        with pytest.raises(judge.JudgeError, match="judge ledger could not be written"):
+            await judge.judge_run(run_dir, llm, max_usd=0.5, runbooks_dir=calibrate.RUNBOOKS)
+
+
+def test_a_non_numeric_claim_carries_the_figures_in_its_text(tmp_path):
+    links = dict(claim="the rival has 1,200 referring domains", subject="rival links", source_tool="dataforseo_bl_summary")
+    ledger = _ledger(tmp_path, links)
+    assert _kinds("# R\n\nThe rival has 1,200 referring domains [C1].\n", ledger) == []
+    assert _kinds("# R\n\nThe rival has 4,000 referring domains [C1].\n", ledger) == ["value_mismatch"]

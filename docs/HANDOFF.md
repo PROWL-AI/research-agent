@@ -52,8 +52,8 @@ Objective: close every open item of this agent in its final form, in waves
   degraded for Prowl), re-run `check_service.py` (B-044 under normal load). Then B-045 (status-tag check).
 - **Human gate (one line):** the live judge calibration — the operator runs
   `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
-  in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or exports
-  `SHELEG_DEV_LIVE_AUTHORISED=live-flag` before starting the agent session so the agent may run it.
+  in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or authorises live flags for
+  the agent's session (an operator setting on this machine) so the agent may run it.
 - Live acceptance still waits on: a `prowl_` key (B-043), the hub's JWKS (KA-G03), the operator's host update (FD-14).
 - Operator decisions (canvas §8) answered 2026-10-12: Q1 PR-per-wave merges, Q2 kit in wave 5,
   Q4 USD 15, Q5 host update at wave 6, Q6 no history rewrite. Q3 closed from sources.

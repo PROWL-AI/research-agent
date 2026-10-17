@@ -155,7 +155,7 @@ def report_head(report_md: str) -> str:
 def partial_disclosed(report_md: str) -> bool:
     """A partial run's report says so before its first section — the rule the
     judge vetoes on (evals/judge.py) and the orchestrator enforces."""
-    return "partial" in report_head(report_md).lower()
+    return re.search(r"\bpartial\b", report_head(report_md), re.IGNORECASE) is not None
 
 
 def disclose_partial(report_md: str, reason: str | None) -> str:
@@ -594,7 +594,8 @@ async def _rewrite_locked(llm: LLMClient, run_dir: Path, run_id: str,
     # The report was written against the recomputed statuses (a v1 ledger is
     # upgraded on load): the file the report cites must say the same.
     ledger.save()
-    _atomic_write_text(run_dir / "report.md", outcome.report_md)
+    report_md = disclose_partial(outcome.report_md, checkpoint.stop_reason) if checkpoint.partial else outcome.report_md
+    _atomic_write_text(run_dir / "report.md", report_md)
     checkpoint.stats["lint_issues_before"] = outcome.lint_before
     checkpoint.stats["lint_issues_after"] = outcome.lint_after
     checkpoint.stats["lint_issues"] = outcome.lint_after

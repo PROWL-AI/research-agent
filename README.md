@@ -172,9 +172,9 @@ python evals/calibrate.py               # the judge against planted-defect fixtu
 ```
 
 The judge's verdict is vetoed by defects the code proves — a citation of no claim; a quotation no
-cited claim backs; a sentence whose metric figure none of its cited claims carries (figures marked
-"derived" excepted); a conflicting claim cited where neither the line, its heading nor its register
-lead-in says CONFLICT; a partial run that does not say "partial" before its first section — so a
+cited claim backs; a sentence whose metric figure none of its cited claims carries (a sentence the writer marked
+"derived" excepted); a conflicting claim cited on a line without the upper-case `CONFLICT` tag and
+outside a conflict register; a partial run that does not say "partial" before its first section — so a
 lenient model cannot pass them. An uncited figure lowers the citation score instead. Each judge LLM
 call is checked by estimate against `--max-usd` (default 0.50) before it is sent and recorded in
 `<run>/judge-ledger.json`, never in the run's checkpoint. The judge needs only an LLM key.

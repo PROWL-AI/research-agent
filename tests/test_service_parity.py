@@ -425,10 +425,18 @@ def test_a_resume_replayed_with_the_same_key_returns_the_same_job(tmp_path, monk
         resume = rt.create(dict(request, resumeJobId=first["id"]), "resume-key", delegation=alice)
         again = rt.create(dict(request, resumeJobId=first["id"]), "resume-key", delegation=alice)
         assert again["id"] == resume["id"]
-        # an operator resume of alice's job stays alice's
+        # an operator resume of alice's job is the operator's act, visible to alice, and replays
+        from research_agent.service.delegation import owned_by
+        from research_agent.service.runtime import attribution_gap
+
         store.transition(resume["id"], "failed", "failed", error={"code": "execution-failed", "message": "x"})
-        operator = rt.create(dict(request, resumeJobId=resume["id"]), "op-key")
-        assert operator["delegation"]["caller"] == "caller-a.default"
+        operator = rt.create(dict(request, resumeJobId=resume["id"]), "op-key", via="dashboard")
+        assert operator["delegation"] is None and operator["chainOwner"]["caller"] == "caller-a.default"
+        assert rt.create(dict(request, resumeJobId=resume["id"]), "op-key", via="dashboard")["id"] == operator["id"]
+        assert owned_by(operator, alice) and not owned_by(operator, dict(alice, caller="caller-b.default"))
+        assert attribution_gap(operator)["claim"] == "Fabric admission and chain attribution"  # no token claimed
+        with pytest.raises(ValueError, match="already being continued"):  # alice's key space is her own
+            rt.create(dict(request, resumeJobId=resume["id"]), "op-key", delegation=alice)
         # a pre-runDir resume body still maps to the run it continues
         assert run_dir_name({"id": "pr-b", "request": {"resumeJobId": "pr-a"}}) == "pr-a"
     finally:
