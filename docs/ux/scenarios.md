@@ -179,8 +179,8 @@
 | CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | PASS@2bbf566 |
 | CORE-07 | Остановка по бюджету LLM | 4 | UNVERIFIED |
 | CORE-08 | Оплаченный сбой входит в бюджет и после продолжения | 2 | PASS@0b0347b |
-| CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | PASS@W3 |
-| CORE-10 | Конфликт остаётся конфликтом | 3 | PASS@W3 |
+| CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | PASS@5fcf2f4 |
+| CORE-10 | Конфликт остаётся конфликтом | 3 | PASS@5fcf2f4 |
 | CORE-11 | Потеря доказательств → `partial`, не `complete` | 2 | PASS@2bbf566 |
 | CORE-12 | Переписать отчёт активного прогона нельзя | 1 | PASS@583f1d1 |
 | CORE-13 | Судья отвергает заведомо плохой отчёт | 6 | UNVERIFIED |
@@ -286,7 +286,7 @@
 - **Coverage:** `test_ka12_billed_failure_cost_survives_resume`
 
 ### CORE-09: `verified` только с цитатой в сохранённом raw или двумя независимыми источниками
-- **Status:** PASS@W3
+- **Status:** PASS@5fcf2f4
 - **Actor:** оператор (P-01), читающий отчёт; вызывающий агент, потребляющий ledger
 - **Trigger:** извлечение утверждений из шага
 - **Preconditions:** raw шага сохранён с `raw_sha256`.
@@ -298,7 +298,7 @@
 - **Coverage:** `test_ka08_fabricated_verbatim_is_not_verified`, `test_ka09_same_document_is_not_two_independent_sources`, `test_span_verification_reads_the_whole_stored_raw`, `test_two_independent_publishers_corroborate`, `test_two_data_providers_without_urls_corroborate_but_one_provider_does_not`, `test_transform_claim_never_corroborates_its_source`, `test_transform_quote_never_span_verifies`, `test_v1_verbatim_claim_without_a_quote_is_downgraded_on_load`, `test_tampered_raw_is_a_typed_extraction_failure_and_the_resume_finishes`, `test_a_bare_number_quote_is_not_a_quote`, `test_a_quote_copied_from_the_json_the_extractor_saw_is_found`, `test_value_in_quote_matches_numbers_on_number_boundaries`, `test_an_invented_source_url_does_not_make_a_second_source`, `test_urls_named_by_the_raw_count_but_one_step_is_one_delivery`, `test_a_web_tool_claim_without_a_url_is_no_source`, `test_a_quote_not_found_neither_verifies_nor_counts`, `test_an_llm_answer_tool_never_span_verifies`, `test_independence_is_the_upstream_source_not_the_delivery_tool`
 
 ### CORE-10: Конфликт остаётся конфликтом
-- **Status:** PASS@W3
+- **Status:** PASS@5fcf2f4
 - **Actor:** оператор (P-01), читающий отчёт
 - **Trigger:** в одной группе утверждений появляются ≥2 разных значения
 - **Preconditions:** —

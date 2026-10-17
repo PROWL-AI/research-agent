@@ -1,6 +1,6 @@
 # Research-agent handoff
 
-## Current entry — wave program, 2026-10-11 (supersedes "Exact next task" below)
+## Current entry — wave program, updated 2026-10-17 (supersedes "Exact next task" below)
 
 Objective: close every open item of this agent in its final form, in waves
 (`/task-pipeline waves`), each followed by independent verification.
@@ -8,7 +8,7 @@ Objective: close every open item of this agent in its final form, in waves
 - Plan: [`specs/2026-10-11-waves-canvas.md`](specs/2026-10-11-waves-canvas.md) — target state, seams,
   waves with exit criteria, §7a wave status, operator questions (§8).
 - Inventory: [`specs/2026-10-11-waves-inventory.json`](specs/2026-10-11-waves-inventory.json)
-  (`python3 scripts/plan/assign_waves.py --check`; 30 of 49 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
+  (`python3 scripts/plan/assign_waves.py --check`; 28 of 55 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
 - **Wave 1 closed** (merged to `main` by PR #1): run-lock ownership (KA-06, B-009, B-010),
   terminal_code, structured events, honest docs, CORE scenarios, nightly CI.
 - **Wave 2 closed** on branch `wip/wave2-checkpoint-v2` (PR #2): checkpoint schema 2 — immutable
@@ -19,12 +19,19 @@ Objective: close every open item of this agent in its final form, in waves
 - **Upgrade is one-way per run dir** (checkpoint.v1.json kept): restart stdio client sessions and
   reinstall the Fabric service (still `891fbc9`) before resuming runs a v2 build has touched —
   scheduled for wave 5.
-- **Exact next task:** [`specs/waves/W3-T1-ledger-v2-evidence-truth.md`](specs/waves/W3-T1-ledger-v2-evidence-truth.md)
-  (KA-07/08/09, B-007), then the wave-3 close pass (its seam tier also re-reads wave 2's fix round).
+- **Wave 3 closed** (PR from `feat/wave3-ledger-v2`, build `86e313e`, fix round `5fcf2f4`): ledger
+  schema 2 — status recomputed per subject group (order-independent), `verified` only by a quote
+  located in the stored raw or by two independent sources (publisher of a URL the raw names, or an
+  upstream dataset; one step is one delivery; transforms and LLM-answer tools are no source);
+  KA-07/08/09, B-007, B-024 closed. Suite 450 passed; deep probes 11/12 (superseded cwd control).
+  The fix round also repaired a wave-2 seam break (MCP status/report serialization).
+- **Exact next task:** [`specs/waves/W4-T1-llm-budget-service-parity.md`](specs/waves/W4-T1-llm-budget-service-parity.md)
+  (KA-G01, B-003, B-004, B-005, B-029, B-035, B-036, B-038), then the wave-4 close pass (its seam
+  tier also re-reads wave 3's fix round).
 - Operator decisions (canvas §8) answered 2026-10-12: Q1 PR-per-wave merges, Q2 kit in wave 5,
   Q4 USD 15, Q5 host update at wave 6, Q6 no history rewrite. Q3 closed from sources.
-- Cross-agent: B-001 (model profiles, waits on Fabric T1–T3), B-020 (with the Fabric plan
-  owner), B-026 (fixed upstream in Observatory, awaiting its release).
+- Cross-agent: B-001 (model profiles, waits on Fabric T1–T3), B-020 (the contract owner adds
+  our adoption row with its PR #113), B-033 (this folder is not a Fabric project yet — operator step).
 
 ---
 

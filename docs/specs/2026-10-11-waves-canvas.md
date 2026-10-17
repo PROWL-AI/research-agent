@@ -345,7 +345,7 @@ only the REQ table, this canvas and the repository and rules whether the system 
 |---|---|---|---|---|
 | 1 | **closed** | `675e769` build, `583f1d1` fix round, `12df501` privacy fix | unit pass; seam fail → 2 breaks fixed; product fail → 7 findings fixed (fix round re-tested by its own tests; blind re-reading folded into wave 2's seam tier) | suite 370 passed; deep probes 7 failed / 5 passed; inventory 38 of 48 open |
 | 2 | **closed** | `cffc2e0` build+tests, `0b0347b` docs, `4d81cf4` fix round, docs fix round | unit fail (2 breaks), seam fail (3 breaks), product fail (6 breaks) → all fixed in one round with tests; crash test found 2 more defects during the build; blind re-reading of the fix round folded into wave 3's seam tier | suite 402 passed; deep probes 4 failed (KA-07/08/09 + superseded cwd control) / 8 passed; inventory 30 of 49 open |
-| 3 | next | — | — | — |
+| 3 | **closed** | `86e313e` build, `5fcf2f4` fix round | unit fail (6 breaks), seam fail (6 breaks, one of them wave 2's: MCP status serialization), product fail (5 breaks) → all fixed in one round, 25 tests watched failing on `86e313e`; planted mutations caught (3/3); blind re-reading of the fix round folded into wave 4's seam tier | suite 450 passed; deep probes 11 passed / 1 superseded control; inventory 28 of 55 open |
 
 ## 8. Operator decisions (one batch)
 
@@ -370,6 +370,7 @@ the recommendation as **assumed**, and the waves that depend on it name it.
 
 | Date | Change | Why |
 |---|---|---|
+| 2026-10-17 | Wave 3 closed (`5fcf2f4`). Decided in code: independence = publisher of a URL the raw names, or the upstream dataset with delivery wrappers removed (`google_trends` == `serpapi_google_trends`); claims of one step never corroborate; LLM-answer tools join transforms as no source; a missing unit is compatible; the conflict event field is `subject` (the events filter refuses names containing `key`); B-036…B-038 filed | wave-3 certification |
 | 2026-10-11 | canvas created from the wave-0 survey at `c0dfb6e` | first cut |
 | 2026-10-12 | Wave 2 closed; B-032 (server-side dedupe, CORE-14) added for wave 6; one-way schema upgrade documented with a checkpoint.v1.json backup | wave-2 close pass |
 | 2026-10-12 | Wave-2 build deviations from §2, decided in code: (1) plan-time `excluded` steps are disclosed but do not make a run `partial` — only `catalog_changed` exclusions do (a planner proposing a non-allowlisted tool is planning noise, not missing research); (2) claim ids stay `C<n>` because the writer's citation lint requires them — a step records the ids it produced and re-extraction replaces by those ids and by `raw_ref`; (3) a same-key resend of an `outcome_unknown` call reuses its attempt record (one logical attempt, counted once) | crash-injection test findings and the writer contract |
