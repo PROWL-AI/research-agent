@@ -68,7 +68,7 @@ def main():
         logs.mkdir(parents=True,exist_ok=True,mode=0o700)
         plist=Path.home()/'Library/LaunchAgents'/f'{LABEL}.plist'
         python=str(release/'venv/bin/python')
-        argv=[python,'-m','research_agent.service.cli','serve','--root',str(data),'--port',str(a.port),'--build',str(release/'build.json')]
+        argv=[python,'-m','research_agent.service.cli','serve','--root',str(data),'--port',str(a.port),'--build',str(release/'build.json'),'--log-dir',str(logs)]
         payload={'Label':LABEL,'ProgramArguments':argv,'RunAtLoad':True,'KeepAlive':True,'ThrottleInterval':10,'ExitTimeOut':15,'ProcessType':'Standard',
                  'EnvironmentVariables':{'PATH':'/usr/bin:/bin:/usr/local/bin','FABRIC_SERVICE_SUPERVISOR':'launchd'},
                  'StandardOutPath':str(logs/'service.log'),'StandardErrorPath':str(logs/'service.log')}

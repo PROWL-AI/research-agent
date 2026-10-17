@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
 from research_agent.evidence.ledger import Ledger, _atomic_write_text
-from research_agent.llm import LLMClient, LLMError
+from research_agent.llm import LLMBudgetExceeded, LLMClient, LLMError
 from research_agent.runbook import Runbook
 
 if TYPE_CHECKING:
@@ -151,7 +152,8 @@ def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str) -> WriterO
         "",
         f"The LLM budget ran out before the report could be written ({reason}). "
         "Below is the evidence ledger as gathered; no synthesis, no conclusions. "
-        "Raise max_llm_usd and run `rewrite` on this run to get the full report.",
+        "`prowl-research rewrite <run_id> --max-llm-usd <larger>` writes the full "
+        "report under a larger cap (its LLM calls count against the run).",
         "",
         "| Claim | Value | Status | Source |",
         "|---|---|---|---|",
@@ -316,6 +318,7 @@ async def write_report(
     except LLMError as exc:
         if exc.retryable or exc.finish_reason != "length":
             raise
+        first_truncated = (exc.content or "").strip()
         # A truncated first draft arrives after the run's entire tool spend —
         # dying here loses the ledger and the money. Retry once with a larger
         # output budget before giving up on the report.
@@ -328,6 +331,13 @@ async def write_report(
             messages, tier="strong", max_tokens=_DRAFT_ESCALATED_MAX_TOKENS, temperature=0.3,
             stage="writer",
         )
+    except LLMBudgetExceeded:
+        if not first_truncated:
+            raise
+        # The cap refuses the larger retry: the first draft was paid for —
+        # ship it truncated rather than drop it for the ledger listing. The
+        # run records the refusal (budget_llm).
+        return first_truncated + "\n\n*(Report truncated: the LLM budget did not allow a longer draft.)*"
     except LLMError as exc:
         truncated = (exc.content or "").strip()
         if exc.retryable or exc.finish_reason != "length" or not truncated:
@@ -492,7 +502,7 @@ async def produce_report(
 
 
 async def rewrite_report(
-    llm: LLMClient, runs_root: Path, run_id: str
+    llm: LLMClient, runs_root: Path, run_id: str, *, max_llm_usd: float | None = None
 ) -> WriterOutcome:
     """Re-run only the writer over a finished run's ledger.
 
@@ -513,12 +523,13 @@ async def rewrite_report(
         emit(log, "run.rewrite.refused", logging.WARNING, run_id=run_id)
         raise OrchestratorError(f"run {run_id} is active; rewrite refused")
     try:
-        return await _rewrite_locked(llm, run_dir, run_id)
+        return await _rewrite_locked(llm, run_dir, run_id, max_llm_usd)
     finally:
         lock.release()
 
 
-async def _rewrite_locked(llm: LLMClient, run_dir: Path, run_id: str) -> WriterOutcome:
+async def _rewrite_locked(llm: LLMClient, run_dir: Path, run_id: str,
+                          max_llm_usd: float | None = None) -> WriterOutcome:
     from research_agent.evidence.store import ArtifactStore
     from research_agent.runbook import get_runbook
 
@@ -532,13 +543,28 @@ async def _rewrite_locked(llm: LLMClient, run_dir: Path, run_id: str) -> WriterO
             f"run '{run_id}' has no ledger.json — nothing to write from"
         )
     ledger = Ledger.load(ledger_path)
+    ledger.run_id = run_id
     runbook = get_runbook(checkpoint.runbook)
-    outcome, fidelity = await produce_report(
-        llm, runbook, ledger, checkpoint.brief,
-        partial=checkpoint.partial,
-        skipped_steps=checkpoint.skipped_steps,
-        transform_notes=checkpoint.transform_notes,
-    )
+    from research_agent.agent.metering import attach_run_meter, budget_stats
+
+    # A rewrite spends the run's own LLM money: same cap, same attempt ledger.
+    meter = attach_run_meter(llm, checkpoint, store, runbook.meta.budget.max_llm_usd, max_llm_usd)
+    store.save_checkpoint(checkpoint)
+    try:
+        outcome, fidelity = await produce_report(
+            llm, runbook, ledger, checkpoint.brief,
+            partial=checkpoint.partial,
+            skipped_steps=checkpoint.skipped_steps,
+            transform_notes=checkpoint.transform_notes,
+        )
+    except LLMBudgetExceeded as exc:
+        checkpoint.stats["llm_budget"] = budget_stats(meter, checkpoint)
+        store.save_checkpoint(checkpoint)
+        raise RewriteError(
+            f"run '{run_id}': the LLM budget does not allow a rewrite ({exc}); "
+            "the existing report is unchanged — pass a larger --max-llm-usd") from exc
+    finally:
+        llm.meter = None
     # The report was written against the recomputed statuses (a v1 ledger is
     # upgraded on load): the file the report cites must say the same.
     ledger.save()
@@ -547,6 +573,8 @@ async def _rewrite_locked(llm: LLMClient, run_dir: Path, run_id: str) -> WriterO
     checkpoint.stats["lint_issues_after"] = outcome.lint_after
     checkpoint.stats["lint_issues"] = outcome.lint_after
     checkpoint.stats["citation_fidelity"] = fidelity.stats
+    checkpoint.stats["llm_budget"] = budget_stats(meter, checkpoint)
+    checkpoint.stats["rewritten_at"] = datetime.now(timezone.utc).isoformat()
     store.save_checkpoint(checkpoint)
     try:
         from research_agent.report.render import render_run

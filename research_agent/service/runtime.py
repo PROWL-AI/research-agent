@@ -101,9 +101,13 @@ class ObservedLLM(LLMClient):
         self.store, self.job = store, job
         return self
 
-    async def _post(self, payload, request_kwargs):
+    def _before_send(self):
+        # Before the run's meter records an attempt: a refusal here sent
+        # nothing and costs nothing, in the journal and the run ledger alike.
         if len(self.store.calls(self.job["id"])) >= 256:
-            raise LLMError("Service call limit reached (256)", retryable=False)
+            raise LLMError("Service call limit reached (256); nothing was sent", retryable=False)
+
+    async def _post(self, payload, request_kwargs):
         call = self.store.start_call(self.job["id"], "llm", payload["model"],
                                     {"messages": len(payload["messages"]), "max_tokens": payload.get("max_tokens")})
         trace = child_trace(self.job.get("traceparent"))

@@ -138,22 +138,25 @@ def test_service_events_reach_a_rotating_log_file(tmp_path):
         package.propagate = before[2]
 
 
-async def test_a_service_research_job_journals_exactly_the_attempts_its_run_ledger_counts(
-        tmp_path, monkeypatch, patched_runbooks):
-    """The call journal (dashboard, usage report) and the run's attempt ledger
-    (budgets, resume) are written at the same boundary — each HTTP attempt to
-    the LLM and each paid dispatch — so they must agree call for call."""
+async def _service_research_job(tmp_path, monkeypatch, provider, *, env_cap=None, prefill=0):
     import asyncio
 
     import research_agent.service.runtime as runtime_mod
     from research_agent.evidence.store import ArtifactStore
     from research_agent.service.runtime import Runtime
-    from test_llm_budget import Provider
 
     monkeypatch.setenv("PROWL_API_KEY", "test-not-a-key")
     monkeypatch.setenv("RESEARCH_LLM_API_KEY", "test-not-a-key")
     monkeypatch.setenv("RESEARCH_NO_SUBAGENTS", "1")
-    provider = Provider(cost=0.02, plan_steps=2)
+    if env_cap is None:
+        monkeypatch.delenv("RESEARCH_MAX_LLM_USD", raising=False)
+    else:
+        monkeypatch.setenv("RESEARCH_MAX_LLM_USD", str(env_cap))
+
+    async def no_sleep(_):
+        return None
+
+    monkeypatch.setattr("research_agent.llm.asyncio.sleep", no_sleep)
 
     class Session:
         async def call_tool(self, name, arguments, **kwargs):
@@ -183,18 +186,104 @@ async def test_a_service_research_job_journals_exactly_the_attempts_its_run_ledg
     try:
         job = rt.create({"kind": "research", "runbook": "mini-teardown",
                          "inputs": {"competitors": ["example.com"]}}, "parity")
+        for _ in range(prefill):
+            store.finish_call(store.start_call(job["id"], "tool", "prefill", {}), status="completed",
+                              costUsd=0.0, costBasis="provider")
         rt.decide(job["id"], job["proposal"]["digest"], True)
         await asyncio.gather(*list(rt.tasks.values()))
         done = store.job(job["id"])
-        assert done["status"] == "completed", done.get("error")
-        assert done["result"]["outcome"] == "succeeded"
-        journal = store.calls(job["id"])
-        attempts = ArtifactStore(tmp_path / "runs" / job["id"]).load_checkpoint().attempts
-        for kind in ("tool", "llm"):
-            rows = [c for c in journal if c["kind"] == kind]
-            ledger = [a for a in attempts if a.kind == kind]
-            assert len(rows) == len(ledger) > 0, kind
-            assert sum(c["costUsd"] for c in rows) == pytest.approx(sum(a.spend_usd for a in ledger)), kind
+        checkpoint = ArtifactStore(tmp_path / "runs" / job["id"]).load_checkpoint()
+        return done, store.calls(job["id"]), checkpoint
     finally:
         await rt.close()
         store.db.close()
+
+
+def _assert_journal_matches_ledger(journal, attempts):
+    for kind in ("tool", "llm"):
+        rows = [c for c in journal if c["kind"] == kind and c["name"] != "prefill"]
+        ledger = [a for a in attempts if a.kind == kind]
+        assert len(rows) == len(ledger), kind
+        # same cost wherever the provider reported one; an unbilled HTTP error
+        # is unknown (null) in the journal and 0 in the run ledger
+        assert sum(c["costUsd"] or 0 for c in rows) == pytest.approx(sum(a.spend_usd for a in ledger)), kind
+
+
+async def test_a_service_research_job_journals_exactly_the_attempts_its_run_ledger_counts(
+        tmp_path, monkeypatch, patched_runbooks):
+    """The call journal (dashboard, usage report) and the run's attempt ledger
+    (budgets, resume) are written at the same boundary — each HTTP attempt to
+    the LLM and each paid dispatch — so they agree call for call."""
+    from test_llm_budget import Provider
+
+    done, journal, checkpoint = await _service_research_job(tmp_path, monkeypatch, Provider(cost=0.02, plan_steps=2))
+    assert done["status"] == "completed", done.get("error")
+    assert done["result"]["outcome"] == "succeeded"
+    _assert_journal_matches_ledger(journal, checkpoint.attempts)
+
+
+async def test_journal_and_ledger_agree_across_a_429(tmp_path, monkeypatch, patched_runbooks):
+    from test_llm_budget import Provider, _completion
+
+    provider = Provider(cost=0.02, plan_steps=1, script=[(429, {"error": "rate"})])
+    done, journal, checkpoint = await _service_research_job(tmp_path, monkeypatch, provider)
+    assert done["status"] == "completed", done.get("error")
+    assert any(a.outcome == "http_error" and a.spend_usd == 0 for a in checkpoint.attempts)
+    _assert_journal_matches_ledger(journal, checkpoint.attempts)
+
+
+async def test_the_service_call_limit_refuses_before_anything_is_recorded(tmp_path, monkeypatch, patched_runbooks):
+    from test_llm_budget import Provider
+
+    done, journal, checkpoint = await _service_research_job(tmp_path, monkeypatch, Provider(cost=0.02), prefill=256)
+    assert done["status"] == "failed"
+    assert [a for a in checkpoint.attempts if a.kind == "llm"] == []  # nothing sent, nothing spent
+    assert len(journal) == 256
+
+
+async def test_a_service_job_stopped_by_the_llm_cap_reports_partial(tmp_path, monkeypatch, patched_runbooks):
+    from test_llm_budget import Provider
+
+    done, journal, checkpoint = await _service_research_job(
+        tmp_path, monkeypatch, Provider(cost=0.4, plan_steps=2), env_cap=1.0)
+    assert done["status"] == "completed", done.get("error")
+    assert checkpoint.terminal_code == "budget_llm"
+    assert done["result"]["outcome"] == "partial" and "budget_llm" in done["result"]["done"][0]["statement"]
+
+
+def test_configuring_the_event_log_twice_keeps_one_handler(tmp_path):
+    from logging.handlers import RotatingFileHandler
+
+    from research_agent.service.cli import configure_logging
+
+    package = logging.getLogger("research_agent")
+    before = list(package.handlers), package.level, package.propagate
+    try:
+        configure_logging(tmp_path / "logs")
+        configure_logging(tmp_path / "logs")
+        assert sum(isinstance(h, RotatingFileHandler) for h in package.handlers) == 1
+    finally:
+        for handler in package.handlers:
+            if handler not in before[0]:
+                handler.close()
+        package.handlers[:] = before[0]
+        package.setLevel(before[1])
+        package.propagate = before[2]
+
+
+@pytest.mark.parametrize("body,gaps", [
+    ("Use `serp_bing` as a fallback for organic data.", ["serp_bing"]),
+    ("There is no fallback for `moz_da`.", []),
+    ("If the call fails, e.g. on timeout, use `google_search`.", ["google_search"]),
+    ("Fall-back: `serp_bing`.", ["serp_bing"]),
+    ("Primary `moz_da`. Then something else.", []),
+])
+def test_failover_sentences(body, gaps):
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "validate_runbooks", Path(__file__).resolve().parent.parent / "scripts" / "validate_runbooks.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.failover_gaps(body, [], ["serp_bing", "moz_da", "google_search"]) == gaps

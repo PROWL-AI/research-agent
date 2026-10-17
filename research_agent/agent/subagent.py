@@ -35,6 +35,7 @@ from pydantic import BaseModel, Field
 
 from research_agent.agent.orchestrator import PlanItem
 from research_agent.events import emit
+from research_agent.evidence.store import CheckpointWriteError  # noqa: F401 — re-exported
 from research_agent.llm import LLMBudgetExceeded
 from research_agent.evidence.ledger import Ledger
 from research_agent.evidence.store import (
@@ -113,9 +114,7 @@ class WorkerContext:
     )
 
 
-class CheckpointWriteError(Exception):
-    """The run's state could not be persisted. Not a step failure: continuing
-    would spend money no checkpoint records, so the run stops as `failed`."""
+# CheckpointWriteError lives in evidence.store (the LLM meter raises it too).
 
 
 def partition_workers(items: list[StepRecord], n_workers: int) -> list[list[StepRecord]]:

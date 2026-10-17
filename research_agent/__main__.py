@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import math
 import os
 import re
 import shutil
@@ -39,8 +40,9 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("runbook", help="runbook name")
     run_p.add_argument("--run-id", default=None, help="resume or reuse this run id")
     run_p.add_argument("--max-llm-usd", type=float, default=None,
-                       help="cap this run's own LLM spend in USD (default: RESEARCH_MAX_LLM_USD, "
-                            "the runbook's max_llm_usd, else the built-in default)")
+                       help="cap this run's own LLM spend in USD, checked before every LLM call "
+                            "(default: RESEARCH_MAX_LLM_USD, else the cap a resumed run recorded, "
+                            "else the runbook's max_llm_usd, else 5)")
 
     val_p = sub.add_parser("validate", help="validate runbook frontmatter and tool names")
     val_p.add_argument(
@@ -62,6 +64,8 @@ def main(argv: list[str] | None = None) -> int:
         help="re-run ONLY the writer for a run (draft + citation repair; LLM key needed, no Prowl spend)",
     )
     rewrite_p.add_argument("run_id")
+    rewrite_p.add_argument("--max-llm-usd", type=float, default=None,
+                           help="LLM cap for the rewrite: its calls count against the run's recorded spend")
 
     export_p = sub.add_parser("export", help="render a run's report (self-contained HTML or markdown path)")
     export_p.add_argument("run_id")
@@ -113,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "report":
         return _cmd_report(args.run_id)
     if args.command == "rewrite":
-        return asyncio.run(_cmd_rewrite(args.run_id))
+        return asyncio.run(_cmd_rewrite(args.run_id, args.max_llm_usd))
     if args.command == "export":
         return _cmd_export(args.run_id, args.format)
     if args.command == "prune":
@@ -140,7 +144,8 @@ def _cmd_list_runbooks() -> int:
         print(f"{rb.name:<{name_width}}  {budget_s:<28}  {description}")
     print(
         "\nbudgets cap tool calls; the run's own LLM spend is capped by max_llm_usd "
-        "(--max-llm-usd, RESEARCH_MAX_LLM_USD, the runbook, else the default) — see stats.llm_budget"
+        "(--max-llm-usd, RESEARCH_MAX_LLM_USD, a resumed run's recorded cap, the runbook, else 5; "
+        "checked before each call) — see stats.llm_budget"
     )
     return 0
 
@@ -185,8 +190,8 @@ def _reconcile(runs_root: Path) -> None:
 async def _cmd_run(
     runbook_name: str, inputs: dict[str, object], run_id: str | None, max_llm_usd: float | None = None,
 ) -> int:
-    if max_llm_usd is not None and not max_llm_usd > 0:
-        print(f"error: --max-llm-usd must be > 0, got {max_llm_usd}", file=sys.stderr)
+    if max_llm_usd is not None and not (math.isfinite(max_llm_usd) and max_llm_usd > 0):
+        print(f"error: --max-llm-usd must be a finite number > 0, got {max_llm_usd}", file=sys.stderr)
         return 2
     if run_id is not None:
         try:
@@ -294,7 +299,10 @@ def _cmd_report(run_id: str) -> int:
     return 0
 
 
-async def _cmd_rewrite(run_id: str) -> int:
+async def _cmd_rewrite(run_id: str, max_llm_usd: float | None = None) -> int:
+    if max_llm_usd is not None and not (math.isfinite(max_llm_usd) and max_llm_usd > 0):
+        print(f"error: --max-llm-usd must be a finite number > 0, got {max_llm_usd}", file=sys.stderr)
+        return 2
     try:
         validate_run_id(run_id)
     except ValueError as exc:
@@ -318,7 +326,7 @@ async def _cmd_rewrite(run_id: str) -> int:
         model_strong=config.llm_model_strong,
     ) as llm:
         try:
-            outcome = await rewrite_report(llm, _runs_root(), run_id)
+            outcome = await rewrite_report(llm, _runs_root(), run_id, max_llm_usd=max_llm_usd)
         except (RewriteError, RunbookError, OrchestratorError) as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 1

@@ -112,7 +112,7 @@ class AttemptRecord(BaseModel):
     idempotency_key: str | None = None
     started_at: str = Field(default_factory=_now)
     ended_at: str | None = None
-    outcome: str = "pending"  # pending | ok | refused | transport_error | cancelled | unknown
+    outcome: str = "pending"  # pending | ok | refused | transport_error | cancelled | unknown | http_error | truncated (llm)
     cost_basis: str = "unknown"  # actual | estimate | unknown
     actual_usd: float | None = None
     estimate_usd: float | None = None
@@ -252,6 +252,11 @@ class Checkpoint(BaseModel):
         earlier attempt's numbers."""
         counters = dict(self.counters)
         return {**counters, "cost_source": self.cost_source("tool"), "steps": self.step_counts()}
+
+
+class CheckpointWriteError(Exception):
+    """The run's state could not be persisted. Not a step failure: continuing
+    would spend money no checkpoint records, so the run stops as `failed`."""
 
 
 class CheckpointMigrationError(ValueError):

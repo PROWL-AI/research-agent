@@ -36,11 +36,17 @@ def configure_logging(log_dir):
 
     log_dir = Path(log_dir)
     log_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    package = logging.getLogger("research_agent")
+    target = str((log_dir / "events.log").resolve())
+    for existing in list(package.handlers):
+        # Idempotent: a second call must not double every line or rotate one
+        # file from two handlers.
+        if isinstance(existing, RotatingFileHandler) and existing.baseFilename == target:
+            return log_dir / "events.log"
     handler = RotatingFileHandler(log_dir / "events.log", maxBytes=EVENT_LOG_BYTES,
                                   backupCount=EVENT_LOG_BACKUPS, encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
     handler.setLevel(logging.INFO)
-    package = logging.getLogger("research_agent")
     package.setLevel(logging.INFO)
     package.addHandler(handler)
     package.propagate = False

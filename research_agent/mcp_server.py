@@ -37,7 +37,7 @@ from research_agent.agent.orchestrator import (
     RunResult,
     build_brief,
 )
-from research_agent.config import Config, ConfigError
+from research_agent.config import Config, ConfigError, resolve_llm_cap
 from research_agent.events import emit
 from research_agent.evidence import terminal
 from research_agent.evidence.runlock import is_locked_elsewhere, reconcile_orphans
@@ -167,8 +167,12 @@ async def research_run(
     """Execute a research runbook. wait=false returns a job handle immediately.
     max_llm_usd caps the run's own LLM spend (USD)."""
     _validate_run_request(runbook, inputs)
-    if max_llm_usd is not None and not max_llm_usd > 0:
-        raise ValueError(f"max_llm_usd must be > 0, got {max_llm_usd!r}")
+    try:
+        # Before a job handle exists: a bad cap (argument or RESEARCH_MAX_LLM_USD)
+        # is the caller's error now, not a failed run later.
+        resolve_llm_cap(max_llm_usd, None, None)
+    except ConfigError as exc:
+        raise ValueError(str(exc)) from exc
     try:
         _config_from_env()
     except ConfigError as exc:

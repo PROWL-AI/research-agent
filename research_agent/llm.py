@@ -55,7 +55,7 @@ class LLMBudgetExceeded(LLMError):
 
 #: Stages that may spend into the writer reserve: they turn what was gathered
 #: into a report, so the run still produces one after research spent its share.
-REPORT_STAGES = frozenset({"writer", "repair", "citations", "rewrite"})
+REPORT_STAGES = frozenset({"writer", "repair", "citations"})
 
 
 @dataclass
@@ -79,13 +79,31 @@ class LlmMeter:
     def limit_for(self, stage: str) -> float:
         return self.max_usd if stage in REPORT_STAGES else max(0.0, self.max_usd - self.reserve_usd)
 
+    #: Stages the meter refused in this run (in order): the run reads it to
+    #: disclose a refusal that a caller handled quietly (repair, citations).
+    refusals: list[str] = field(default_factory=list)
+
     def research_exhausted(self) -> bool:
+        """Research must stop: its limit is spent, or a research call was
+        already refused — the same rule that refused it stops the next
+        dispatch, so no tool is paid for whose evidence cannot be read."""
+        if any(stage not in REPORT_STAGES for stage in self.refusals):
+            return True
         return self.spend() >= self.limit_for("research")
+
+    def _persist(self) -> None:
+        try:
+            self.persist()
+        except Exception as exc:  # noqa: BLE001 — never a step failure
+            from research_agent.evidence.store import CheckpointWriteError
+
+            raise CheckpointWriteError(f"run state could not be saved: {exc}") from exc
 
     def check(self, stage: str, model: str, estimate: float) -> None:
         spent = self.spend()
         limit = self.limit_for(stage)
         if spent + estimate > limit:
+            self.refusals.append(stage)
             raise LLMBudgetExceeded(
                 f"max_llm_usd={self.max_usd} (spent {spent:.4f}, next {stage} call ~{estimate:.4f}, "
                 f"{'report' if stage in REPORT_STAGES else 'research'} limit {limit:.4f})",
@@ -96,13 +114,17 @@ class LlmMeter:
         record = self.record_type(attempt_id=self.new_id(), step_id=stage, kind="llm",
                                   attempt_no=attempt_no, model=model, estimate_usd=estimate)
         self.attempts.append(record)
-        self.persist()
+        self._persist()
         return record
 
-    def finish(self, record: Any, *, outcome: str, data: dict[str, Any] | None) -> None:
+    def finish(self, record: Any, *, outcome: str, data: dict[str, Any] | None,
+               answered: bool = False) -> None:
+        """`answered`: an HTTP response came back. An error response without
+        usage is an unbilled refusal (429, 5xx, 4xx) — recorded at 0, not at
+        its estimate, so rate limiting does not eat the budget."""
         from datetime import datetime, timezone
 
-        usage = (data or {}).get("usage") or {}
+        usage = ((data or {}).get("usage") or {}) if isinstance(data, dict) else {}
         tokens_in = int(usage.get("prompt_tokens") or 0)
         tokens_out = int(usage.get("completion_tokens") or 0)
         provider_cost = usage.get("cost")
@@ -115,11 +137,13 @@ class LlmMeter:
         elif data is not None and (tokens_in or tokens_out):
             cost, known = pricing.cost_usd(record.model or "", tokens_in, tokens_out)
             record.estimate_usd, record.cost_basis = cost, ("estimate" if known else "unknown")
+        elif answered and outcome == "http_error":
+            record.actual_usd, record.cost_basis = 0.0, "actual"
         else:
             # Nothing came back to count: the pre-call estimate stands (a lost
             # reply may still have been billed).
             record.cost_basis = "unknown"
-        self.persist()
+        self._persist()
 
 
 class LLMClient:
@@ -213,6 +237,10 @@ class LLMClient:
             )
         return content
 
+    def _before_send(self) -> None:
+        """A local refusal before anything is sent or recorded (the service's
+        call limit). Raising here leaves no attempt: nothing was spent."""
+
     async def _post(self, payload: dict[str, Any], request_kwargs: dict[str, Any]) -> httpx.Response:
         """One HTTP attempt. The service observer overrides it to journal the
         attempt and add trace headers — retries, timeouts and error mapping stay
@@ -238,6 +266,10 @@ class LLMClient:
             payload["response_format"] = {"type": "json_object"}
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
+        if "openrouter.ai" in self.base_url:
+            # OpenRouter reports the call's cost only when asked (usage
+            # accounting); without it every attempt is a table estimate.
+            payload["usage"] = {"include": True}
 
         request_kwargs: dict[str, Any] = {"json": payload}
         if max_tokens is not None:
@@ -254,6 +286,7 @@ class LLMClient:
             # not leak its Retry-After into a later transport failure.
             response: httpx.Response | None = None
             record = None
+            self._before_send()
             if self.meter is not None:
                 # Before every attempt, retries included: each one can be billed.
                 self.meter.check(stage, model, estimate)
@@ -262,10 +295,11 @@ class LLMClient:
             outcome = "transport_error"
             try:
                 response = await self._post(payload, request_kwargs)
+                if response.status_code >= 400:
+                    outcome = "http_error"
                 if response.status_code >= 500 or response.status_code in (408, 429):
                     raise LLMError(f"LLM HTTP {response.status_code}: {response.text[:300]}")
                 if response.status_code >= 400:
-                    outcome = "refused"
                     raise LLMError(
                         f"LLM HTTP {response.status_code}: {response.text[:300]}",
                         retryable=False,
@@ -277,6 +311,7 @@ class LLMClient:
                 # Truncated and null-content completions are still billed by
                 # the provider — account for them before _extract can raise.
                 self._record_usage(tier, data)
+                outcome = "truncated"
                 content = self._extract(data)
                 outcome = "ok"
                 return content
@@ -299,5 +334,5 @@ class LLMClient:
                     await asyncio.sleep(delay)
             finally:
                 if record is not None and self.meter is not None:
-                    self.meter.finish(record, outcome=outcome, data=data)
+                    self.meter.finish(record, outcome=outcome, data=data, answered=response is not None)
         raise LLMError(f"LLM call failed after {_MAX_ATTEMPTS} attempts: {last_error}")

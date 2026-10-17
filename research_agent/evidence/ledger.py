@@ -156,6 +156,20 @@ class Claim(BaseModel):
             and _source.value_in_quote(self.value, self.quote or "")
         )
 
+    def compact_row(self) -> dict[str, Any]:
+        """What a reader cites, with empty fields and the default verification
+        left out."""
+        row: dict[str, Any] = {"id": self.id, "claim": self.claim}
+        for key, value in (("value", self.value), ("unit", self.unit), ("subject", self.subject)):
+            if value is not None:
+                row[key] = value
+        row["status"] = self.status.value
+        row["source_tool"] = self.source_tool
+        method = self.verification.get("method", "none")
+        if method != "none":
+            row["verification"] = method
+        return row
+
     @property
     def independence(self) -> str | None:
         """This claim's source key for corroboration — None when it cannot count:
@@ -395,22 +409,10 @@ class Ledger:
             emit(log, "claim.verified", logging.INFO, run_id=self.run_id, claim_id=claim.id, method=method)
 
     def compact_rows(self) -> list[dict[str, Any]]:
-        """One small row per claim: what a reader cites, with empty fields and
-        the default verification left out (B-036 — the writer prompt, every
-        repair pass, the judge and the service's inline ledger all read this)."""
-        rows = []
-        for c in self.claims:
-            row: dict[str, Any] = {"id": c.id, "claim": c.claim}
-            for key, value in (("value", c.value), ("unit", c.unit), ("subject", c.subject)):
-                if value is not None:
-                    row[key] = value
-            row["status"] = c.status.value
-            row["source_tool"] = c.source_tool
-            method = c.verification.get("method", "none")
-            if method != "none":
-                row["verification"] = method
-            rows.append(row)
-        return rows
+        """One small row per claim (Claim.compact_row) — the writer prompt, every
+        repair pass, the judge, the citation check and the service's inline
+        ledger all read this shape (B-036)."""
+        return [c.compact_row() for c in self.claims]
 
     def as_prompt_json(self) -> str:
         # Compact: this lands in the writer's system prompt and in EVERY repair

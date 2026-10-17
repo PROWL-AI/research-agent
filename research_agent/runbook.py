@@ -44,7 +44,7 @@ class Budget(BaseModel):
     #: LLM spend ceiling for the run (planner, extraction, transforms, writer).
     #: Optional: a caller, RESEARCH_MAX_LLM_USD or config.DEFAULT_MAX_LLM_USD
     #: decide when the runbook does not.
-    max_llm_usd: float | None = Field(default=None, gt=0)
+    max_llm_usd: float | None = Field(default=None, gt=0, allow_inf_nan=False)
 
 
 class Outputs(BaseModel):

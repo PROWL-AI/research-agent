@@ -73,16 +73,8 @@ class FidelityResult:
 
 
 def _claim_json(claim: Claim) -> dict[str, Any]:
-    return {
-        "id": claim.id,
-        "claim": claim.claim,
-        "value": claim.value,
-        "unit": claim.unit,
-        "subject": claim.subject,
-        "status": claim.status.value,
-        "verification": claim.verification.get("method", "none"),
-        "source_tool": claim.source_tool,
-    }
+    # The same compact row the writer saw (one serializer, B-036).
+    return claim.compact_row()
 
 
 def _cited_sentences(report_md: str) -> tuple[list[tuple[int, int, str]], list[str]]:

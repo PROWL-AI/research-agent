@@ -17,8 +17,8 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, Field
 
 from research_agent.agent.citations import FidelityResult
-from research_agent.agent.writer import ledger_only_report, produce_report
-from research_agent.config import resolve_llm_cap, writer_reserve
+from research_agent.agent.writer import WriterOutcome, ledger_only_report, produce_report
+from research_agent.agent.metering import attach_run_meter, budget_stats
 from research_agent.events import emit
 from research_agent.evidence import terminal
 from research_agent.evidence.ledger import (
@@ -432,21 +432,7 @@ class Orchestrator:
 
     def _attach_meter(self, checkpoint: Checkpoint, store: ArtifactStore, runbook: Runbook,
                       max_llm_usd: float | None) -> LlmMeter:
-        cap, source = resolve_llm_cap(max_llm_usd, checkpoint.llm_cap_usd, runbook.meta.budget.max_llm_usd)
-        checkpoint.llm_cap_usd = cap
-        counter = {"n": sum(1 for a in checkpoint.attempts if a.kind == "llm")}
-
-        def new_id() -> str:
-            counter["n"] += 1
-            return f"llm#{counter['n']}"
-
-        meter = LlmMeter(max_usd=cap, reserve_usd=writer_reserve(cap), attempts=checkpoint.attempts,
-                         persist=lambda: store.save_checkpoint(checkpoint), record_type=AttemptRecord,
-                         new_id=new_id)
-        self.llm.meter = meter
-        emit(log, "llm.budget", run_id=checkpoint.run_id, max_llm_usd=cap, source=source,
-             reserve_usd=meter.reserve_usd, spent_usd=meter.spend())
-        return meter
+        return attach_run_meter(self.llm, checkpoint, store, runbook.meta.budget.max_llm_usd, max_llm_usd)
 
     async def _run_metered(
         self,
@@ -505,7 +491,14 @@ class Orchestrator:
             checkpoint.partial = False
             store.save_checkpoint(checkpoint)
         else:
+            previous = checkpoint
             checkpoint = Checkpoint(run_id=run_id, runbook=runbook_name, brief=brief)
+            if previous is not None:
+                # A run that never got a plan (planner failed or was refused)
+                # is re-planned — but what it spent and the cap it ran under
+                # stay: they are money, not plan.
+                checkpoint.attempts = list(previous.attempts)
+                checkpoint.llm_cap_usd = previous.llm_cap_usd
             # Persist the run's existence BEFORE planning: a planner or
             # list_tools failure must not leave get_status answering "unknown
             # run_id" for an id a caller was handed — and the owner's terminal
@@ -513,6 +506,8 @@ class Orchestrator:
             store.save_checkpoint(checkpoint)
         meter = self._attach_meter(checkpoint, store, runbook, max_llm_usd)
         store.save_checkpoint(checkpoint)
+        claims_at_start = {c.id for c in ledger.claims}
+        previous_stats = dict(checkpoint.stats)
         emit(log, "run.started", run_id=run_id, runbook=runbook_name, resuming=resuming)
         started_monotonic = time.monotonic()
 
@@ -552,7 +547,13 @@ class Orchestrator:
         checkpoint.partial = checkpoint.partial or unfinished or evidence_incomplete
         disclosures = checkpoint.disclosures(final=True)
 
+        report_path = store.run_dir / "report.md"
+        kept_report = False
         try:
+            if not planned:
+                # Nothing was gathered and the planner was refused: no writer
+                # call can say anything the ledger listing does not.
+                raise LLMBudgetExceeded("planner refused", stage="planner")
             outcome, fidelity = await produce_report(
                 self.llm, runbook, ledger, brief,
                 partial=checkpoint.partial, skipped_steps=disclosures,
@@ -566,11 +567,31 @@ class Orchestrator:
                 terminal.BUDGET_LLM, meter.max_usd)
             emit(log, "budget.stop", logging.WARNING, run_id=run_id, reason=checkpoint.stop_reason,
                  stage=exc.stage, llm_spend_usd=meter.spend())
-            outcome, fidelity = ledger_only_report(runbook, ledger, checkpoint.stop_reason), FidelityResult(
-                report_md="")
+            if report_path.is_file() and {c.id for c in ledger.claims} == claims_at_start:
+                # A resume that gathered nothing new and cannot afford a writer
+                # keeps the report it already paid for.
+                kept_report = True
+                prior = previous_stats.get("citation_fidelity") or {}
+                outcome = WriterOutcome(
+                    report_md=report_path.read_text(encoding="utf-8"),
+                    lint_before=previous_stats.get("lint_issues_before", 0),
+                    lint_after=previous_stats.get("lint_issues_after", 0),
+                    revised=False, repair_passes=previous_stats.get("lint_repair_passes", 0))
+                fidelity = FidelityResult(report_md="", **{k: prior.get(k, 0) for k in
+                                                           ("checked", "supported", "unverified", "unchecked")})
+            else:
+                outcome, fidelity = ledger_only_report(runbook, ledger, checkpoint.stop_reason), FidelityResult(
+                    report_md="")
+        if meter.refusals and checkpoint.stop_reason is None:
+            # A repair pass or a citation batch the cap refused was handled
+            # quietly (draft kept, batch unchecked); the run still says so.
+            checkpoint.partial = True
+            checkpoint.stop_reason = terminal.budget_stop_text(terminal.BUDGET_LLM, meter.max_usd)
+            emit(log, "budget.stop", logging.WARNING, run_id=run_id, reason=checkpoint.stop_reason,
+                 stage=meter.refusals[-1], llm_spend_usd=meter.spend())
 
-        report_path = store.run_dir / "report.md"
-        _atomic_write_text(report_path, outcome.report_md)
+        if not kept_report:
+            _atomic_write_text(report_path, outcome.report_md)
         ledger.save()
         checkpoint.status = "partial" if checkpoint.partial else "complete"
         if checkpoint.stop_reason is not None:
@@ -596,13 +617,7 @@ class Orchestrator:
             # extraction, transform, writer and fidelity LLM tokens are billed
             # by the LLM provider on top — say so wherever cost_usd is read.
             "budget_scope": "max_usd/max_tool_calls cap tool calls; max_llm_usd caps LLM calls (see llm_budget)",
-            "llm_budget": {
-                "max_llm_usd": meter.max_usd,
-                "writer_reserve_usd": meter.reserve_usd,
-                "spend_usd": meter.spend(),
-                "cost_source": checkpoint.cost_source("llm"),
-                "attempts": sum(1 for a in checkpoint.attempts if a.kind == "llm"),
-            },
+            "llm_budget": budget_stats(meter, checkpoint),
             "claims": len(ledger.claims),
             "duration_s": round(time.monotonic() - started_monotonic, 1),
             "lint_issues_before": outcome.lint_before,

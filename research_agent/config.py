@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass
 from typing import Mapping
 
 DEFAULT_PROWL_MCP_URL = "https://prowl.chat/mcp"
 DEFAULT_LLM_BASE_URL = "https://openrouter.ai/api/v1"
-#: Model defaults follow the operator's model guide (2026-10-14): the cheap tier
+#: Model defaults: the cheap tier
 #: (claim extraction, transforms — high volume) runs the lite model, the strong
 #: tier (planner, writer) the strongest listed model, and the judge a model of a
 #: DIFFERENT vendor, so a report is not graded by the family that wrote it.
@@ -35,23 +36,27 @@ def resolve_llm_cap(
     """(cap, source): the caller's value, then RESEARCH_MAX_LLM_USD, then the
     cap a resumed run recorded, then the runbook's, then DEFAULT_MAX_LLM_USD."""
     env = os.environ if environ is None else environ
+
+    def valid(value: object, name: str) -> float:
+        # Finite and positive: an infinite cap is no cap (and does not even
+        # serialize into the checkpoint).
+        try:
+            number = float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError) as exc:
+            raise ConfigError(f"{name} is not a number: {value!r}") from exc
+        if not (math.isfinite(number) and number > 0):
+            raise ConfigError(f"{name} must be a finite number > 0, got {value!r}")
+        return number
+
     if explicit is not None:
-        if not (explicit > 0):
-            raise ConfigError(f"max_llm_usd must be > 0, got {explicit!r}")
-        return float(explicit), "caller"
+        return valid(explicit, "max_llm_usd"), "caller"
     raw = env.get("RESEARCH_MAX_LLM_USD", "").strip()
     if raw:
-        try:
-            value = float(raw)
-        except ValueError as exc:
-            raise ConfigError(f"RESEARCH_MAX_LLM_USD is not a number: {raw!r}") from exc
-        if not (value > 0):
-            raise ConfigError(f"RESEARCH_MAX_LLM_USD must be > 0, got {raw!r}")
-        return value, "env"
+        return valid(raw, "RESEARCH_MAX_LLM_USD"), "env"
     if recorded is not None:
-        return float(recorded), "checkpoint"
+        return valid(recorded, "the run's recorded llm_cap_usd"), "checkpoint"
     if runbook_cap is not None:
-        return float(runbook_cap), "runbook"
+        return valid(runbook_cap, "the runbook's budget.max_llm_usd"), "runbook"
     return DEFAULT_MAX_LLM_USD, "default"
 
 

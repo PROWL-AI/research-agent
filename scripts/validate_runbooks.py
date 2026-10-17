@@ -43,22 +43,27 @@ def check_tools_against_catalog(
     return [name for name in tools if name not in live]
 
 
-_FAILOVER = re.compile(r"fall\s?back|failover|falls back|if [^.]{0,80}fails", re.IGNORECASE)
+_FAILOVER = re.compile(r"fall[\s-]?back|failover|falls back|if [^.]{0,80}fails", re.IGNORECASE)
+_NEGATED = re.compile(r"\b(no|without( a)?|never)\s+(fall[\s-]?back|failover)", re.IGNORECASE)
 _TICKED = re.compile(r"`([a-z][a-z0-9_]{2,})`")
+_ABBREVIATIONS = re.compile(r"\b(e\.g|i\.e|etc|vs|cf)\.", re.IGNORECASE)
+_SENTENCE = re.compile(r"(?<=[.;!?])\s+(?=[A-Z`(])")
 
 
 def failover_gaps(body: str, allowlist: list[str], catalog: list[str]) -> list[str]:
-    """Catalog tools a runbook names as a fallback that its allowlist misses."""
+    """Catalog tools a runbook names in a fallback sentence that its allowlist
+    misses. The whole sentence counts (a fallback can be named before the
+    keyword); a negated one ("no fallback for `x`") does not."""
     live, allowed = set(catalog), set(allowlist)
     gaps: list[str] = []
     for item in re.split(r"\n\s*\n|\n(?=\s*(?:\d+\.|-)\s)", body):
-        text = " ".join(item.split())
-        match = _FAILOVER.search(text)
-        if not match:
-            continue
-        for name in _TICKED.findall(text[match.start():]):
-            if name in live and name not in allowed and name not in gaps:
-                gaps.append(name)
+        text = _ABBREVIATIONS.sub(lambda m: m.group(1), " ".join(item.split()))
+        for sentence in _SENTENCE.split(text):
+            if not _FAILOVER.search(sentence) or _NEGATED.search(sentence):
+                continue
+            for name in _TICKED.findall(sentence):
+                if name in live and name not in allowed and name not in gaps:
+                    gaps.append(name)
     return gaps
 
 

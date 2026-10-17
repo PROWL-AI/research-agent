@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-PRICES_READ_AT = "2026-10-17"
+PRICES_READ_AT = "2026-10-17"  # re-read: scripts/check_prices.py (network)
 
 #: model id → (input USD / 1M tokens, output USD / 1M tokens)
 PRICES: dict[str, tuple[float, float]] = {
@@ -19,18 +19,24 @@ PRICES: dict[str, tuple[float, float]] = {
     "anthropic/claude-haiku-5.5": (0.10, 0.50),
     "google/gemini-3.8-flash": (0.825, 4.125),
     "qwen/qwen3.8-flash": (0.15, 0.47),
-    "deepseek/deepseek-v4.1-flash": (0.032, 0.144),
-    "z-ai/glm-5.3-flash": (0.04, 0.20),
+    "deepseek/deepseek-v4.1-flash": (0.04, 0.70),
+    "z-ai/glm-5.3-flash": (0.049, 0.65),
     # previous defaults, kept so old configurations estimate correctly
     "google/gemini-2.5-flash": (0.30, 2.50),
     "anthropic/claude-sonnet-4.5": (3.0, 15.0),
 }
 
-#: The conservative price for a model the table does not know.
-UNKNOWN_PRICE: tuple[float, float] = max(PRICES.values(), key=lambda p: p[0] + p[1])
+#: The price for a model the table does not know: deliberately at the top of
+#: the frontier-model range (15 / 75 USD per 1M), well above every listed
+#: model, so an unlisted model stops early rather than late. A model priced
+#: above it (rare reasoning-pro tiers) is under-estimated — list it here.
+UNKNOWN_PRICE: tuple[float, float] = (15.0, 75.0)
 
-#: Characters per token for a prompt estimate before the provider counts it.
+#: Characters per token for a prompt estimate before the provider counts it:
+#: ~4 for English, fewer for Cyrillic/CJK — the estimate uses the lower figure
+#: for non-ASCII text so it errs high.
 CHARS_PER_TOKEN = 4
+CHARS_PER_TOKEN_NON_ASCII = 2
 #: Output tokens assumed when a call sets no max_tokens.
 DEFAULT_OUTPUT_TOKENS = 2000
 
@@ -49,7 +55,10 @@ def cost_usd(model: str, tokens_in: int, tokens_out: int) -> tuple[float, bool]:
 def estimate_call_usd(model: str, messages: list[dict[str, Any]], max_tokens: int | None) -> float:
     """Upper-bound estimate of one call before it is sent: the prompt at
     CHARS_PER_TOKEN and the whole output budget."""
-    chars = sum(len(str(m.get("content", ""))) for m in messages)
-    tokens_in = chars // CHARS_PER_TOKEN + 1
+    tokens_in = 1
+    for m in messages:
+        text = str(m.get("content", ""))
+        ascii_chars = sum(1 for ch in text if ord(ch) < 128)
+        tokens_in += ascii_chars // CHARS_PER_TOKEN + (len(text) - ascii_chars) // CHARS_PER_TOKEN_NON_ASCII
     tokens_out = max_tokens if max_tokens is not None else DEFAULT_OUTPUT_TOKENS
     return cost_usd(model, tokens_in, tokens_out)[0]
