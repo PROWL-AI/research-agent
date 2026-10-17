@@ -172,12 +172,12 @@
 | ID | Title | Wave | Status |
 |---|---|---|---|
 | CORE-01 | Запуск до терминального состояния (CLI, stdio MCP) | 1 | PASS@583f1d1 |
-| CORE-02 | Запуск через Fabric `research.run`: исход совпадает с ядром | 4 | PASS@W4 |
+| CORE-02 | Запуск через Fabric `research.run`: исход совпадает с ядром | 4 | PASS@dfe395b |
 | CORE-03 | Второй процесс не меняет живой прогон | 1 | PASS@583f1d1 |
 | CORE-04 | Осиротевший прогон → `interrupted` → продолжение | 1, 2 | PASS@0b0347b |
 | CORE-05 | Продолжение после сбоя не платит дважды | 2 | PASS@2bbf566 |
 | CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | PASS@2bbf566 |
-| CORE-07 | Остановка по бюджету LLM | 4 | PASS@W4 |
+| CORE-07 | Остановка по бюджету LLM | 4 | PASS@dfe395b |
 | CORE-08 | Оплаченный сбой входит в бюджет и после продолжения | 2 | PASS@0b0347b |
 | CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | PASS@5fcf2f4 |
 | CORE-10 | Конфликт остаётся конфликтом | 3 | PASS@5fcf2f4 |
@@ -200,7 +200,7 @@
 - **Coverage:** `tests/test_ka_contracts.py`: `test_clean_finish_is_completed_everywhere`, `test_owner_writes_failed_on_exception`, `test_cancel_mid_run_is_written_by_the_owner_and_non_owners_write_nothing`, `test_budget_stop_maps_to_budget_code`, `test_usd_budget_stop_maps_to_budget_usd_end_to_end`, `test_minutes_budget_stop_maps_to_budget_minutes_end_to_end`, `test_emit_*`
 
 ### CORE-02: Запуск через Fabric `research.run`: исход совпадает с ядром
-- **Status:** PASS@W4
+- **Status:** PASS@dfe395b
 - **Actor:** вызывающий агент; оператор (P-01) одобряет в панели
 - **Trigger:** вызов `research.run` сервиса `prowl-research.default`
 - **Preconditions:** сервис запущен; оператор одобрил задание (SCN-004).
@@ -210,7 +210,7 @@
 - **Expected result:** `outcome` в результате задания выводится из `status`/`terminal_code` ядра по таблице соответствия в `docs/FABRIC.md`; `research.artifact.get` возвращает тот же checkpoint, что видит CLI.
 - **Failure outcome:** отмена, таймаут (ошибка задания `timeout`) или остановка сервиса оставляют checkpoint прогона в терминальном состоянии (`partial` + `cancelled`), а не `running`, и ошибка задания несёт тот же `terminalCode`; уже списанные расходы сохраняются (SCN-005).
 - **Wave:** 4 (N-SVC, B-005); терминальная запись при отмене — 1 (N-OWN)
-- **Coverage:** волна 1 (терминальная запись при отмене, таймауте и остановке сервиса): `test_service_cancel_reaches_the_orchestrator`, `test_service_timeout_has_its_own_code_and_carries_terminal_code`, `test_service_shutdown_marks_job_interrupted_and_checkpoint_cancelled`; волна 4 (соответствие `outcome`, один транспорт LLM, переподключение служебных вызовов, журнал вызовов = журнал попыток прогона): `test_envelope_outcome_follows_the_run`, `test_a_service_research_job_journals_exactly_the_attempts_its_run_ledger_counts`, `test_service_llm_retries_a_429_like_the_core_and_journals_each_attempt`, `test_service_metadata_calls_reconnect_but_a_paid_call_is_sent_once`
+- **Coverage:** волна 1 (терминальная запись при отмене, таймауте и остановке сервиса): `test_service_cancel_reaches_the_orchestrator`, `test_service_timeout_has_its_own_code_and_carries_terminal_code`, `test_service_shutdown_marks_job_interrupted_and_checkpoint_cancelled`; волна 4 (соответствие `outcome`, один транспорт LLM, переподключение служебных вызовов, журнал вызовов = журнал попыток прогона): `test_envelope_outcome_follows_the_run`, `test_a_service_research_job_journals_exactly_the_attempts_its_run_ledger_counts`, `test_service_llm_retries_a_429_like_the_core_and_journals_each_attempt`, `test_service_metadata_calls_reconnect_but_a_paid_call_is_sent_once`, `test_journal_and_ledger_agree_across_a_429`, `test_the_service_call_limit_refuses_before_anything_is_recorded`, `test_a_service_job_stopped_by_the_llm_cap_reports_partial`
 
 ### CORE-03: Второй процесс не меняет живой прогон
 - **Status:** PASS@583f1d1
@@ -262,7 +262,7 @@
 - **Coverage:** `test_budget_stop_maps_to_budget_code`, `test_usd_budget_stop_maps_to_budget_usd_end_to_end`, `test_minutes_budget_stop_maps_to_budget_minutes_end_to_end`, `test_ka11_known_cost_does_not_discard_previous_estimates`, `test_writer_is_told_which_steps_are_missing`, `test_skipped_budget_steps_run_only_once_the_budget_allows`
 
 ### CORE-07: Остановка по бюджету LLM
-- **Status:** PASS@W4
+- **Status:** PASS@dfe395b
 - **Actor:** оператор (P-01); вызывающий агент
 - **Trigger:** расход LLM приближается к `max_llm_usd` (runbook, `RESEARCH_MAX_LLM_USD`, `--max-llm-usd`, вход stdio MCP `max_llm_usd`; поле входа Fabric `research.run` — волна 5, вместе с пересборкой манифеста; до неё сервис берёт лимит из окружения, runbook или значения по умолчанию)
 - **Preconditions:** лимит задан или действует `config.DEFAULT_MAX_LLM_USD`.
@@ -271,7 +271,7 @@
 - **Expected result:** проверка до вызова останавливает исследовательские стадии с `terminal_code=budget_llm`, когда следующий вызов вышел бы за лимит минус резерв писателя, и после такого отказа ни один платный инструмент больше не отправляется; писатель тратит резерв и выпускает отчёт из собранного, а если и резерва нет — отчёт состоит из ledger как собран (продолжение без новых доказательств и без денег сохраняет уже написанный отчёт); отказ на этапе отчёта (repair, проверка цитат) делает прогон `partial` + `budget_llm`, а не `completed`; ограничение действует на каждую попытку, повторы тоже, и после продолжения или повторного планирования (расход и лимит читаются из журнала попыток); `rewrite` тратит из того же лимита. Лимит — проверка перед вызовом по оценке: последний разрешённый вызов может превысить его на разницу между фактом и оценкой. Ответ с ошибкой HTTP (429, 5xx) учитывается как бесплатный.
 - **Failure outcome:** модель без цены учитывается по консервативной оценке как `unknown`, никогда как 0.
 - **Wave:** 4 (N-LLMB, KA-G01)
-- **Coverage:** `tests/test_llm_budget.py`: `test_research_calls_stop_before_the_cap_and_the_writer_spends_the_reserve`, `test_every_retry_is_an_attempt_and_counts`, `test_a_missing_price_is_never_zero`, `test_the_run_stops_research_at_the_llm_cap_and_resumes_without_paying_twice`, `test_when_even_the_reserve_is_gone_the_evidence_still_ships`, `test_the_cap_resolves_caller_then_env_then_recorded_then_runbook_then_default`
+- **Coverage:** `tests/test_llm_budget.py`: `test_research_calls_stop_before_the_cap_and_the_writer_spends_the_reserve`, `test_every_retry_is_an_attempt_and_counts`, `test_a_missing_price_is_never_zero`, `test_the_run_stops_research_at_the_llm_cap_and_resumes_without_paying_twice`, `test_when_even_the_reserve_is_gone_the_evidence_still_ships`, `test_the_cap_resolves_caller_then_env_then_recorded_then_runbook_then_default`, `test_a_retry_is_refused_before_it_is_sent`, `test_once_research_is_refused_no_further_tool_is_paid_for`, `test_a_refused_repair_or_citation_pass_ends_the_run_partial`, `test_a_replanned_run_keeps_its_cap_and_spend`, `test_a_billed_planner_failure_is_still_counted_after_a_replan`, `test_a_resume_that_gathers_nothing_keeps_the_paid_report`, `test_rewrite_spends_from_the_run_ledger_and_refuses_without_budget`, `test_a_refused_longer_draft_ships_the_paid_truncated_one`, `test_the_cap_reaches_the_run_from_the_cli`, `test_the_cap_reaches_the_run_from_mcp`, `test_infinite_caps_are_refused_everywhere`
 
 ### CORE-08: Оплаченный сбой входит в бюджет и после продолжения
 - **Status:** PASS@0b0347b

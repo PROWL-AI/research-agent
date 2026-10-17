@@ -8,7 +8,7 @@ Objective: close every open item of this agent in its final form, in waves
 - Plan: [`specs/2026-10-11-waves-canvas.md`](specs/2026-10-11-waves-canvas.md) — target state, seams,
   waves with exit criteria, §7a wave status, operator questions (§8).
 - Inventory: [`specs/2026-10-11-waves-inventory.json`](specs/2026-10-11-waves-inventory.json)
-  (`python3 scripts/plan/assign_waves.py --check`; 28 of 55 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
+  (`python3 scripts/plan/assign_waves.py --check`; 23 of 58 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
 - **Wave 1 closed** (merged to `main` by PR #1): run-lock ownership (KA-06, B-009, B-010),
   terminal_code, structured events, honest docs, CORE scenarios, nightly CI.
 - **Wave 2 closed** on branch `wip/wave2-checkpoint-v2` (PR #2): checkpoint schema 2 — immutable
@@ -25,9 +25,17 @@ Objective: close every open item of this agent in its final form, in waves
   upstream dataset; one step is one delivery; transforms and LLM-answer tools are no source);
   KA-07/08/09, B-007, B-024 closed. Suite 450 passed; deep probes 11/12 (superseded cwd control).
   The fix round also repaired a wave-2 seam break (MCP status/report serialization).
-- **Exact next task:** [`specs/waves/W4-T1-llm-budget-service-parity.md`](specs/waves/W4-T1-llm-budget-service-parity.md)
-  (KA-G01, B-003, B-004, B-005, B-029, B-035, B-036, B-038), then the wave-4 close pass (its seam
-  tier also re-reads wave 3's fix round).
+- **Wave 4 closed** (PR from `feat/wave4-llm-budget`, build `b045dca`, fix round `dfe395b`): every LLM
+  attempt is checked against `max_llm_usd` before it is sent and recorded in the attempt ledger
+  (provider cost, else the price table, never 0); research stops with `budget_llm`, the writer
+  keeps a reserve, `rewrite` spends from the same ledger. The service runs the core's transports;
+  envelope outcome follows the run; events go to a rotating `events.log`. KA-G01, B-003/004/005/
+  029/035/036/038 closed; B-040/B-041 filed for wave 6. Suite 490 passed.
+- **Exact next task:** wave 5 — write `specs/waves/W5-T1-fabric-contract.md` from canvas §2 N-FAB
+  (contract pin to the latest `fabric-agent-contract` main, callee-side delegation verification by
+  trust tier, `max_llm_usd` in the service's `research.run` input with the manifest rebuild,
+  vault-only installer consumer, provider keys through Observatory doors, dashboard kit 1.0.0,
+  service resume B-039, reinstall B-037), then build it; its seam tier re-reads wave 4's fix round.
 - Operator decisions (canvas §8) answered 2026-10-12: Q1 PR-per-wave merges, Q2 kit in wave 5,
   Q4 USD 15, Q5 host update at wave 6, Q6 no history rewrite. Q3 closed from sources.
 - Cross-agent: B-001 (model profiles, waits on Fabric T1–T3), B-020 (the contract owner adds
@@ -94,8 +102,7 @@ Prerequisites: Python >=3.11, test dependencies, clone/access to the central aud
 probes. No provider key is needed for offline reproduction. Do not clone the
 unrelated `~/DATA/research-agent` project as this dependency.
 
-Open product acceptance: LLM budget enforcement is not implemented (`Budget`
-contains tool calls, USD and minutes only); README correctly separates LLM usage.
+Open product acceptance: LLM budget enforcement landed in wave 4 (`max_llm_usd`, README "How it works").
 After money/resume fixes, run finance and subscription acceptance with explicit
 run and judge exit codes, cost receipts and then Fabric host evidence. A public
 manifest alone is not evidence of admission.
