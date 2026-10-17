@@ -405,3 +405,26 @@ def test_a_verified_tag_on_a_verified_claim_is_fine(tmp_path):
     ledger = _ledger(tmp_path, TRAFFIC)
     ledger.claims[0].status = type(ledger.claims[0].status)("verified")
     assert _kinds("# R\n\nTraffic is 150,000 visits [C1] (VERIFIED).\n", ledger) == []
+
+
+def _corroborated(tmp_path):
+    a = dict(claim="example.com has 1,200 referring domains", subject="example.com referring domains", value=1200,
+             unit="domains", source_tool="dataforseo_bl_summary")
+    b = dict(a, source_tool="spyfu_get_domain_stats")
+    ledger = _ledger(tmp_path, a, b, TRAFFIC)
+    assert [c.status.value for c in ledger.claims] == ["verified", "verified", "assumed"]  # real corroboration
+    return ledger
+
+
+def test_a_mixed_citation_block_flags_only_the_unverified_claim(tmp_path):
+    ledger = _corroborated(tmp_path)
+    assert _kinds("# R\n\nLinks 1,200 [C1, C2] (VERIFIED).\n", ledger) == []
+    defects = judge.code_defects("# R\n\nLinks 1,200 and 150,000 visits [C1, C3] (VERIFIED).\n", ledger,
+                                 Checkpoint(run_id="r", runbook="calibration-teardown"))
+    assert [(d["kind"], d["claim"]) for d in defects] == [("status_mislabel", "C3")]
+
+
+def test_the_word_verified_away_from_a_citation_is_not_a_tag(tmp_path):
+    ledger = _ledger(tmp_path, TRAFFIC)
+    assert _kinds("# R\n\nTraffic is 150,000 visits [C1]. VERIFIED claims are listed below.\n", ledger) == []
+    assert _kinds("# R\n\nStatuses: VERIFIED, ASSUMED, CONFLICT.\n\nTraffic is 150,000 visits [C1].\n", ledger) == []
