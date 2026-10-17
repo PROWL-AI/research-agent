@@ -124,11 +124,15 @@ def ledger_stats(ledger: Ledger) -> dict[str, Any]:
         c.id for c in claims if c.source_tool.startswith(LLM_DERIVED_PREFIXES)
     ]
     by_status: dict[str, int] = {}
+    by_method: dict[str, int] = {}
     for claim in claims:
         by_status[claim.status.value] = by_status.get(claim.status.value, 0) + 1
+        method = claim.verification.get("method", "none")
+        by_method[method] = by_method.get(method, 0) + 1
     return {
         "claims": len(claims),
         "by_status": by_status,
+        "by_verification": by_method,
         "llm_derived_claims": llm_derived,
         "primary_source_ratio": (
             round((len(claims) - len(llm_derived)) / len(claims), 3) if claims else None

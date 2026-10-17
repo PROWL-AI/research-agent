@@ -299,7 +299,7 @@ class TestLedgerSchemaVersion:
         ledger = Ledger(tmp_path / "l.json")
         ledger.save()
         data = json.loads(ledger.path.read_text())
-        assert data["schema_version"] == 1
+        assert data["schema_version"] == 2
         assert data["claims"] == []
 
     def test_dict_without_claims_key_is_not_an_empty_ledger(self, tmp_path: Path, caplog):

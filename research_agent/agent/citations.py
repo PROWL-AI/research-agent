@@ -80,6 +80,7 @@ def _claim_json(claim: Claim) -> dict[str, Any]:
         "unit": claim.unit,
         "subject": claim.subject,
         "status": claim.status.value,
+        "verification": claim.verification.get("method", "none"),
         "source_tool": claim.source_tool,
     }
 

@@ -867,7 +867,7 @@ async def test_ka05_completed_step_is_persisted_before_worker_returns(tmp_path):
     store = ArtifactStore(tmp_path)
     orch = type("O", (), {"prowl": prowl, "_budget_stop_reason": staticmethod(lambda *_: None)})()
 
-    async def extract(*_):
+    async def extract(*_, **__):
         return 0
 
     ctx = WorkerContext(orch, checkpoint, store, Ledger(tmp_path / "ledger.json"), None, extract)
@@ -1421,3 +1421,81 @@ def test_url_normalization_and_publisher():
     assert independence_key("web_search", "https://www.example.com/a") == independence_key("page_scraper", "https://example.com/b")
     assert independence_key("transform", None) is None
     assert independence_key("spyfu_get_domain_stats", None) == "provider:spyfu"
+
+
+async def test_transform_quote_never_span_verifies(tmp_path):
+    # A transform's raw is its own LLM note: the quote IS there, and that
+    # proves nothing (B-007).
+    llm = FakeLLM()
+    llm.claims_payload = {"claims": [{"claim": "visits", "subject": "a.com visits", "value": 1200,
+                                      "unit": "visits", "quote": "visits reached 1,200"}]}
+    ledger = Ledger(tmp_path / "ledger.json")
+    await Orchestrator(FakeProwl(), llm, runs_root=tmp_path)._extract_claims(
+        PlanItem(step="sum", tool="transform"), "Monthly visits reached 1,200 in May", tmp_path / "t.md", ledger)
+    claim = ledger.claims[0]
+    assert claim.status == ClaimStatus.assumed and claim.quote_span is None
+    assert claim.verification["detail"].startswith("transform output")
+
+
+async def test_tampered_raw_fails_extraction_and_verifies_nothing(tmp_path):
+    # The raw is re-read with its recorded sha256 on resume: a changed file is
+    # a typed extraction failure, never evidence (packet: "raw hash mismatch").
+    from research_agent.agent.subagent import extract_step
+
+    store = ArtifactStore(tmp_path)
+    record = _records(TOOL)[0]
+    record.raw_ref, record.raw_sha256 = store.save_raw(record.step_id, TOOL, {"note": "visits 1,200"})
+    record.state = "raw_saved"
+    store.resolve(record.raw_ref).write_text(json.dumps({"note": "visits 9,999"}))
+    checkpoint = Checkpoint(run_id="t", runbook="mini-teardown", steps=[record])
+    llm = FakeLLM()
+    llm.claims_payload = {"claims": [{"claim": "v", "subject": "s", "value": 9999, "quote": "visits 9,999"}]}
+    orch = Orchestrator(FakeProwl(), llm, runs_root=tmp_path)
+    ledger = Ledger(tmp_path / "ledger.json")
+    ctx = WorkerContext(orch, checkpoint, store, ledger, None, orch._extract_claims)
+    with pytest.raises(ValueError, match="sha256"):
+        await extract_step(ctx, record, None)
+    assert ledger.claims == []
+
+
+def test_removing_a_claim_recomputes_its_group(tmp_path):
+    ledger = Ledger(tmp_path / "ledger.json")
+    a = ledger.add(claim="100", value=100, unit="u", subject="s", source_tool="spyfu_a")
+    b = ledger.add(claim="200", value=200, unit="u", subject="s", source_tool="dataforseo_b")
+    assert a.status == ClaimStatus.conflict
+    ledger.remove_ids([b.id])
+    assert a.status == ClaimStatus.assumed  # its conflict was the removed claim's
+
+
+def test_status_events_are_emitted_once_per_transition(tmp_path, caplog):
+    ledger = Ledger(tmp_path / "ledger.json")
+    with caplog.at_level(logging.INFO, logger="research_agent.evidence.ledger"):
+        ledger.add(claim="100", value=100, unit="u", subject="s", source_tool="spyfu_a")
+        ledger.add(claim="100", value=100, unit="u", subject="s", source_tool="dataforseo_b")
+        ledger.add(claim="100", value=100, unit="u", subject="s", source_tool="moz_c")
+        ledger.add(claim="200", value=200, unit="u", subject="s", source_tool="moz_d")
+        ledger.add(claim="200", value=200, unit="u", subject="s", source_tool="moz_e")  # same sides
+        ledger.add(claim="300", value=300, unit="u", subject="s", source_tool="moz_f")  # a new side
+    lines = [r.getMessage() for r in caplog.records]
+    assert sum("event=claim.verified" in m and "method=corroboration" in m for m in lines) == 3
+    conflicts = [m for m in lines if "event=claim.conflict" in m]
+    assert len(conflicts) == 2 and "300 u" in conflicts[-1]  # per change of the disagreement
+
+
+async def test_quote_not_found_is_an_event(tmp_path, caplog):
+    llm = FakeLLM()
+    llm.claims_payload = {"claims": [{"claim": "x", "subject": "s", "quote": "not in the raw at all"}]}
+    with caplog.at_level(logging.INFO):
+        await Orchestrator(FakeProwl(), llm, runs_root=tmp_path)._extract_claims(
+            PlanItem(step="s", tool=TOOL), {"rows": []}, tmp_path / "r.json", Ledger(tmp_path / "l.json"), "s-1")
+    assert any("event=claim.quote_not_found" in r.getMessage() and "step_id=s-1" in r.getMessage()
+               for r in caplog.records)
+
+
+def test_prompt_json_carries_verification_not_verbatim(tmp_path):
+    ledger = Ledger(tmp_path / "ledger.json")
+    ledger.add(claim="x", value=1, unit="u", subject="s", source_tool="spyfu_a")
+    row = json.loads(ledger.as_prompt_json())[0]
+    assert row["verification"] == "none" and row["subject"] == "s" and "verbatim" not in row
+    saved = (ledger.save(), json.loads((tmp_path / "ledger.json").read_text()))[1]
+    assert "verbatim" not in saved["claims"][0] and saved["schema_version"] == 2

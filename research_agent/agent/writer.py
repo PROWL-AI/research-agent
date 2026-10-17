@@ -86,8 +86,12 @@ RIGHT: "Their channel has 430K subscribers [C17] (VERIFIED)."
 {ledger_json}
 
 ## More citation rules (all subordinate to RULE 0)
-- Estimates must carry their error band and a VERIFIED or ASSUMED tag matching the
-  ledger claim status.
+- Estimates must carry their error band and a VERIFIED, ASSUMED or CONFLICT tag
+  matching the ledger claim status. VERIFIED means the claim's quote was found in
+  the stored source (verification "span") or two independent sources agree
+  ("corroboration") — never call a claim VERIFIED that the ledger marks otherwise.
+  A claim with status "conflict" is cited with its disagreeing peers and
+  [CONFLICT]; never present one side as settled.
 - If the ledger has no evidence for a section, say so explicitly; do not fill gaps
   from general knowledge.
 {partial_note}

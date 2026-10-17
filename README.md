@@ -189,6 +189,18 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   claim extraction, transforms, writing, citation repair) is billed by your
   LLM provider on top of `max_usd` — it is metered, not capped, and reported
   under `stats.llm_usage` in every run's output.
+- **Evidence statuses (ledger schema 2).** A claim's status is recomputed over
+  its whole subject group on every change and on load, so it never depends on
+  arrival order. `verified` needs either a quote found in the step's stored raw
+  (the whole raw, sha256-checked on resume) with the value inside it, or two
+  agreeing claims from distinct known sources — different publishers (the
+  registrable domain of the source URL) or different data providers. Two tools
+  over one URL, two endpoints of one provider and a transform note are one
+  source each. Two distinct values in a group make every valued claim
+  `conflict`; a claim without a value never confirms or resolves one. The
+  extractor's own word never verifies; a v1 ledger's `verbatim` claim without a
+  quote loads as `assumed` with the reason in `verification.detail`. Events:
+  `claim.verified`, `claim.conflict`, `claim.quote_not_found`.
 - Charts are rendered deterministically from ledger data, never described by
   the LLM.
 
@@ -197,10 +209,10 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
 The [deep agent audit](docs/reports/2026-10-10-agent-deep-audit/README.md) adds
 seven defects: lifecycle ownership (KA-06 — wave 1), hidden artifact/extraction
 failures and budget accounting across mixed receipts/resume (KA-10…KA-12 — wave 2),
-and false evidence verification (KA-07…KA-09 — open, wave 3). The ported contracts
-live in `tests/test_ka_contracts.py`. The historical probe file stays as the
-audit's cut: its KA-07/08/09 cases fail until wave 3, and its success control
-asserts a cwd-relative `raw_ref`, which wave 2 replaced with a run-dir-relative one.
+and false evidence verification (KA-07…KA-09 — wave 3, ledger schema 2). The ported
+contracts live in `tests/test_ka_contracts.py`. The historical probe file stays as the
+audit's cut: 11 of its 12 cases pass; its success control asserts a cwd-relative
+`raw_ref`, which wave 2 replaced with a run-dir-relative one.
 The [2026-10-10 handoff](docs/HANDOFF.md) links the remediation plan and records the audited source revision,
 checks and next repair tasks. The offline suite is `.venv/bin/python -m pytest
 tests/ -q` (network-free); its pass count is a fact about one revision, so it is

@@ -15,15 +15,26 @@ def test_single_source_non_verbatim_is_assumed(tmp_path):
     assert claim.status == ClaimStatus.assumed
 
 
-def test_verbatim_quote_is_verified(tmp_path):
+def test_quote_found_in_stored_raw_is_verified(tmp_path):
+    # Was test_verbatim_quote_is_verified: `verbatim=True` from the extractor
+    # verified by itself (KA-08). Now only a quote located in the stored raw does.
     ledger = Ledger(tmp_path / "ledger.json")
     claim = ledger.add(
         claim='"Best tool we ever bought" — G2 review',
         subject="example.com review sentiment",
         source_tool="scrape_review_platforms",
-        verbatim=True,
+        quote="Best tool we ever bought",
+        quote_span=(10, 34),
     )
     assert claim.status == ClaimStatus.verified
+    assert claim.verification["method"] == "span"
+
+
+def test_quote_without_a_located_span_is_assumed(tmp_path):
+    ledger = Ledger(tmp_path / "ledger.json")
+    claim = ledger.add(claim="x", subject="s", source_tool="scrape_review_platforms",
+                       quote="Best tool we ever bought")
+    assert claim.status == ClaimStatus.assumed
 
 
 def test_two_independent_tools_verify(tmp_path):

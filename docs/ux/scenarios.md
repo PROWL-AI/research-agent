@@ -179,8 +179,8 @@
 | CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | PASS@2bbf566 |
 | CORE-07 | Остановка по бюджету LLM | 4 | UNVERIFIED |
 | CORE-08 | Оплаченный сбой входит в бюджет и после продолжения | 2 | PASS@0b0347b |
-| CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | UNVERIFIED |
-| CORE-10 | Конфликт остаётся конфликтом | 3 | UNVERIFIED |
+| CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | PASS@W3 |
+| CORE-10 | Конфликт остаётся конфликтом | 3 | PASS@W3 |
 | CORE-11 | Потеря доказательств → `partial`, не `complete` | 2 | PASS@2bbf566 |
 | CORE-12 | Переписать отчёт активного прогона нельзя | 1 | PASS@583f1d1 |
 | CORE-13 | Судья отвергает заведомо плохой отчёт | 6 | UNVERIFIED |
@@ -286,7 +286,7 @@
 - **Coverage:** `test_ka12_billed_failure_cost_survives_resume`
 
 ### CORE-09: `verified` только с цитатой в сохранённом raw или двумя независимыми источниками
-- **Status:** UNVERIFIED
+- **Status:** PASS@W3
 - **Actor:** оператор (P-01), читающий отчёт; вызывающий агент, потребляющий ledger
 - **Trigger:** извлечение утверждений из шага
 - **Preconditions:** raw шага сохранён с `raw_sha256`.
@@ -295,10 +295,10 @@
 - **Expected result:** утверждение `verified` только если (а) его цитата найдена в сохранённом raw (после нормализации пробелов, sha256 совпадает) и значение стоит внутри цитаты, или (б) ≥2 согласных утверждения с разными известными `independence_key`; два инструмента над одним URL — один источник; transform не независим от своих входов.
 - **Failure outcome:** цитата не найдена или источник `unknown` — утверждение не `verified`; v1 `verbatim` без цитаты понижается до `assumed` с раскрытием.
 - **Wave:** 3 (N-EVID; KA-07, KA-08, KA-09)
-- **Coverage:** —
+- **Coverage:** `test_ka08_fabricated_verbatim_is_not_verified`, `test_ka09_same_document_is_not_two_independent_sources`, `test_span_verification_reads_the_whole_stored_raw`, `test_two_independent_publishers_corroborate`, `test_two_data_providers_without_urls_corroborate_but_one_provider_does_not`, `test_transform_claim_never_corroborates_its_source`, `test_transform_quote_never_span_verifies`, `test_v1_verbatim_claim_without_a_quote_is_downgraded_on_load`, `test_tampered_raw_fails_extraction_and_verifies_nothing`
 
 ### CORE-10: Конфликт остаётся конфликтом
-- **Status:** UNVERIFIED
+- **Status:** PASS@W3
 - **Actor:** оператор (P-01), читающий отчёт
 - **Trigger:** в одной группе утверждений появляются ≥2 разных значения
 - **Preconditions:** —
@@ -307,7 +307,7 @@
 - **Expected result:** все утверждения группы `conflict`, независимо от порядка поступления и от того, что пришло позже; утверждение без значения не подтверждает и не разрешает конфликт; отчёт показывает конфликт.
 - **Failure outcome:** если итоговый статус группы зависит от порядка — тест независимости от порядка падает; сценарий `FAIL`.
 - **Wave:** 3 (N-EVID)
-- **Coverage:** —
+- **Coverage:** `test_ka07_valueless_claim_cannot_erase_numeric_conflict`, `test_statuses_do_not_depend_on_insertion_order`, `test_recompute_survives_save_and_load`, `test_removing_a_claim_recomputes_its_group`, `test_status_events_are_emitted_once_per_transition`
 
 ### CORE-11: Потеря доказательств → `partial`, не `complete`
 - **Status:** PASS@2bbf566

@@ -271,7 +271,8 @@ async def extract_step(ctx: WorkerContext, record: StepRecord, result: Any | Non
     before_ids = {c.id for c in ctx.ledger.claims}
     try:
         added = await ctx.extract_claims(
-            plan_item(record), result, Path(record.raw_ref), ctx.ledger, record.step_id
+            plan_item(record), result, Path(record.raw_ref), ctx.ledger, record.step_id,
+            raw_sha256=record.raw_sha256,
         ) or 0
     except Exception as exc:  # noqa: BLE001 — typed into the step, not swallowed
         record.extraction = {"status": "failed", "error": str(exc)[:300], "claim_ids": []}
