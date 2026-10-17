@@ -9,6 +9,8 @@ environment only, and never touch the plist, argv, a file or a log. Without it
 the service starts degraded (no provider keys) and says so. Delegation settings
 (RESEARCH_DELEGATION_ISSUER/_JWKS/_AUDIENCE) present in the installer's
 environment are passed to the service; they are public configuration, not keys.
+A folder holding only some slots launches with those (the service is degraded
+for the missing provider and says so); a folder holding none is refused.
 --dry-run prints the launch argv and the slots it needs, installs nothing.
 """
 import argparse
@@ -60,20 +62,40 @@ def missing_slots(project):
     return [s for s in SLOTS if f'{project}/prod/{s}' not in held]
 
 
-def vault_consumer(project):
-    """The Observatory vault-only service consumer's argv prefix."""
+def vault_consumer(project,slots=SLOTS):
+    """The Observatory vault-only service consumer's argv prefix, for the slots the folder holds."""
     engine=Path(command('project-observatory','full-path'))
     return [observatory_python(engine),str(engine/'tools/use_secret.py'),'serve','--env','prod','--consumer',LABEL,
-            project,','.join(SLOTS),'--']
+            project,','.join(slots),'--']
 
 
 #: Public delegation configuration passed through to the service (never a key).
 DELEGATION_ENV=('RESEARCH_DELEGATION_ISSUER','RESEARCH_DELEGATION_JWKS','RESEARCH_DELEGATION_AUDIENCE')
 
 
-def launch_argv(python,data,port,build,logs,vault_project):
+def launch_argv(python,data,port,build,logs,vault_project,slots=SLOTS):
     serve=[python,'-m','research_agent.service.cli','serve','--root',str(data),'--port',str(port),'--build',str(build),'--log-dir',str(logs)]
-    return (vault_consumer(vault_project)+serve) if vault_project else serve
+    return (vault_consumer(vault_project,slots)+serve) if vault_project else serve
+
+
+def slot_check(project):
+    """(held, missing, problem): the slots to launch with — those the folder holds.
+    A missing one leaves the service degraded (it says which provider is absent);
+    `problem` names why an install must not proceed (none held, check failed)."""
+    try:missing=missing_slots(project)
+    except subprocess.CalledProcessError as exc:
+        return [],list(SLOTS),f'vault {project}: the slot check failed (exit {exc.returncode}); resolve the folder in Observatory first'
+    except FileNotFoundError:
+        return [],list(SLOTS),'project-observatory is not on PATH; install Project Observatory first'
+    held=[s for s in SLOTS if s not in missing]
+    problem=None if held else f"vault {project}/prod holds none of {', '.join(SLOTS)}: issue them through Observatory's doors first"
+    return held,missing,problem
+
+
+def held_slots(project,p):
+    held,missing,problem=slot_check(project)
+    if problem:p.error(problem)
+    return held,missing
 
 
 def main():
@@ -84,18 +106,17 @@ def main():
     if sys.platform!='darwin': p.error('This installer supports macOS launchd; manual foreground serve is portable.')
     if a.dry_run:
         base=Path.home()/'.local/share'/ID
-        argv=launch_argv(str(base/'releases/<commit>/venv/bin/python'),Path.home()/'Library/Application Support'/ID,a.port,
-                         base/'releases/<commit>/build.json',Path.home()/'Library/Logs'/ID,a.vault_project)
-        try:missing=missing_slots(a.vault_project) if a.vault_project else []
-        except subprocess.CalledProcessError as exc:missing=f'vault check failed (exit {exc.returncode}); resolve it before installing'
-        print(json.dumps({'argv':argv,'slots':list(SLOTS) if a.vault_project else [],
-                          'missing':missing,
+        held,missing,problem=slot_check(a.vault_project) if a.vault_project else ([],[],None)
+        try:argv=launch_argv(str(base/'releases/<commit>/venv/bin/python'),Path.home()/'Library/Application Support'/ID,a.port,
+                         base/'releases/<commit>/build.json',Path.home()/'Library/Logs'/ID,a.vault_project,held)
+        except FileNotFoundError:argv=None  # no Observatory engine to name; `problem` says so
+        print(json.dumps({'argv':argv,'slots':held,
+                          'missing':missing,'problem':problem,
                           'keys':'vault-only consumer' if a.vault_project else 'none: the service starts degraded'},indent=2))
+        if problem:raise SystemExit(2)  # the real install would refuse: say so in the exit code too
         return
-    if a.vault_project:
-        try:missing=missing_slots(a.vault_project)
-        except subprocess.CalledProcessError as exc:p.error(f'vault {a.vault_project}: the slot check failed (exit {exc.returncode}); resolve the folder in Observatory first')
-        if missing:p.error(f"vault {a.vault_project}/prod lacks {', '.join(missing)}: issue them through Observatory's doors first")
+    held,missing=held_slots(a.vault_project,p) if a.vault_project else ([],[])
+    if missing:print(f"warning: vault {a.vault_project}/prod lacks {', '.join(missing)}; the service starts degraded without it",file=sys.stderr)
     if command('git','status','--porcelain',cwd=ROOT): p.error('Commit task changes before immutable installation.')
     sha=command('git','rev-parse','HEAD',cwd=ROOT)
     base=Path.home()/'.local/share'/ID
@@ -131,7 +152,7 @@ def main():
         logs.mkdir(parents=True,exist_ok=True,mode=0o700)
         plist=Path.home()/'Library/LaunchAgents'/f'{LABEL}.plist'
         python=str(release/'venv/bin/python')
-        argv=launch_argv(python,data,a.port,release/'build.json',logs,a.vault_project)
+        argv=launch_argv(python,data,a.port,release/'build.json',logs,a.vault_project,held)
         payload={'Label':LABEL,'ProgramArguments':argv,'RunAtLoad':True,'KeepAlive':True,'ThrottleInterval':10,'ExitTimeOut':15,'ProcessType':'Standard',
                  'EnvironmentVariables':{'PATH':'/usr/bin:/bin:/usr/local/bin','FABRIC_SERVICE_SUPERVISOR':'launchd',
                                          **{k:os.environ[k] for k in DELEGATION_ENV if os.environ.get(k)}},

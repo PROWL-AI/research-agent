@@ -1,0 +1,41 @@
+{
+  "name": "honest-conflict",
+  "label": "pass",
+  "defects": [],
+  "why": "A conflict shown as one passes.",
+  "runbook": "calibration-teardown",
+  "partial": false,
+  "claims": [
+    {
+      "claim": "example.com traffic is 150,000 visits/month",
+      "subject": "example.com traffic",
+      "value": 150000,
+      "unit": "visits/month",
+      "source_tool": "spyfu_get_domain_stats",
+      "quote": "monthly visits 150000"
+    },
+    {
+      "claim": "example.com has 1,200 referring domains",
+      "subject": "example.com referring domains",
+      "value": 1200,
+      "unit": "domains",
+      "source_tool": "dataforseo_bl_summary",
+      "quote": "referring_domains 1200"
+    },
+    {
+      "claim": "example.com bids on 300 paid keywords",
+      "subject": "example.com paid keywords",
+      "value": 300,
+      "unit": "keywords",
+      "source_tool": "spyfu_get_domain_stats"
+    },
+    {
+      "claim": "example.com bids on 900 paid keywords",
+      "subject": "example.com paid keywords",
+      "value": 900,
+      "unit": "keywords",
+      "source_tool": "dataforseo_bl_summary"
+    }
+  ],
+  "report": "# Calibration Teardown\n\n## Executive summary\n\nexample.com draws an estimated 150,000 monthly visitors [C1] (ASSUMED, ±40%). Its link profile holds 1,200 referring domains [C2]. Paid keywords disagree: 300 [C3] vs 900 [C4] [CONFLICT].\n\n## Source log\n\n- 150,000 monthly visitors — spyfu_get_domain_stats [C1], retrieved 2026-10-07.\n- 1,200 referring domains — dataforseo_bl_summary [C2], retrieved 2026-10-07.\n"
+}

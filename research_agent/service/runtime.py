@@ -200,13 +200,26 @@ class Runtime:
         if not isinstance(key, str) or not 1 <= len(key) <= 128:
             raise ValueError("idempotencyKey must contain 1–128 characters")
         request = validate_request(request)
-        run_dir = self._check_resumable(request, delegation) if request.get("resumeJobId") else None
+        # A replay answers the job it created before any rule is checked again:
+        # a resume's own job would otherwise count as "already continuing" it.
+        existing = self.store.replay(request, key, delegation)
+        if existing is not None:
+            return existing
+        run_dir = chain_owner = None
+        if request.get("resumeJobId"):
+            run_dir = self._check_resumable(request, delegation)
+            previous = self.store.job(request["resumeJobId"])
+            # Who owns the chain: the principal of its first delegated job. An
+            # operator's resume stays the operator's act (delegation None) and
+            # stays visible to that agent through chainOwner.
+            chain_owner = previous.get("chainOwner") or previous.get("delegation")
         if request["kind"] != "tutorial":
             try:
                 Config.from_env(require_llm=request["kind"] == "research")
             except ConfigError as exc:
                 raise ValueError("Provider credentials are not connected. Use the tutorial or configure the supervised service through Observatory.") from exc
-        return self.store.create(request, key, child_trace(trace), delegation=delegation, run_dir=run_dir, via=via)[0]
+        return self.store.create(request, key, child_trace(trace), delegation=delegation, run_dir=run_dir, via=via,
+                                 chain_owner=chain_owner)[0]
 
     def _check_resumable(self, request, delegation=None):
         """B-039: a resume continues an ENDED, unfinished research job's run and
@@ -383,8 +396,9 @@ def attribution_gap(job):
 
 def run_dir_name(job):
     """The run directory a job writes: its own id, or — for a resume (B-039) —
-    the root run of the chain it continues, fixed when the resume was created."""
-    return job.get("runDir") or job["id"]
+    the root run of the chain it continues, fixed when the resume was created.
+    A resume stored before `runDir` existed falls back to the job it names."""
+    return job.get("runDir") or (job.get("request") or {}).get("resumeJobId") or job["id"]
 
 
 def outcome_for(output):

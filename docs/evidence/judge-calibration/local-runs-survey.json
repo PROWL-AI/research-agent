@@ -1,0 +1,50 @@
+[
+ {
+  "run": "local-1",
+  "claims": 0,
+  "partial": true,
+  "defects": {}
+ },
+ {
+  "run": "local-2",
+  "claims": 455,
+  "partial": true,
+  "defects": {
+   "quote_not_in_ledger": 1,
+   "value_mismatch": 1
+  }
+ },
+ {
+  "run": "local-3",
+  "claims": 222,
+  "partial": false,
+  "defects": {
+   "quote_not_in_ledger": 7,
+   "value_mismatch": 1
+  }
+ },
+ {
+  "run": "local-4",
+  "claims": 149,
+  "partial": false,
+  "defects": {}
+ },
+ {
+  "run": "local-5",
+  "claims": 185,
+  "partial": false,
+  "defects": {
+   "conflict_hidden": 1,
+   "quote_not_in_ledger": 1
+  }
+ },
+ {
+  "run": "local-6",
+  "claims": 209,
+  "partial": false,
+  "defects": {
+   "conflict_hidden": 24,
+   "quote_not_in_ledger": 1
+  }
+ }
+]

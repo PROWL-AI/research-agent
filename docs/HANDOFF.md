@@ -8,7 +8,7 @@ Objective: close every open item of this agent in its final form, in waves
 - Plan: [`specs/2026-10-11-waves-canvas.md`](specs/2026-10-11-waves-canvas.md) — target state, seams,
   waves with exit criteria, §7a wave status, operator questions (§8).
 - Inventory: [`specs/2026-10-11-waves-inventory.json`](specs/2026-10-11-waves-inventory.json)
-  (`python3 scripts/plan/assign_waves.py --check`; 25 of 60 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
+  (`python3 scripts/plan/assign_waves.py --check`; 21 of 64 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
 - **Wave 1 closed** (merged to `main` by PR #1): run-lock ownership (KA-06, B-009, B-010),
   terminal_code, structured events, honest docs, CORE scenarios, nightly CI.
 - **Wave 2 closed** on branch `wip/wave2-checkpoint-v2` (PR #2): checkpoint schema 2 — immutable
@@ -39,14 +39,22 @@ Objective: close every open item of this agent in its final form, in waves
   rules; dashboard on fabric-dashboard-kit 1.1.0 (estate themes, «Ещё», 360 px, verified initiator,
   service chip); installer under `use_secret.py serve --consumer chat.prowl.research`. Suite 515
   passed; mutations 12/12; WebKit PASS. Receipts: `evidence/fabric-dashboard/VERIFICATION.md` § Wave 5.
-- **Exact next task:** reinstall the service from the merge commit
-  (`python3 scripts/install-fabric-service.py`, no `--vault-project` until B-042 resolves — the
-  service starts degraded without keys and says so), run the adapter's `check_service.py` against
-  it and record every NOT_RUN (B-037: the installed pre-wave-3 build must not touch schema-2
-  ledgers). Then wave 6 offline work: meter the judge's LLM calls (B-041), planted-bad judge
-  fixtures (KA-G02, B-017). Live acceptance (KA-G03 host chain, FD-13 keys, FD-14 host update,
-  CORE-13/14) waits on: the Fabric issuer publishing JWKS, B-042 (registry) and B-043
-  (`prowl_` key door), the operator's host update.
+- **Wave 5 merged** (PR #5, `12ad137`) and installed from the merge: release `12ad13770223`, adapter probe
+  29 PASS / 8 NOT_RUN / 1 FAIL — `well-known.fast` under machine load average 175–250 (B-044);
+  every NOT_RUN named in VERIFICATION § Wave 5. B-037 closed (the pre-wave-3 build no longer runs).
+- **W6-T1 offline half** (branch `feat/wave6-acceptance`): code-proven defects veto the judge, the judge's
+  spend is metered into `<run>/judge-ledger.json`, `evals/calibrate.py` + planted fixtures, `scripts/mutation_check.py`
+  (41/41). Three certification rounds; their fixes also closed two wave-5 seam findings (a replayed resume
+  returns its job; an operator resume stays the operator's act and records the chain's owner, `chainOwner`). Evidence:
+  `evidence/judge-calibration/README.md`. The LLM key is issued into vault `prowl-research-agent` (B-042).
+- **Exact next task:** PR wave 6's offline half to `main`, merge, reinstall from the merge with
+  `python3 scripts/install-fabric-service.py --vault-project prowl-research-agent` (LLM key only; the service stays
+  degraded for Prowl), re-run `check_service.py` (B-044 under normal load). Then B-045 (status-tag check).
+- **Human gate (one line):** the live judge calibration — the operator runs
+  `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
+  in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or authorises live flags for
+  the agent's session (an operator setting on this machine) so the agent may run it.
+- Live acceptance still waits on: a `prowl_` key (B-043), the hub's JWKS (KA-G03), the operator's host update (FD-14).
 - Operator decisions (canvas §8) answered 2026-10-12: Q1 PR-per-wave merges, Q2 kit in wave 5,
   Q4 USD 15, Q5 host update at wave 6, Q6 no history rewrite. Q3 closed from sources.
 - Cross-agent: B-001 (model profiles, waits on Fabric T1–T3), B-020 (the contract owner adds

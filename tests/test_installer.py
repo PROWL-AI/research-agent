@@ -51,3 +51,34 @@ def test_without_a_vault_the_service_starts_with_no_keys(tmp_path):
     inst = _installer()
     argv = inst.launch_argv("/py", tmp_path / "data", 18764, tmp_path / "build.json", tmp_path / "logs", None)
     assert argv[0] == "/py" and "use_secret" not in " ".join(argv)
+
+
+def test_a_folder_with_some_slots_launches_degraded_and_one_with_none_is_refused(tmp_path, monkeypatch):
+    inst = _installer()
+    _, engine = _engine(tmp_path)
+    listing = {"v": "  folder/prod/RESEARCH_LLM_API_KEY  (73B)\n"}
+    monkeypatch.setattr(inst, "command", lambda *a, **kw: str(engine) if a[0] == "project-observatory" else listing["v"])
+
+    class P:
+        def error(self, message):
+            raise SystemExit(message)
+
+    held, missing = inst.held_slots("folder", P())
+    assert held == ["RESEARCH_LLM_API_KEY"] and missing == ["PROWL_API_KEY"]
+    argv = inst.launch_argv("/py", tmp_path, 18764, tmp_path / "b.json", tmp_path / "l", "folder", held)
+    assert argv[8] == "RESEARCH_LLM_API_KEY"  # only what the folder holds reaches use_secret
+    listing["v"] = "  folder/local/PROWL_API_KEY  (40B)\n"
+    try:
+        inst.held_slots("folder", P())
+    except SystemExit as exc:
+        assert "holds none" in str(exc)
+    else:
+        raise AssertionError("a folder with no slot must be refused")
+
+
+def test_a_dry_run_reports_a_folder_problem_instead_of_refusing(tmp_path, monkeypatch):
+    inst = _installer()
+    _, engine = _engine(tmp_path)
+    monkeypatch.setattr(inst, "command", lambda *a, **kw: str(engine) if a[0] == "project-observatory" else "")
+    held, missing, problem = inst.slot_check("folder")
+    assert held == [] and missing == list(inst.SLOTS) and "holds none" in problem

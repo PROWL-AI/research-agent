@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, Field
 
 from research_agent.agent.citations import FidelityResult
-from research_agent.agent.writer import WriterOutcome, ledger_only_report, produce_report
+from research_agent.agent.writer import WriterOutcome, disclose_partial, ledger_only_report, produce_report
 from research_agent.agent.metering import attach_run_meter, budget_stats
 from research_agent.events import emit
 from research_agent.evidence import terminal
@@ -590,6 +590,12 @@ class Orchestrator:
             emit(log, "budget.stop", logging.WARNING, run_id=run_id, reason=checkpoint.stop_reason,
                  stage=meter.refusals[-1], llm_spend_usd=meter.spend())
 
+        if checkpoint.partial:
+            # The writer was told only what was partial before it wrote; a run
+            # that turned partial afterwards still says so in report.md.
+            disclosed = disclose_partial(outcome.report_md, checkpoint.stop_reason)
+            if disclosed != outcome.report_md:
+                outcome.report_md, kept_report = disclosed, False
         if not kept_report:
             _atomic_write_text(report_path, outcome.report_md)
         ledger.save()

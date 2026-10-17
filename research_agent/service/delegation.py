@@ -133,11 +133,13 @@ class Refused(Exception):
 
 def owned_by(job: dict[str, Any], delegation: dict[str, Any] | None) -> bool:
     """A delegated caller acts only on jobs started for the same principal by the
-    same caller; the service's own token (no delegation) is the operator's floor."""
+    same caller, or on an operator's continuation of a chain it owns
+    (`chainOwner`); the service's own token (no delegation) is the operator's floor."""
     if not delegation:
         return True
-    started_by = job.get("delegation") or {}
-    return (started_by.get("principal"), started_by.get("caller")) == (delegation["principal"], delegation["caller"])
+    me = (delegation["principal"], delegation["caller"])
+    return any(((who or {}).get("principal"), (who or {}).get("caller")) == me
+               for who in (job.get("delegation"), job.get("chainOwner")) if who)
 
 
 def require_owner(job: dict[str, Any], delegation: dict[str, Any] | None) -> None:

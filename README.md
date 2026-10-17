@@ -167,8 +167,17 @@ with a source log and confidence ladder.
 ```bash
 pytest                                  # unit tests + runbook validation (offline)
 python scripts/validate_runbooks.py --online  # frontmatter + tool names vs live Prowl catalog (needs PROWL_API_KEY)
-python evals/judge.py --run runs/<id>   # 5-dimension quality rubric for a finished run
+python evals/judge.py --run runs/<id>   # 5-dimension quality rubric for a finished run (exit 0 pass, 1 fail, 2 judge error)
+python evals/calibrate.py               # the judge against planted-defect fixtures (offline; --live spends)
 ```
+
+The judge's verdict is vetoed by defects the code proves — a citation of no claim; a quotation no
+cited claim backs; a sentence whose metric figure none of its cited claims carries (a sentence the writer marked
+"derived" excepted); a conflicting claim cited on a line without the upper-case `CONFLICT` tag and
+outside a conflict register (rows under a "Source log" heading are provenance, not findings); a partial run that does not say "partial" before its first section — so a
+lenient model cannot pass them. An uncited figure lowers the citation score instead. Each judge LLM
+call is checked by estimate against `--max-usd` (default 0.50) before it is sent and recorded in
+`<run>/judge-ledger.json`, never in the run's checkpoint. The judge needs only an LLM key.
 
 Authoring a new runbook: `docs/runbook-authoring.md`.
 Architecture decisions and inherited traps: `docs/knowledge-pack.md`.

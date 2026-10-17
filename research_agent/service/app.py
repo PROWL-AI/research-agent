@@ -167,6 +167,7 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
                 costs = [c["costUsd"] for c in calls if c["costUsd"] is not None]
                 summaries.append({k: job[k] for k in ["id", "status", "phase", "createdAt", "updatedAt", "request"]} | {
                     "delegation": job.get("delegation"), "via": job.get("via"), "runDir": job.get("runDir"),
+                    "chainOwner": job.get("chainOwner"),
                     "costUsd": sum(costs) if costs else None, "unpricedCalls": sum(c["costUsd"] is None for c in calls), "calls": len(calls)})
             return JSONResponse({"at": now(), "health": health(), "jobs": summaries, "config": store.config(), "usage": store.usage(), "runbooks": runbooks()})
         if path == "/api/jobs" and request.method == "POST":

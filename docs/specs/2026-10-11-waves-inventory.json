@@ -427,31 +427,33 @@
       "id": "B-014",
       "title": "HUB-PACKET and HANDOFF describe a hub-forwarding route ADR-0144 retired; hub.json now exists (Fabric 0.3.4). Rewrite around DEC-0039 direct calls with delegation tokens",
       "source": "docs/evidence/fabric-dashboard/HUB-PACKET.md; passioncode-ai/fabric docs/adr/0144; fabric-agent-contract DECISIONS.md:1364",
-      "status": "closed — 77a0621 + 198a227 (HUB-PACKET rewritten for DEC-0039 direct calls)",
+      "status": "closed",
       "area": "fabric",
       "node": "N-FAB",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 5,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — 77a0621 + 198a227 (HUB-PACKET rewritten for DEC-0039 direct calls)"
     },
     {
       "id": "B-021",
       "title": "Contract pin 623bf613 → fabric-agent-contract 8e49fbd (DEC-0036…0040 additive, contractVersion stays 0.1.0)",
       "source": "fabric-contract.lock.json",
-      "status": "closed — eb1751b (pinned 7a14a48, later than 8e49fbd; canvas §9)",
+      "status": "closed",
       "area": "fabric",
       "node": "N-FAB",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 5,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — eb1751b (pinned 7a14a48, later than 8e49fbd; canvas §9)"
     },
     {
       "id": "FD-12",
       "title": "Callee side of DEC-0039 by trust tier (ADR-0144 amd. 4): loopback = T0, token optional/attribution, verified when present; non-loopback bind requires verification; own tokens stay for outside callers",
       "source": "docs/evidence/fabric-dashboard/HANDOFF.md:19; fabric-agent-contract src/delegation.ts:292",
-      "status": "closed (callee side, offline) — eb1751b + 198a227; the service binds loopback only, so the non-loopback clause is moot; host-chain acceptance → KA-G03 (wave 6)",
+      "status": "closed",
       "area": "fabric",
       "node": "N-FAB",
       "blocked_by": [
@@ -460,29 +462,30 @@
       "closable_in_one_pass": true,
       "notes": "Callee code and offline tests close here; synthetic chain acceptance waits for the issuer (KA-G03).",
       "wave": 5,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed (callee side, offline) — eb1751b + 198a227; the service binds loopback only, so the non-loopback clause is moot; host-chain acceptance → KA-G03 (wave 6)"
     },
     {
       "id": "B-019",
       "title": "Installer launches the service without an Observatory consumer (vault-only serve)",
       "source": "scripts/install-fabric-service.py:71; ~/Library/LaunchAgents/chat.prowl.research.plist",
-      "status": "closed — 198a227 (use_secret.py serve --consumer chat.prowl.research)",
+      "status": "closed",
       "area": "fabric",
       "node": "N-FAB",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 5,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — 198a227 (use_secret.py serve --consumer chat.prowl.research)"
     },
     {
       "id": "FD-13",
       "title": "Provider wiring: PROWL_API_KEY and an LLM key through an Observatory consumer; none exist in any vault slot for prowl-research",
       "source": "research_agent/service/app.py:55-57; observatory names (prowl-research: none)",
-      "status": "blocked — keys: B-042 (LLM key folder), B-043 (prowl_ key door); installer ready (B-019)",
+      "status": "open — LLM key in vault prowl-research-agent (2026-10-17); prowl_ key blocked (B-043); installer launches with the slots the folder holds",
       "area": "fabric",
       "node": "N-FAB",
       "blocked_by": [
-        "B-042",
         "B-043"
       ],
       "closable_in_one_pass": true,
@@ -494,14 +497,15 @@
       "id": "B-002",
       "title": "Dashboard has no fabric-dashboard-kit (1.0.0, DEC-0036): legacy 480px; nav 208/160px and horizontal mobile nav break ED-3",
       "source": "SessionStart notice; dashboard_kit.py status → no kit copy; docs/design/fabric-dashboard.md:19",
-      "status": "closed — eb1751b + 198a227 (kit 1.1.0, operator go 2026-10-12)",
+      "status": "closed",
       "area": "fabric",
       "node": "N-FAB",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "needs_operator": "go-ahead for the kit upgrade and the launchd restart it implies (dashboard-kit.md:111-113)",
       "wave": 5,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — eb1751b + 198a227 (kit 1.1.0, operator go 2026-10-12)"
     },
     {
       "id": "B-017",
@@ -516,7 +520,7 @@
         "KA-09"
       ],
       "closable_in_one_pass": false,
-      "notes": "Offline harness + planted-bad fixtures in wave 3/4 scope; the live calibration pass spends money.",
+      "notes": "Offline harness + planted-bad fixtures in wave 3/4 scope; the live calibration pass spends money. W6-T1 offline half done 2026-10-17: planted fixtures + code vetoes + harness (docs/evidence/judge-calibration); live half waits on B-042.",
       "wave": 6,
       "release": "this"
     },
@@ -535,7 +539,8 @@
       "closable_in_one_pass": false,
       "needs_operator": "spend cites the 2026-10-09 approval (~$2-3 per run) plus one durable budget row B-027",
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "notes": "W6-T1 offline half done 2026-10-17: planted fixtures + code vetoes + harness (docs/evidence/judge-calibration); live half waits on B-042."
     },
     {
       "id": "B-027",
@@ -741,13 +746,14 @@
       "id": "B-037",
       "title": "A pre-wave-3 build (the installed service release) loads a schema-2 ledger and re-saves it as schema 1, dropping quote/span/source; schema-2 claims then read assumed",
       "source": "wave-3 seam certification 2026-10-17 · ledger.py load guard exists only in the new build",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-FAB",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 5,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — reinstalled from 12ad137 (wave-5 merge)"
     },
     {
       "id": "B-038",
@@ -766,13 +772,14 @@
       "id": "B-039",
       "title": "The service cannot resume an interrupted run; a new request starts a new run that pays again",
       "source": "wave-4 build 2026-10-17 · research_agent/service/runtime.py (run_id = job id)",
-      "status": "closed — eb1751b + 198a227 (resumeJobId; chain rules)",
+      "status": "closed",
       "area": "service",
       "node": "N-FAB",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 5,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — eb1751b + 198a227 (resumeJobId; chain rules)"
     },
     {
       "id": "B-040",
@@ -790,19 +797,20 @@
       "id": "B-041",
       "title": "The eval judge's own LLM calls are unmetered (evals/judge.py runs without a meter): its spend is in no attempt ledger",
       "source": "wave-4 unit certification 2026-10-17 · evals/judge.py",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — W6-T1 (judge ledger beside the run, --max-usd)"
     },
     {
       "id": "B-042",
       "title": "Observatory's registry maps this repository ambiguously (merged with another, private repository of the operator; its project id resolves to the parent product; its key folder is shared with another product); the OpenRouter door refuses to issue RESEARCH_LLM_API_KEY",
       "source": "wave-5 build 2026-10-17 · openrouter.py issue refusal; a registry proposal filed with Observatory",
-      "status": "open — external",
+      "status": "open — external (registry split); LLM key issued into prowl-research-agent 2026-10-17",
       "area": "service",
       "node": "N-EXT",
       "blocked_by": [],
@@ -821,6 +829,54 @@
       "closable_in_one_pass": true,
       "wave": null,
       "release": "external"
+    },
+    {
+      "id": "B-044",
+      "title": "Installed service fails well-known.fast under machine saturation (load avg 175–250); handler answers in ~4 ms when the CPU is free",
+      "source": "wave-5 install probe 2026-10-17 · docs/evidence/fabric-dashboard/raw/service-probe-12ad137.json",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-045",
+      "title": "The judge does not check status tags: an assumed claim labelled VERIFIED in the report passes",
+      "source": "W6-T1 product certification 2026-10-17",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-046",
+      "title": "Judge rules: (CONFLICT) register form not accepted; bare m/b/k unit read as scale",
+      "source": "W6 close verification 2026-10-18",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-047",
+      "title": "Test gaps: chain-owner resume/cancel e2e, who() label, installer message, impartial mutant",
+      "source": "W6 close verification 2026-10-18",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
     }
   ]
 }

@@ -86,13 +86,29 @@ class Store:
     def jobs(self):
         return [json.loads(r[0]) for r in self.db.execute("SELECT body FROM jobs ORDER BY rowid DESC LIMIT 5000")]
 
+    @staticmethod
+    def namespaced_key(request_key: str, delegation: dict | None) -> str:
+        """Idempotency keys are a caller's own namespace: another principal
+        replaying a key gets its own job, never someone else's handle."""
+        if not delegation:
+            return request_key
+        return "delegated:" + digest({"p": delegation.get("principal"), "c": delegation.get("caller")})[:16] + ":" + request_key
+
+    def replay(self, request: dict, request_key: str, delegation: dict | None = None) -> dict | None:
+        """The job an earlier call with this key created, or None; a different
+        request under the same key is a conflict."""
+        row = self.db.execute("SELECT request_hash,body FROM jobs WHERE request_key=?",
+                              (self.namespaced_key(request_key, delegation),)).fetchone()
+        if row is None:
+            return None
+        if row[0] != digest(request):
+            raise Conflict("idempotencyKey уже использован с другим запросом")
+        return json.loads(row[1])
+
     def create(self, request: dict, request_key: str, trace: str | None = None, delegation: dict | None = None,
-               run_dir: str | None = None, via: str = "mcp"):
+               run_dir: str | None = None, via: str = "mcp", chain_owner: dict | None = None):
         request_hash = digest(request)
-        if delegation:
-            # Idempotency keys are a caller's own namespace: another principal
-            # replaying a key gets its own job, never someone else's handle.
-            request_key = "delegated:" + digest({"p": delegation.get("principal"), "c": delegation.get("caller")})[:16] + ":" + request_key
+        request_key = self.namespaced_key(request_key, delegation)
         with self.db:
             row = self.db.execute("SELECT request_hash,body FROM jobs WHERE request_key=?", (request_key,)).fetchone()
             if row:
@@ -111,7 +127,10 @@ class Store:
                        runDir=run_dir,
                        # Which door the request came through: "dashboard" (the operator's
                        # signed-in panel) or "mcp" (an agent with a token).
-                       via=via)
+                       via=via,
+                       # The principal and caller that own a resume chain (B-039): an
+                       # operator's continuation stays visible to them; not a delegation.
+                       chainOwner=chain_owner)
             job["proposal"] = {"digest": digest({"id": job_id, "request": request, "config": job["config"]}),
                                "expiresAt": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat().replace("+00:00", "Z")}
             self.db.execute("INSERT INTO jobs VALUES(?,?,?,?)", (job_id, request_key, request_hash, json.dumps(job)))
