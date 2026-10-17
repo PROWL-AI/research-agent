@@ -49,7 +49,7 @@ Objective: close every open item of this agent in its final form, in waves
   `evidence/judge-calibration/README.md`. The LLM key is issued into vault `prowl-research-agent` (B-042).
 - **Wave 6 offline half merged** (PR #6, `d868706`) and installed from the merge with the LLM key
   (vault `prowl-research-agent`): adapter probe 30 PASS / 8 NOT_RUN / 0 FAIL; health degraded for Prowl only.
-- **Exact next task:** nothing offline remains in wave 6: B-045/B-046/B-047 closed. The rest waits on the operator (live judge calibration, host update) and external owners (B-043 `prowl_` key door, KA-G03 hub JWKS, B-020 contract PR, B-033 Fabric project registration). Re-check those at each resume.
+- **Exact next task:** nothing offline remains in wave 6: B-045/B-046/B-047 closed. The rest waits on the operator (live judge calibration, host update) and external owners (B-043 `prowl_` key door, KA-G03 hub JWKS, B-020 contract PR, B-033 Fabric project registration). Re-check those at each resume. The installed service (`d868706`) carries every service change: later merges (#8, #9) touched the judge, tests, installer and docs only (`git diff d868706..e0f726a -- research_agent` is empty).
 - **Human gate (one line):** the live judge calibration — the operator runs
   `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
   in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or authorises live flags for
