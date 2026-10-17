@@ -26,6 +26,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from research_agent.agent.writer import lint_report  # noqa: E402
 from research_agent.evidence.ledger import Ledger  # noqa: E402
+from research_agent.evidence.source import is_llm_answer, is_transform  # noqa: E402
 from research_agent.evidence.store import ArtifactStore, Checkpoint  # noqa: E402
 from research_agent.llm import LLMClient  # noqa: E402
 from research_agent.runbook import Runbook, get_runbook  # noqa: E402
@@ -48,12 +49,12 @@ WEIGHTS = {
 }
 DEFAULT_THRESHOLD = 0.7
 
-LLM_DERIVED_PREFIXES = (
-    "perplexity_",
-    "gemini_",
-    "google_ai_mode",
-    "dataforseo_ai_",
-)
+#: One definition of an LLM-derived source, shared with the ledger's
+#: independence rules (research_agent.evidence.source): LLM-answer tools and
+#: transforms are never primary sources.
+def _llm_derived(tool: str) -> bool:
+    return is_llm_answer(tool) or is_transform(tool)
+
 
 _REPORT_SNIPPET_CHARS = 20_000
 _SECTION_RE = re.compile(r"^\s*\d+\.\s+\*\*([^*]+)\*\*", re.MULTILINE)
@@ -121,7 +122,7 @@ def section_coverage(report_md: str, sections: list[str]) -> dict[str, Any]:
 def ledger_stats(ledger: Ledger) -> dict[str, Any]:
     claims = ledger.claims
     llm_derived = [
-        c.id for c in claims if c.source_tool.startswith(LLM_DERIVED_PREFIXES)
+        c.id for c in claims if _llm_derived(c.source_tool)
     ]
     by_status: dict[str, int] = {}
     by_method: dict[str, int] = {}

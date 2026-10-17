@@ -91,7 +91,10 @@ RIGHT: "Their channel has 430K subscribers [C17] (VERIFIED)."
   the stored source (verification "span") or two independent sources agree
   ("corroboration") — never call a claim VERIFIED that the ledger marks otherwise.
   A claim with status "conflict" is cited with its disagreeing peers and
-  [CONFLICT]; never present one side as settled.
+  [CONFLICT]; never present one side as settled, and never chart it.
+  verification "span" means the one source literally says it: where a runbook
+  rule requires two independent sources for a figure, a span-verified claim
+  satisfies one of them — tag it "VERIFIED (single source)".
 - If the ledger has no evidence for a section, say so explicitly; do not fill gaps
   from general knowledge.
 {partial_note}
@@ -512,6 +515,9 @@ async def _rewrite_locked(llm: LLMClient, run_dir: Path, run_id: str) -> WriterO
         skipped_steps=checkpoint.skipped_steps,
         transform_notes=checkpoint.transform_notes,
     )
+    # The report was written against the recomputed statuses (a v1 ledger is
+    # upgraded on load): the file the report cites must say the same.
+    ledger.save()
     _atomic_write_text(run_dir / "report.md", outcome.report_md)
     checkpoint.stats["lint_issues_before"] = outcome.lint_before
     checkpoint.stats["lint_issues_after"] = outcome.lint_after

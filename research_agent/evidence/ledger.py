@@ -58,7 +58,7 @@ class ClaimStatus(str, Enum):
 QUOTE_NOT_FOUND = "quote not found in stored raw"
 QUOTE_V1_VERBATIM = "v1 verbatim without quote"
 QUOTE_TRANSFORM = "transform output is an LLM note, not a source"
-QUOTE_RAW_MISMATCH = "stored raw does not match its recorded sha256"
+QUOTE_LLM_ANSWER = "LLM-answer tool output is not a primary source"
 
 
 class SourceIdentity(BaseModel):
@@ -94,9 +94,11 @@ class Claim(BaseModel):
     raw_ref: str | None = None
     step_id: str | None = None
     #: The exact text the extractor says it read, and where it was found in the
-    #: stored raw text (offsets into source.flatten_text of that raw).
+    #: stored raw: offsets into the text named by `quote_basis` — "values"
+    #: (source.flatten_text of the raw) or "json" (its whitespace-normalized JSON).
     quote: str | None = None
     quote_span: tuple[int, int] | None = None
+    quote_basis: str | None = None
     #: Why a quote did not verify, recorded at extraction (QUOTE_* constants).
     quote_check: str | None = None
     source: SourceIdentity | None = None
@@ -123,6 +125,14 @@ class Claim(BaseModel):
             self.source = _identity(self.source_tool, self.source_url, None)
         return self
 
+    @field_validator("value", "unit", mode="before")
+    @classmethod
+    def _blank_is_absent(cls, value: Any) -> Any:
+        # An extractor's "" is no value: it must neither corroborate nor conflict.
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     @field_validator("value")
     @classmethod
     def _value_must_be_finite(cls, value: Any) -> Any:
@@ -135,12 +145,24 @@ class Claim(BaseModel):
 
     @property
     def span_verified(self) -> bool:
-        """The quote is in the stored raw and the value is inside the quote."""
+        """The quote is in the stored raw and the value is inside the quote.
+        An LLM's own text (a transform note, an LLM-answer tool) never qualifies."""
         return (
             self.quote_span is not None
             and bool(self.quote)
+            and self.quote_check is None
+            and not _source.is_transform(self.source_tool)
+            and not _source.is_llm_answer(self.source_tool)
             and _source.value_in_quote(self.value, self.quote or "")
         )
+
+    @property
+    def independence(self) -> str | None:
+        """This claim's source key for corroboration — None when it cannot count:
+        unknown source, or a quote the extractor gave that is not in the raw."""
+        if self.quote_check == QUOTE_NOT_FOUND or self.source is None:
+            return None
+        return self.source.independence_key
 
 
 _SUBJECT_STOPWORDS = frozenset({"the", "a", "an", "of", "per"})
@@ -172,10 +194,27 @@ def _norm_value(value: Any) -> str:
     return str(value).strip().lower().replace(",", "").replace(" ", "").lstrip("$€£")
 
 
+_CURRENCY = {"$": "usd", "us$": "usd", "usd": "usd", "dollars": "usd", "€": "eur", "eur": "eur",
+             "euro": "eur", "euros": "eur", "£": "gbp", "gbp": "gbp", "pounds": "gbp"}
+
+
+def _norm_unit(value: Any, unit: str | None) -> str:
+    text = (unit or "").strip().lower()
+    if not text and isinstance(value, str) and value.strip()[:1] in "$€£":
+        text = value.strip()[:1]
+    return _CURRENCY.get(text, text)
+
+
 def _norm_pair(value: Any, unit: str | None) -> tuple[str, str]:
     """Value comparisons must include the unit: "5" (%) vs "5" (M) is a
-    conflict, not a corroboration."""
-    return (_norm_value(value), (unit or "").strip().lower())
+    conflict, not a corroboration. Currency symbols and codes are one unit."""
+    return (_norm_value(value), _norm_unit(value, unit))
+
+
+def _agree(a: tuple[str, str], b: tuple[str, str]) -> bool:
+    """Same value, and the units do not contradict — a missing unit is
+    compatible with any unit (1200 and $1,200 are one figure)."""
+    return a[0] == b[0] and (a[1] == b[1] or not a[1] or not b[1])
 
 
 def _atomic_write_text(path: Path, text: str) -> None:
@@ -187,8 +226,10 @@ def _atomic_write_text(path: Path, text: str) -> None:
 
 
 class Ledger:
-    def __init__(self, path: Path, claims: list[Claim] | None = None) -> None:
+    def __init__(self, path: Path, claims: list[Claim] | None = None, *, run_id: str | None = None) -> None:
         self.path = path
+        #: Carried on claim.* events: claim ids repeat in every run.
+        self.run_id = run_id
         self.claims: list[Claim] = list(claims) if claims else []
         self.recompute_all(announce=False)
 
@@ -203,6 +244,11 @@ class Ledger:
             # a report with zero evidence over a full raw/ directory.
             log.warning("ledger at %s has no 'claims' key — refusing to load it as empty", path)
             raise LedgerError(f"ledger at {path} is not a ledger file (no 'claims' key)")
+        version = data.get("schema_version") or 1
+        if not isinstance(version, int) or version > SCHEMA_VERSION:
+            # A newer build wrote it: loading and re-saving would drop the
+            # fields this build does not know.
+            raise LedgerError(f"ledger at {path} is schema {version!r}; this build reads up to {SCHEMA_VERSION}")
         claims = [Claim.model_validate(item) for item in data.get("claims", [])]
         # Statuses on disk are never trusted: a v1 ledger was computed by the
         # incremental rules, so every load recomputes with the current ones.
@@ -249,6 +295,7 @@ class Ledger:
         step_id: str | None = None,
         quote: str | None = None,
         quote_span: tuple[int, int] | None = None,
+        quote_basis: str | None = None,
         quote_check: str | None = None,
         document_sha256: str | None = None,
     ) -> Claim:
@@ -264,6 +311,7 @@ class Ledger:
             step_id=step_id,
             quote=quote,
             quote_span=quote_span,
+            quote_basis=quote_basis,
             quote_check=quote_check,
             source=_identity(source_tool, source_url, document_sha256),
         )
@@ -294,12 +342,14 @@ class Ledger:
         if not group:
             return
         valued = [c for c in group if c.value is not None]
-        pairs = {_norm_pair(c.value, c.unit) for c in valued}
-        if len(pairs) >= 2:
+        norm = {c.id: _norm_pair(c.value, c.unit) for c in valued}
+        disagree = any(not _agree(norm[x.id], norm[y.id]) for i, x in enumerate(valued) for y in valued[i + 1:])
+        if disagree:
+            pairs = set(norm.values())
             values = sorted({f"{v}{(' ' + u) if u else ''}" for v, u in pairs})
             # Announced when the disagreement itself changes, not per arrival:
             # a third claim repeating one side adds no news.
-            before = {_norm_pair(c.value, c.unit) for c in valued if c.status == ClaimStatus.conflict}
+            before = {norm[c.id] for c in valued if c.status == ClaimStatus.conflict}
             newly = before != pairs
             for claim in valued:
                 method = "span" if claim.span_verified else "none"
@@ -309,27 +359,33 @@ class Ledger:
                 if claim.value is None:
                     self._set(claim, *_alone(claim), announce=announce)
             if newly and announce:
-                emit(log, "claim.conflict", logging.INFO, subject=subject_key, values=values)
+                emit(log, "claim.conflict", logging.INFO, run_id=self.run_id, subject=subject_key, values=values)
             return
-        keys = sorted({c.source.independence_key for c in valued
-                       if c.source is not None and c.source.independence_key})
+        # Independent = two different known keys from two different steps: one
+        # step's raw is one delivery, whatever URLs the extractor attached.
+        sources = [(c.independence, c.step_id) for c in valued if c.independence]
+        keys = sorted({k for k, _ in sources})
+        corroborated = any(
+            k1 != k2 and (s1 is None or s2 is None or s1 != s2)
+            for i, (k1, s1) in enumerate(sources) for (k2, s2) in sources[i + 1:]
+        )
         for claim in group:
             if claim.span_verified:
                 self._set(claim, ClaimStatus.verified, "span",
                           f"quote found in stored raw at {list(claim.quote_span or ())}", announce=announce)
-            elif claim.value is not None and len(keys) >= 2:
-                self._set(claim, ClaimStatus.verified, "corroboration",
-                          f"{len(keys)} independent sources agree: {', '.join(keys)}", announce=announce)
+            elif claim.value is not None and corroborated and claim.quote_check != QUOTE_NOT_FOUND:
+                detail = (f"{len(keys)} independent sources agree: {', '.join(keys)}" if claim.independence
+                          else f"agrees with {len(keys)} independent sources; not itself one")
+                self._set(claim, ClaimStatus.verified, "corroboration", detail, announce=announce)
             else:
                 self._set(claim, *_alone(claim), announce=announce)
 
-    @staticmethod
-    def _set(claim: Claim, status: ClaimStatus, method: str, detail: str, *, announce: bool) -> None:
+    def _set(self, claim: Claim, status: ClaimStatus, method: str, detail: str, *, announce: bool) -> None:
         became_verified = status == ClaimStatus.verified and claim.status != ClaimStatus.verified
         claim.status = status
         claim.verification = {"method": method, "detail": detail}
         if became_verified and announce:
-            emit(log, "claim.verified", logging.INFO, claim_id=claim.id, method=method)
+            emit(log, "claim.verified", logging.INFO, run_id=self.run_id, claim_id=claim.id, method=method)
 
     def as_prompt_json(self) -> str:
         # Compact: this lands in the writer's system prompt and in EVERY repair

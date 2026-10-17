@@ -292,10 +292,10 @@
 - **Preconditions:** raw шага сохранён с `raw_sha256`.
 - **Steps:**
   1. Прогнать; открыть ledger и отчёт.
-- **Expected result:** утверждение `verified` только если (а) его цитата найдена в сохранённом raw (после нормализации пробелов, sha256 совпадает) и значение стоит внутри цитаты, или (б) ≥2 согласных утверждения с разными известными `independence_key`; два инструмента над одним URL — один источник; transform не независим от своих входов.
+- **Expected result:** утверждение `verified` только если (а) его цитата найдена в сохранённом raw (после нормализации пробелов, sha256 совпадает) и значение стоит внутри цитаты, или (б) ≥2 согласных утверждения с разными известными `independence_key`; два инструмента над одним URL — один источник; два поставщика одного исходного датасета (`google_trends` и `serpapi_google_trends`) — один источник; URL засчитывается, только если его называет raw или запрос; утверждения одного шага не подтверждают друг друга; transform и LLM-инструменты (Perplexity, Gemini, Google AI) — не источник.
 - **Failure outcome:** цитата не найдена или источник `unknown` — утверждение не `verified`; v1 `verbatim` без цитаты понижается до `assumed` с раскрытием.
 - **Wave:** 3 (N-EVID; KA-07, KA-08, KA-09)
-- **Coverage:** `test_ka08_fabricated_verbatim_is_not_verified`, `test_ka09_same_document_is_not_two_independent_sources`, `test_span_verification_reads_the_whole_stored_raw`, `test_two_independent_publishers_corroborate`, `test_two_data_providers_without_urls_corroborate_but_one_provider_does_not`, `test_transform_claim_never_corroborates_its_source`, `test_transform_quote_never_span_verifies`, `test_v1_verbatim_claim_without_a_quote_is_downgraded_on_load`, `test_tampered_raw_fails_extraction_and_verifies_nothing`
+- **Coverage:** `test_ka08_fabricated_verbatim_is_not_verified`, `test_ka09_same_document_is_not_two_independent_sources`, `test_span_verification_reads_the_whole_stored_raw`, `test_two_independent_publishers_corroborate`, `test_two_data_providers_without_urls_corroborate_but_one_provider_does_not`, `test_transform_claim_never_corroborates_its_source`, `test_transform_quote_never_span_verifies`, `test_v1_verbatim_claim_without_a_quote_is_downgraded_on_load`, `test_tampered_raw_is_a_typed_extraction_failure_and_the_resume_finishes`, `test_a_bare_number_quote_is_not_a_quote`, `test_a_quote_copied_from_the_json_the_extractor_saw_is_found`, `test_value_in_quote_matches_numbers_on_number_boundaries`, `test_an_invented_source_url_does_not_make_a_second_source`, `test_urls_named_by_the_raw_count_but_one_step_is_one_delivery`, `test_a_web_tool_claim_without_a_url_is_no_source`, `test_a_quote_not_found_neither_verifies_nor_counts`, `test_an_llm_answer_tool_never_span_verifies`, `test_independence_is_the_upstream_source_not_the_delivery_tool`
 
 ### CORE-10: Конфликт остаётся конфликтом
 - **Status:** PASS@W3
@@ -304,10 +304,10 @@
 - **Preconditions:** —
 - **Steps:**
   1. Прогнать; открыть ledger и отчёт.
-- **Expected result:** все утверждения группы `conflict`, независимо от порядка поступления и от того, что пришло позже; утверждение без значения не подтверждает и не разрешает конфликт; отчёт показывает конфликт.
+- **Expected result:** все утверждения группы со значением — `conflict`, независимо от порядка поступления и от того, что пришло позже (единица не указана — совместима с любой; `$` и `USD` — одна единица); утверждение без значения не подтверждает и не разрешает конфликт; writer получает обе стороны со статусом `conflict` и правило `[CONFLICT]`, график по конфликтному утверждению отклоняется. Что живой отчёт действительно показывает конфликт, проверяет живая приёмка (волна 6).
 - **Failure outcome:** если итоговый статус группы зависит от порядка — тест независимости от порядка падает; сценарий `FAIL`.
 - **Wave:** 3 (N-EVID)
-- **Coverage:** `test_ka07_valueless_claim_cannot_erase_numeric_conflict`, `test_statuses_do_not_depend_on_insertion_order`, `test_recompute_survives_save_and_load`, `test_removing_a_claim_recomputes_its_group`, `test_status_events_are_emitted_once_per_transition`
+- **Coverage:** `test_ka07_valueless_claim_cannot_erase_numeric_conflict`, `test_statuses_do_not_depend_on_insertion_order`, `test_recompute_survives_save_and_load`, `test_removing_a_claim_recomputes_its_group`, `test_status_events_are_emitted_once_per_transition`, `test_currency_symbol_and_code_are_one_unit_and_missing_unit_is_compatible`, `test_blank_values_are_no_values`, `test_conflict_reaches_the_writer_with_both_sides_and_the_rule`, `test_a_chart_over_a_conflict_claim_is_rejected`
 
 ### CORE-11: Потеря доказательств → `partial`, не `complete`
 - **Status:** PASS@2bbf566

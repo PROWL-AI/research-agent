@@ -889,7 +889,7 @@ async def test_ka10_evidence_failure_cannot_report_complete(wired, monkeypatch, 
             raise OSError("synthetic raw artifact write failure")
         monkeypatch.setattr(ArtifactStore, "save_raw", fail_write)
     else:
-        async def fail_extract(*args):
+        async def fail_extract(*args, **kwargs):
             raise RuntimeError("synthetic extractor failure")
         monkeypatch.setattr(orch, "_extract_claims", fail_extract)
     result = await orch.run("mini-teardown", BRIEF, run_id=fault)
@@ -908,7 +908,7 @@ async def test_ka10_resume_finishes_extraction_from_saved_raw_without_paying(wir
                                       "subject": "example.com metric"}]}
     first = Orchestrator(FakeProwl(), llm, runs_root=wired)
 
-    async def fail_extract(*args):
+    async def fail_extract(*args, **kwargs):
         raise RuntimeError("synthetic extractor failure")
 
     monkeypatch.setattr(first, "_extract_claims", fail_extract)
@@ -1087,11 +1087,11 @@ async def test_raw_saved_step_is_extracted_even_after_the_tool_budget_is_spent(w
     real = first._extract_claims
     calls = {"n": 0}
 
-    async def fail_first(*args):
+    async def fail_first(*args, **kwargs):
         calls["n"] += 1
         if calls["n"] == 1:
             raise RuntimeError("extractor down")
-        return await real(*args)
+        return await real(*args, **kwargs)
 
     monkeypatch.setattr(first, "_extract_claims", fail_first)
     await first.run("mini-teardown", BRIEF, run_id="stranded")
@@ -1437,25 +1437,31 @@ async def test_transform_quote_never_span_verifies(tmp_path):
     assert claim.verification["detail"].startswith("transform output")
 
 
-async def test_tampered_raw_fails_extraction_and_verifies_nothing(tmp_path):
+async def test_tampered_raw_is_a_typed_extraction_failure_and_the_resume_finishes(wired, monkeypatch):
     # The raw is re-read with its recorded sha256 on resume: a changed file is
-    # a typed extraction failure, never evidence (packet: "raw hash mismatch").
-    from research_agent.agent.subagent import extract_step
-
-    store = ArtifactStore(tmp_path)
-    record = _records(TOOL)[0]
-    record.raw_ref, record.raw_sha256 = store.save_raw(record.step_id, TOOL, {"note": "visits 1,200"})
-    record.state = "raw_saved"
-    store.resolve(record.raw_ref).write_text(json.dumps({"note": "visits 9,999"}))
-    checkpoint = Checkpoint(run_id="t", runbook="mini-teardown", steps=[record])
+    # a typed extraction failure (evidence_incomplete), never evidence and
+    # never an exception that kills every later resume (seam finding, W3 fix round).
     llm = FakeLLM()
-    llm.claims_payload = {"claims": [{"claim": "v", "subject": "s", "value": 9999, "quote": "visits 9,999"}]}
-    orch = Orchestrator(FakeProwl(), llm, runs_root=tmp_path)
-    ledger = Ledger(tmp_path / "ledger.json")
-    ctx = WorkerContext(orch, checkpoint, store, ledger, None, orch._extract_claims)
-    with pytest.raises(ValueError, match="sha256"):
-        await extract_step(ctx, record, None)
-    assert ledger.claims == []
+    llm.plan_payload = steps()
+    llm.claims_payload = {"claims": [{"claim": "Observed value 42", "value": 42, "unit": "items",
+                                      "subject": "example.com metric"}]}
+    first = Orchestrator(FakeProwl(), llm, runs_root=wired)
+
+    async def fail_extract(*args, **kwargs):
+        raise RuntimeError("synthetic extractor failure")
+
+    monkeypatch.setattr(first, "_extract_claims", fail_extract)
+    await first.run("mini-teardown", BRIEF, run_id="tamper")
+    store = ArtifactStore(wired / "tamper")
+    step = store.load_checkpoint().steps[0]
+    store.resolve(step.raw_ref).write_text(json.dumps({"forged": "Observed value 42"}))
+    prowl = FakeProwl()
+    for _ in range(2):  # every resume finishes, none raises
+        result = await Orchestrator(prowl, llm, runs_root=wired).run("mini-teardown", BRIEF, run_id="tamper")
+        assert result.status == "partial" and result.terminal_code == "evidence_incomplete"
+    step = store.load_checkpoint().steps[0]
+    assert step.extraction["status"] == "failed" and "raw_unreadable" in step.extraction["error"]
+    assert prowl.tool_calls == [] and Ledger.load(wired / "tamper" / "ledger.json").claims == []
 
 
 def test_removing_a_claim_recomputes_its_group(tmp_path):
@@ -1499,3 +1505,166 @@ def test_prompt_json_carries_verification_not_verbatim(tmp_path):
     assert row["verification"] == "none" and row["subject"] == "s" and "verbatim" not in row
     saved = (ledger.save(), json.loads((tmp_path / "ledger.json").read_text()))[1]
     assert "verbatim" not in saved["claims"][0] and saved["schema_version"] == 2
+
+
+# ── Wave 3 fix round: findings of the unit / seam / product readings ────────
+
+async def _extract(tmp_path, raw, claims, tool=TOOL, arguments=None, step_id="s-1"):
+    llm = FakeLLM()
+    llm.claims_payload = {"claims": claims}
+    ledger = Ledger(tmp_path / "ledger.json")
+    await Orchestrator(FakeProwl(), llm, runs_root=tmp_path)._extract_claims(
+        PlanItem(step="s", tool=tool, arguments=arguments or {}), raw, tmp_path / "r.json", ledger, step_id)
+    return ledger
+
+
+async def test_a_bare_number_quote_is_not_a_quote(tmp_path):
+    ledger = await _extract(tmp_path, {"rows": [{"etv": 11200}]},
+                            [{"claim": "1200", "subject": "s", "value": "1200", "quote": "1200"}])
+    assert ledger.claims[0].status == ClaimStatus.assumed and ledger.claims[0].quote_span is None
+
+
+async def test_a_quote_copied_from_the_json_the_extractor_saw_is_found(tmp_path):
+    ledger = await _extract(tmp_path, {"rows": [{"etv": 11200}]},
+                            [{"claim": "etv", "subject": "s", "value": 11200, "quote": '"etv": 11200'}])
+    claim = ledger.claims[0]
+    assert claim.status == ClaimStatus.verified and claim.quote_basis == "json"
+
+
+@pytest.mark.parametrize("value,quote,found", [
+    ("1200", "11,200 visits", False), ("5", "grew 15%", False), (1200, "1,200.5 visits", False),
+    (1200, "In 2024, 1,200 users", True), ("1,200", "visits reached 1,200 in May", True),
+    (3.5, "a rate of 3.5% overall", True), ("$1,200", "costs $1,200 a month", True),
+    ("", "anything", False),
+])
+def test_value_in_quote_matches_numbers_on_number_boundaries(value, quote, found):
+    from research_agent.evidence.source import value_in_quote
+
+    assert value_in_quote(value, quote) is found
+
+
+def test_blank_values_are_no_values(tmp_path):
+    ledger = Ledger(tmp_path / "ledger.json")
+    a = ledger.add(claim="x", value="", subject="s", source_tool="spyfu_a")
+    b = ledger.add(claim="x", value="  ", subject="s", source_tool="moz_b")
+    assert a.value is b.value is None and {a.status, b.status} == {ClaimStatus.assumed}
+    c = ledger.add(claim="100", value=100, unit="u", subject="s", source_tool="dataforseo_c")
+    assert c.status != ClaimStatus.conflict
+
+
+async def test_an_invented_source_url_does_not_make_a_second_source(tmp_path):
+    # One delivery, two URLs the raw never names: no independence.
+    ledger = await _extract(tmp_path, {"rows": []}, [
+        {"claim": "100", "subject": "s", "value": 100, "source_url": "https://alpha.example/a"},
+        {"claim": "100", "subject": "s", "value": 100, "source_url": "https://beta.example/b"}])
+    assert all(c.status == ClaimStatus.assumed and c.source_url is None for c in ledger.claims)
+
+
+async def test_urls_named_by_the_raw_count_but_one_step_is_one_delivery(tmp_path):
+    raw = {"results": [{"url": "https://alpha.example/a", "v": 100}, {"url": "https://beta.example/b", "v": 100}]}
+    ledger = await _extract(tmp_path, raw, [
+        {"claim": "100", "subject": "s", "value": 100, "source_url": "https://alpha.example/a"},
+        {"claim": "100", "subject": "s", "value": 100, "source_url": "https://beta.example/b"}],
+        tool="web_search")
+    assert {c.source_url for c in ledger.claims} == {"https://alpha.example/a", "https://beta.example/b"}
+    assert all(c.status == ClaimStatus.assumed for c in ledger.claims)  # same step
+
+
+def test_a_web_tool_claim_without_a_url_is_no_source(tmp_path):
+    ledger = Ledger(tmp_path / "ledger.json")
+    ledger.add(claim="100", value=100, subject="s", source_tool="web_search")
+    ledger.add(claim="100", value=100, subject="s", source_tool="page_scraper", source_url="https://example.com/r")
+    assert all(c.status != ClaimStatus.verified for c in ledger.claims)
+
+
+def test_a_quote_not_found_neither_verifies_nor_counts(tmp_path):
+    from research_agent.evidence.ledger import QUOTE_NOT_FOUND
+
+    ledger = Ledger(tmp_path / "ledger.json")
+    a = ledger.add(claim="100", value=100, subject="s", source_tool="spyfu_a", quote="made up", quote_check=QUOTE_NOT_FOUND)
+    b = ledger.add(claim="100", value=100, subject="s", source_tool="moz_b")
+    assert a.status == b.status == ClaimStatus.assumed
+    assert a.verification["detail"] == QUOTE_NOT_FOUND
+
+
+async def test_an_llm_answer_tool_never_span_verifies(tmp_path):
+    ledger = await _extract(tmp_path, {"answer": "Monthly visits reached 1,200 in May"},
+                            [{"claim": "v", "subject": "s", "value": 1200, "quote": "visits reached 1,200"}],
+                            tool="perplexity_chat")
+    assert ledger.claims[0].status == ClaimStatus.assumed and ledger.claims[0].quote_span is None
+
+
+@pytest.mark.parametrize("pair,verified", [
+    (("perplexity_chat", "gemini_keyword_report"), False),
+    (("google_trends", "serpapi_google_trends"), False),
+    (("google_maps_reviews", "dataforseo_biz_google_reviews"), False),
+    (("google_finance", "dataforseo_serp_google_finance_quote"), False),
+    (("spyfu_get_domain_stats", "dataforseo_labs_domain_rank_overview"), True),
+])
+def test_independence_is_the_upstream_source_not_the_delivery_tool(tmp_path, pair, verified):
+    ledger = Ledger(tmp_path / "ledger.json")
+    for tool in pair:
+        ledger.add(claim="100", value=100, unit="u", subject="s", source_tool=tool)
+    assert all((c.status == ClaimStatus.verified) is verified for c in ledger.claims)
+
+
+def test_currency_symbol_and_code_are_one_unit_and_missing_unit_is_compatible(tmp_path):
+    ledger = Ledger(tmp_path / "ledger.json")
+    a = ledger.add(claim="x", value=1200, unit="USD", subject="s", source_tool="spyfu_a")
+    b = ledger.add(claim="x", value="$1,200", subject="s", source_tool="moz_b")
+    assert a.status == b.status == ClaimStatus.verified
+    c = ledger.add(claim="x", value=1200, unit="EUR", subject="s", source_tool="dataforseo_c")
+    assert c.status == a.status == ClaimStatus.conflict
+
+
+async def test_concurrent_steps_record_only_their_own_claims(tmp_path):
+    from research_agent.agent.subagent import extract_step
+
+    store = ArtifactStore(tmp_path)
+    records = _records(TOOL, "dataforseo_bl_summary")
+    for r in records:
+        r.raw_ref, r.raw_sha256 = store.save_raw(r.step_id, r.tool, {"v": 1})
+        r.state = "raw_saved"
+    checkpoint = Checkpoint(run_id="c", runbook="mini-teardown", steps=records)
+    ledger = Ledger(tmp_path / "ledger.json")
+    gate = asyncio.Event()
+
+    async def extract(item, result, raw_path, ledger_, step_id=None, **_):
+        if step_id == records[0].step_id:
+            await gate.wait()  # the other step adds its claim meanwhile
+        ledger_.add(claim="c", subject=step_id, source_tool=item.tool, step_id=step_id)
+        if step_id == records[1].step_id:
+            gate.set()
+        return 1
+
+    ctx = WorkerContext(type("O", (), {"prowl": None})(), checkpoint, store, ledger, None, extract)
+    await asyncio.gather(*(extract_step(ctx, r, None) for r in records))
+    for r in records:
+        assert r.extraction["claim_ids"] and all(
+            next(c for c in ledger.claims if c.id == i).step_id == r.step_id for i in r.extraction["claim_ids"])
+
+
+def test_a_newer_ledger_schema_is_refused(tmp_path):
+    from research_agent.evidence.ledger import LedgerError
+
+    (tmp_path / "ledger.json").write_text(json.dumps({"schema_version": 99, "claims": []}))
+    with pytest.raises(LedgerError, match="schema 99"):
+        Ledger.load(tmp_path / "ledger.json")
+
+
+def test_claim_events_carry_the_run_id(tmp_path, caplog):
+    ledger = Ledger(tmp_path / "ledger.json", run_id="run-7")
+    with caplog.at_level(logging.INFO, logger="research_agent.evidence.ledger"):
+        ledger.add(claim="1", value=1, subject="s", source_tool="spyfu_a")
+        ledger.add(claim="2", value=2, subject="s", source_tool="moz_b")
+    assert any("event=claim.conflict" in r.getMessage() and "run_id=run-7" in r.getMessage() for r in caplog.records)
+
+
+def test_a_chart_over_a_conflict_claim_is_rejected(tmp_path):
+    from research_agent.charts import ChartSpec, validate_against_ledger
+
+    ledger = Ledger(tmp_path / "ledger.json")
+    ledger.add(claim="1", value=1, subject="s", source_tool="spyfu_a")
+    ledger.add(claim="2", value=2, subject="s", source_tool="moz_b")
+    spec = ChartSpec(type="bar", title="t", labels=["a", "b"], values=[1, 2], claim_refs=["C1", "C2"])
+    assert "conflict" in (validate_against_ledger(spec, ledger) or "")

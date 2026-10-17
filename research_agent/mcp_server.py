@@ -355,7 +355,7 @@ def _status_dict(run_id: str) -> dict[str, Any]:
         "step_counts": checkpoint.step_counts(),
         "completed_steps": checkpoint.completed_steps,
         "skipped_steps": checkpoint.skipped_steps,
-        "counters": checkpoint.counters,
+        "counters": dict(checkpoint.counters),  # a MappingProxyType does not serialize over MCP
         "duration_s": duration_s,
     }
 

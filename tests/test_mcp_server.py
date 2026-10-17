@@ -220,3 +220,21 @@ class TestJobLifecycle:
         assert result["run_id"] == "wait1"
         assert result["status"] in ("complete", "partial")
         assert "stats" in result and "skipped_steps" in result
+
+
+async def test_status_and_report_serialize_through_fastmcp(wired, fake_llm):
+    # Seam finding (W3 fix round, a wave-2 regression): counters became a
+    # MappingProxyType and FastMCP refused to serialize it. The direct-coroutine
+    # tests above never reach the serializer; this one goes through it.
+    fake_llm.plan_payload = _one_step_plan()
+    await srv.research_run("mini-teardown", {"competitors": ["a.com"]}, run_id="mcp-ser", wait=True)
+    for tool in ("research.get_status", "research.get_report"):
+        result = await srv.mcp.call_tool(tool, {"run_id": "mcp-ser"})
+        blocks, structured = result if isinstance(result, tuple) else (result, None)
+        payload = structured["result"] if structured and "result" in structured else (
+            structured or json.loads(blocks[0].text))
+        assert payload["run_id"] == "mcp-ser"
+    status = await srv.mcp.call_tool("research.get_status", {"run_id": "mcp-ser"})
+    blocks, structured = status if isinstance(status, tuple) else (status, None)
+    body = structured.get("result", structured) if structured else json.loads(blocks[0].text)
+    assert isinstance(body["counters"], dict) and body["counters"]["data_calls"] == 1

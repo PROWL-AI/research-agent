@@ -35,6 +35,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from research_agent.events import emit
+from research_agent.evidence.source import TRANSFORM_TOOLS as _TRANSFORM_TOOLS
 from research_agent.evidence.store import (
     COMPLETED,
     EXCLUDED,
@@ -54,7 +55,6 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-_TRANSFORM_TOOLS = frozenset({"transform", "llm_transform"})
 _RAW_INDEX = re.compile(r"^(\d+)_(.+)\.(?:json|md)$")
 _BUDGET_PREFIXES = ("max_tool_calls=", "max_usd=", "max_minutes=")
 

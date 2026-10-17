@@ -19,8 +19,22 @@ from pydantic import BaseModel, Field
 from research_agent.agent.writer import produce_report
 from research_agent.events import emit
 from research_agent.evidence import terminal
-from research_agent.evidence.ledger import QUOTE_NOT_FOUND, QUOTE_TRANSFORM, Claim, Ledger, _atomic_write_text
-from research_agent.evidence.source import find_quote, flatten_text
+from research_agent.evidence.ledger import (
+    QUOTE_LLM_ANSWER,
+    QUOTE_NOT_FOUND,
+    QUOTE_TRANSFORM,
+    Claim,
+    Ledger,
+    _atomic_write_text,
+)
+from research_agent.evidence.source import (
+    TRANSFORM_TOOLS,
+    find_quote,
+    flatten_text,
+    is_llm_answer,
+    normalize_space,
+    url_in_text,
+)
 from research_agent.evidence.runlock import RunLock
 from research_agent.evidence.store import (
     COMPLETED,
@@ -48,7 +62,6 @@ log = logging.getLogger(__name__)
 _RAW_SNIPPET_CHARS = 12_000
 _TRANSFORM_CONTEXT_CHARS = 4_000
 _TRANSFORM_CONTEXT_ARTIFACTS = 3
-TRANSFORM_TOOLS = frozenset({"transform", "llm_transform"})
 #: Each transform is an LLM call outside every budget — the planner does not
 #: get to spawn them without bound.
 _MAX_TRANSFORM_STEPS = 25
@@ -399,6 +412,7 @@ class Orchestrator:
         store: ArtifactStore,
     ) -> RunResult:
         ledger = Ledger.load(store.run_dir / "ledger.json")
+        ledger.run_id = run_id
         try:
             checkpoint = store.load_checkpoint()
         except CheckpointMigrationError as exc:
@@ -856,15 +870,20 @@ class Orchestrator:
         )
         payload = _parse_json_object(text)
         claims = payload.get("claims", []) if isinstance(payload, dict) else []
-        # The whole raw, flattened once per step: the text every quote is searched in.
-        haystack = flatten_text(stripped)
+        # The whole raw, once per step, in both shapes a quote can be copied
+        # from: its values (what a page says) and its JSON (what the extractor saw).
+        texts = {
+            "values": flatten_text(stripped),
+            "json": normalize_space(json.dumps(stripped, ensure_ascii=False, default=str)),
+        }
+        args_text = json.dumps(item.arguments or {}, ensure_ascii=False, default=str).casefold()
         transform = item.tool.lower() in TRANSFORM_TOOLS
         added = 0
         for raw_claim in claims[:8]:
             if not isinstance(raw_claim, dict) or not raw_claim.get("claim"):
                 continue
             try:
-                entry = self._add_claim(ledger, item, raw_claim, raw_path, haystack,
+                entry = self._add_claim(ledger, item, raw_claim, raw_path, texts, args_text,
                                         transform=transform, step_id=step_id, raw_sha256=raw_sha256)
             except ValueError as exc:
                 # One malformed claim (e.g. a NaN value) is dropped on its own;
@@ -872,36 +891,49 @@ class Orchestrator:
                 log.warning("claim dropped for %s: %s", item.tool, exc)
                 continue
             if entry.quote_check == QUOTE_NOT_FOUND:
-                emit(log, "claim.quote_not_found", logging.INFO, claim_id=entry.id, step_id=step_id)
+                emit(log, "claim.quote_not_found", logging.INFO, run_id=ledger.run_id,
+                     claim_id=entry.id, step_id=step_id)
             added += 1
         return added
 
     @staticmethod
     def _add_claim(
-        ledger: Ledger, item: PlanItem, raw_claim: dict[str, Any], raw_path: Path, haystack: str,
+        ledger: Ledger, item: PlanItem, raw_claim: dict[str, Any], raw_path: Path,
+        texts: dict[str, str], args_text: str,
         *, transform: bool, step_id: str | None, raw_sha256: str | None,
     ) -> Claim:
         quote = raw_claim.get("quote")
         quote = quote.strip() if isinstance(quote, str) and quote.strip() else None
-        span, check = None, None
+        span, check, basis = None, None, None
         if transform:
             # A transform's raw is its own LLM note: finding the quote there
             # proves only that the note said it (B-007).
             check = QUOTE_TRANSFORM
+        elif is_llm_answer(item.tool):
+            check = QUOTE_LLM_ANSWER
         elif quote is not None:
-            span = find_quote(quote, haystack)
-            check = None if span is not None else QUOTE_NOT_FOUND
+            for basis, text in texts.items():
+                span = find_quote(quote, text)
+                if span is not None:
+                    break
+            if span is None:
+                basis, check = None, QUOTE_NOT_FOUND
+        # Independence comes from where the data came from, never from the
+        # extractor's say-so: a URL counts only if the raw or the request names it.
+        url = raw_claim.get("source_url")
+        url = url if isinstance(url, str) and url_in_text(url, texts["values"], texts["json"], args_text) else None
         return ledger.add(
             claim=str(raw_claim["claim"]),
             value=raw_claim.get("value"),
             unit=raw_claim.get("unit"),
             subject=raw_claim.get("subject"),
             source_tool=item.tool,
-            source_url=raw_claim.get("source_url"),
+            source_url=url,
             raw_ref=str(raw_path),
             step_id=step_id,
             quote=quote,
             quote_span=span,
+            quote_basis=basis,
             quote_check=check,
             document_sha256=raw_sha256,
         )

@@ -88,12 +88,15 @@ Follow the flagship (`saas-competitor-teardown/SKILL.md`):
    VERIFIED/ASSUMED tags, [CONFLICT] instead of silent averaging, LLM output
    never a primary source. Reference, don't re-derive. The ledger enforces the
    meaning of VERIFIED (schema 2): a claim is verified only when its quote is
-   found in the step's stored raw with the value inside it, or when two agreeing
-   claims come from **different publishers** (registrable domain of the source
-   URL) or **different data providers** (tool prefix, e.g. `spyfu` vs
-   `dataforseo`). Two tools reading one URL, two endpoints of one provider, and
-   a transform summarizing a tool are each ONE source — design triangulation
-   steps across providers or publishers, not across tools of one provider.
+   found in the step's stored raw with the value inside it (one source saying
+   it), or when two agreeing claims from different steps come from
+   **different publishers** (registrable domain of a URL the raw names) or
+   **different upstream data providers** (e.g. `spyfu` vs `dataforseo`; two
+   delivery vendors of one Google dataset — `google_trends` and
+   `serpapi_google_trends` — are ONE source). Two tools reading one URL and two
+   endpoints of one provider are one source; a transform and an LLM-answer tool
+   count as NO source. Design triangulation steps across providers or
+   publishers, not across delivery tools of one upstream.
 5. `## Output instructions` — numbered required report sections. The first
    section is the decision summary; the last is always the Source log (tool +
    retrieval date per figure, confidence ladder, [CONFLICT] register, refresh

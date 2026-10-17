@@ -191,16 +191,32 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   under `stats.llm_usage` in every run's output.
 - **Evidence statuses (ledger schema 2).** A claim's status is recomputed over
   its whole subject group on every change and on load, so it never depends on
-  arrival order. `verified` needs either a quote found in the step's stored raw
-  (the whole raw, sha256-checked on resume) with the value inside it, or two
-  agreeing claims from distinct known sources — different publishers (the
-  registrable domain of the source URL) or different data providers. Two tools
-  over one URL, two endpoints of one provider and a transform note are one
-  source each. Two distinct values in a group make every valued claim
-  `conflict`; a claim without a value never confirms or resolves one. The
+  arrival order. `verified` needs either:
+  - **span** — the claim's quote is found in the step's whole stored raw (its
+    values or its JSON, sha256-checked on resume; a bare number is not a quote)
+    and the value sits inside the quote on number boundaries (1200 is not in
+    11,200). A span-verified claim is one source saying it; or
+  - **corroboration** — two agreeing claims from two different steps with
+    distinct known sources: different publishers (registrable domain of a URL
+    the raw or the request actually names — an extractor-supplied URL that the
+    raw does not contain is dropped) or different upstream data providers
+    (delivery wrappers removed: `google_trends` and `serpapi_google_trends` are
+    one Google Trends source).
+
+  Never a source: a transform note and an LLM-answer tool (Perplexity, Gemini,
+  Google AI mode/overview, `*_responses`) — their own text never span-verifies
+  and they add no independence; a web search/scrape claim without a URL; a
+  claim whose quote was not found. Two values that disagree make every valued
+  claim of the group `conflict` (a missing unit is compatible with any unit;
+  `$` and `USD` are one unit); a claim without a value never confirms or
+  resolves one, and a chart over a conflicting claim is rejected. The
   extractor's own word never verifies; a v1 ledger's `verbatim` claim without a
-  quote loads as `assumed` with the reason in `verification.detail`. Events:
-  `claim.verified`, `claim.conflict`, `claim.quote_not_found`.
+  quote loads as `assumed` with the reason in `verification.detail`. Reports
+  written before schema 2 keep their old tags — regenerate them with
+  `rewrite_report`, which also re-saves the ledger; judge status shares are
+  not comparable across this change. Events: `claim.verified`,
+  `claim.conflict`, `claim.quote_not_found` (with `run_id`; under the service
+  they reach `service.log` once B-035 lands).
 - Charts are rendered deterministically from ledger data, never described by
   the LLM.
 

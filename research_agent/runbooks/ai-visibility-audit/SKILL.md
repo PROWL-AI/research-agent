@@ -156,7 +156,9 @@ no scorecard.
 - A "brand X is mentioned / not mentioned" claim needs ≥2 engines or it is
   tagged ASSUMED. Google AI claims need ≥2 of `google_ai_mode`,
   `dataforseo_serp_google_ai_mode`, `serpapi_google_ai_overview` agreeing;
-  disagreement → `[CONFLICT]`.
+  disagreement → `[CONFLICT]`. Engine answers are LLM output: the ledger
+  keeps them ASSUMED, so report agreement as "consistent across N engines",
+  never as VERIFIED.
 - Share-of-voice numbers state their denominator (prompts × engines × date).
 - LLM answer CONTENT is never evidence about the market — only about what the
   engine said. Market facts come from data tools.

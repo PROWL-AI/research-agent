@@ -121,6 +121,10 @@ def validate_against_ledger(spec: ChartSpec, ledger: Ledger) -> str | None:
         if claim is None:
             return f"unknown claim ref {ref}"
         claims.append(claim)
+    conflicted = [c.id for c in claims if c.status.value == "conflict"]
+    if conflicted:
+        # A bar settles a figure the ledger says sources disagree on.
+        return f"claim {', '.join(conflicted)} is in conflict — cite both sides in prose with [CONFLICT]"
     claim_values = [
         rounded for claim in claims
         if (rounded := _to_float(claim.value)) is not None
