@@ -700,6 +700,18 @@
       "notes": "Owner: the 0xDEV/local slot (not this repo). Rotate through Observatory doors and settle with vault.py settle; or re-scope the finding away from prowl-research.",
       "wave": null,
       "release": "external"
+    },
+    {
+      "id": "B-035",
+      "title": "Service configures no logging: INFO events never reach service.log; launchd stdout log has no size cap or rotation",
+      "source": "infra check 2026-10-17 · research_agent/service/cli.py; launchd plist StandardOutPath",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 4,
+      "release": "this"
     }
   ]
 }

@@ -27,6 +27,7 @@
 | B-032 | Server-side dedupe of a same-key resend is unverified offline (Prowl retry window, 15 min default); CORE-14 | wave-2 product certification 2026-10-12 | S | 3 | 3 | 0 | 9 | open | wave 6 |
 | B-033 | This checkout is not a Fabric project: `fabric_whoami` refuses, so the project board (`com.*`) and work claims are unreachable; this file stays the board | `fabric_whoami` 2026-10-16 | S | 2 | 2 | 0 | 4 | open — operator step in Fabric: + Project → Open a project | external |
 | B-034 | Observatory attributes 3 critical leaked-unrotated keys (`CIVITAI_API_TOKEN`, `HF_TOKEN`, `REPLICATE_API_TOKEN`, slot `0xDEV/local`, seen 2026-09-14) to this project; research-agent uses none of them | `observatory_findings` project:prowl-research 2026-10-16 | S | 3 | 1 | 1 | 4 | open — owner is the `0xDEV/local` slot: rotate via Observatory doors + `vault.py settle`, or re-scope the finding | external |
+| B-035 | Service configures no logging: INFO events (`claim.*`, `budget.stop`, `evidence.incomplete` below WARNING) never reach `service.log`, and the launchd stdout/stderr file has no size cap or rotation | infra check 2026-10-17 · `research_agent/service/cli.py` (no logging setup); launchd plist StandardOutPath; `service.log` 0 B after 6 days | S | 2 | 2 | 0 | 4 | open | wave 4 |
 
 Prio = `Sev × Blast + age_bonus` (`age_bonus` 1 past 14 days, 2 past 30).
 
