@@ -449,3 +449,13 @@ def test_the_parenthesised_conflict_tag_marks_a_register_too(tmp_path, body):
 def test_only_a_currency_letter_or_scale_word_scales_a_unit(tmp_path, unit, sentence, expected):
     claim = dict(claim="a measured value of 12", subject="thing", value=12, unit=unit, source_tool="spyfu_get_domain_stats")
     assert _kinds("# R\n\n" + sentence + "\n", _ledger(tmp_path, claim)) == expected
+
+
+@pytest.mark.parametrize("legend", [
+    "Statuses: (VERIFIED), (ASSUMED), (CONFLICT).",
+    "## Key: (VERIFIED) checked · (CONFLICT) sources disagree",
+    "Statuses: [VERIFIED], [ASSUMED], [CONFLICT].",
+])
+def test_a_status_legend_with_tags_is_not_a_register(tmp_path, legend):
+    body = legend + "\n\n- 300 paid keywords [C1]\n- 900 paid keywords [C2]"
+    assert _kinds("# R\n\n" + body + "\n", _ledger(tmp_path, *PK)) == ["conflict_hidden", "conflict_hidden"]

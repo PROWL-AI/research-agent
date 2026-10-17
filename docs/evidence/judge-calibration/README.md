@@ -30,7 +30,7 @@ model a judging of the largest local report estimates at about USD 0.004.
   sentence the writer marked "derived": the checks read figures and the derived mark, not meaning.
 - A conflict cited under a heading or list lead-in that is a conflict register (the tag in brackets or
   parentheses, `[CONFLICT]` / `(CONFLICT)`, or the words "conflict register"; a status legend listing
-  CONFLICT is not one): that is the disclosure the runbooks require, so a register that
+  CONFLICT — a line naming two or more statuses, tagged or not — is not one): that is the disclosure the runbooks require, so a register that
   mislabels an unrelated claim is not caught.
 
 ## The checks on real reports

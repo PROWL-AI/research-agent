@@ -38,8 +38,9 @@ MUTANTS = [
     # W6 fix round
     ("llm-error-exit-2", J, "    except LLMError as exc:\n", "    except ZeroDivisionError as exc:\n", JT),
     ("judge-no-prowl", J, "Config.from_env(require_prowl=False)", "Config.from_env()", JT),
-    ("register-heading", J, "or _CONFLICT_REGISTER_RE.search(heading) is not None", "", JT),
-    ("register-lead-in", J, "or (bullet and _CONFLICT_REGISTER_RE.search(lead_in) is not None)", "", JT),
+    ("register-heading", J, " or _register(heading)\n", "\n", JT),
+    ("register-lead-in", J, "or (bullet and _register(lead_in))", "", JT),
+    ("legend-not-register", J, "and len(set(_STATUS_WORD_RE.findall(text))) < 2", "", JT),
     ("source-log-rows", J, "or _SOURCE_LOG_HEADING_RE.match(heading) is not None)", ")", JT),
     ("conflict-tag-exact", J, 'disclosed = (_CONFLICT_TAG_RE.search(stripped) is not None', 'disclosed = ("conflict" in stripped.lower()', JT),
     ("table-register", J, 'or stripped.startswith("|")', "", JT),
@@ -70,7 +71,7 @@ MUTANTS = [
     ("source-log-numbered", J, "(?:\\d+[.)]\\s*)?(?:\\*\\*)?source log", "source log", JT),
     ("source-log-exact", J, "source log(?:\\*\\*)?\\s*[:.]?\\s*$", "source log", JT),
     ("unit-scale", J, "values.append(value * (_SCALE.get(word) or _LETTER_SCALE[word]))", "pass", JT),
-    ("register-bracketed", J, r'_CONFLICT_REGISTER_RE = re.compile(r"[\[(]CONFLICT[\])]|', r'_CONFLICT_REGISTER_RE = re.compile(r"\bCONFLICT\b|', JT),
+    # (register-bracketed retired: since the legend rule, a bare CONFLICT in a heading is covered by legend-not-register)
     ("partially", "research_agent/agent/writer.py", r"\bpartial(?:ly)?\b", r"\bpartial\b", JT),
     ("dry-run-exit-2", "scripts/install-fabric-service.py", "if problem:raise SystemExit(2)", "if False:raise SystemExit(2)", JT),
     # B-045

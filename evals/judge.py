@@ -256,6 +256,14 @@ _CONFLICT_TAG_RE = re.compile(r"\bCONFLICT\b")
 #: not a status legend that merely lists CONFLICT among the statuses.
 _CONFLICT_REGISTER_RE = re.compile(r"[\[(]CONFLICT[\])]|(?i:\bconflicts?\s+register\b)")
 #: A section named "Source log", numbered or bold as the runbooks write it — not "Source log and findings".
+#: A status legend names two or more statuses ("(VERIFIED) checked · (CONFLICT) disagree"): not a register.
+_STATUS_WORD_RE = re.compile(r"\b(?:VERIFIED|ASSUMED|CONFLICT|UNVERIFIED)\b")
+
+
+def _register(text: str) -> bool:
+    return _CONFLICT_REGISTER_RE.search(text) is not None and len(set(_STATUS_WORD_RE.findall(text))) < 2
+
+
 _SOURCE_LOG_HEADING_RE = re.compile(r"^#+\s*(?:\d+[.)]\s*)?(?:\*\*)?source log(?:\*\*)?\s*[:.]?\s*$", re.IGNORECASE)
 _DERIVED_RE = re.compile(r"\bderived\b(?!\s+from\b)", re.IGNORECASE)
 
@@ -294,8 +302,8 @@ def _conflict_scopes(report_md: str) -> list[tuple[str, bool]]:
         bullet = bool(re.match(r"^([-*+]|\d+[.)])\s", stripped)) or stripped.startswith("|")
         if stripped and not bullet:
             lead_in = stripped
-        disclosed = (_CONFLICT_TAG_RE.search(stripped) is not None or _CONFLICT_REGISTER_RE.search(heading) is not None
-                     or (bullet and _CONFLICT_REGISTER_RE.search(lead_in) is not None)
+        disclosed = (_CONFLICT_TAG_RE.search(stripped) is not None or _register(heading)
+                     or (bullet and _register(lead_in))
                      or _SOURCE_LOG_HEADING_RE.match(heading) is not None)
         out.append((line, disclosed))  # a blank line keeps the lead-in: "Register:\n\n- C1 …"
     return out
