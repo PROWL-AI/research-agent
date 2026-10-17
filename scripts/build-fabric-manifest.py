@@ -6,8 +6,8 @@ from research_agent.service.protocol import CAPABILITIES, JOBS, SCHEMAS, RESULT_
 from research_agent.service.store import digest
 ROOT=Path(__file__).resolve().parents[1]
 folder=ROOT/'fabric/schemas';folder.mkdir(parents=True,exist_ok=True)
-manifest={'contractVersion':'0.1.0','provider':{'id':'https://prowl.chat/fabric/providers/research-agent','revision':5,
- 'createdAt':'2026-10-10T00:00:00Z','createdBy':'urn:fabric:operator:prowl-ai','name':'Prowl Research',
+manifest={'contractVersion':'0.1.0','provider':{'id':'https://prowl.chat/fabric/providers/research-agent','revision':6,
+ 'createdAt':'2026-10-17T00:00:00Z','createdBy':'urn:fabric:operator:prowl-ai','name':'Prowl Research',
  'identity':{'subject':'https://prowl.chat/fabric/providers/research-agent','method':'local-install'},'supportedContractVersions':['0.1.0'],
  'extensions':{'https://fabric.passioncode.ai/agent-contract/extensions/service/0.1':{'descriptor':'prowl-research.default'}}},'capabilities':[]}
 for name in CAPABILITIES:

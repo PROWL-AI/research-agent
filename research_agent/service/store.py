@@ -86,7 +86,7 @@ class Store:
     def jobs(self):
         return [json.loads(r[0]) for r in self.db.execute("SELECT body FROM jobs ORDER BY rowid DESC LIMIT 5000")]
 
-    def create(self, request: dict, request_key: str, trace: str | None = None):
+    def create(self, request: dict, request_key: str, trace: str | None = None, delegation: dict | None = None):
         request_hash = digest(request)
         with self.db:
             row = self.db.execute("SELECT request_hash,body FROM jobs WHERE request_key=?", (request_key,)).fetchone()
@@ -98,7 +98,10 @@ class Store:
                 raise Conflict("Хранилище содержит 5000 запросов. Архивируйте данные перед новым запуском.")
             job_id = "pr-" + secrets.token_hex(10)
             job = dict(id=job_id, status="input_required", phase="approval", createdAt=now(), updatedAt=now(),
-                       request=request, config=self.config(), traceparent=trace, result=None, error=None)
+                       request=request, config=self.config(), traceparent=trace, result=None, error=None,
+                       # Who acts for whom (a verified delegation, DEC-0039); None for the
+                       # service's own agent token or the operator's dashboard.
+                       delegation=delegation)
             job["proposal"] = {"digest": digest({"id": job_id, "request": request, "config": job["config"]}),
                                "expiresAt": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat().replace("+00:00", "Z")}
             self.db.execute("INSERT INTO jobs VALUES(?,?,?,?)", (job_id, request_key, request_hash, json.dumps(job)))

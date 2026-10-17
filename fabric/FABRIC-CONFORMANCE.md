@@ -1,6 +1,6 @@
 # Current adapter — revision 5 (2026-10-10)
 
-The active manifest now describes the separate loopback Fabric service, not legacy stdio. Contract pin: `623bf61358c339cb10297807b3f024b5d9f1f327`. Exact tool definitions generate their schemas and manifest via `scripts/build-fabric-manifest.py`. `provider.contentHash` is SHA256 of compact, key-sorted UTF-8 manifest JSON before inserting that contentHash; runtime producer references use the same generated manifest. Installed build commit/digest identifies implementation separately.
+The active manifest now describes the separate loopback Fabric service, not legacy stdio. Contract pin: `7a14a4877ca7d7b28cc33a0f52beaa14b38e1d92` (wave 5, 2026-10-17; was `623bf61` until revision 5). Exact tool definitions generate their schemas and manifest via `scripts/build-fabric-manifest.py`. `provider.contentHash` is SHA256 of compact, key-sorted UTF-8 manifest JSON before inserting that contentHash; runtime producer references use the same generated manifest. Installed build commit/digest identifies implementation separately.
 
 Current evidence and open gates: [Fabric handoff](../docs/evidence/fabric-dashboard/HANDOFF.md). Prior receipts below are historical and do not certify revision 5. Admission fixtures remain discovery-only proposals; no charge-capability admission is claimed from their declarations. All declared schemas resolve locally beside the manifest.
 

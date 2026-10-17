@@ -287,3 +287,84 @@ def test_failover_sentences(body, gaps):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert module.failover_gaps(body, [], ["serp_bing", "moz_da", "google_search"]) == gaps
+
+
+async def test_a_failed_service_job_is_resumed_without_paying_again(tmp_path, monkeypatch, patched_runbooks):
+    """B-039: research.run with resumeJobId continues the ended job's run: the
+    paid tool step is not dispatched again; only the writer runs."""
+    import asyncio
+
+    import research_agent.service.runtime as runtime_mod
+    from research_agent.evidence.store import ArtifactStore
+    from research_agent.service.runtime import Runtime
+    from test_llm_budget import Provider
+
+    monkeypatch.setenv("PROWL_API_KEY", "test-not-a-key")
+    monkeypatch.setenv("RESEARCH_LLM_API_KEY", "test-not-a-key")
+    monkeypatch.setenv("RESEARCH_NO_SUBAGENTS", "1")
+    monkeypatch.delenv("RESEARCH_MAX_LLM_USD", raising=False)
+    dispatched = []
+    healthy = Provider(cost=0.01, plan_steps=1)
+    state = {"writer_down": True}
+
+    def provider(request):
+        body = json.loads(request.content)
+        if state["writer_down"] and "response_format" not in body:
+            return httpx.Response(400, json={"error": "writer unavailable"})
+        return healthy(request)
+
+    class Session:
+        async def call_tool(self, name, arguments, **kwargs):
+            if name == "prowl_list_tools":
+                body = {"tools": ["spyfu_get_domain_stats", "dataforseo_bl_summary"]}
+            else:
+                if name == "prowl_call_tool":
+                    dispatched.append(arguments)
+                body = {"success": True, "data": {"visits": 42}, "billing": {"actual_cost_usd": 0.05}}
+            return CallToolResult(content=[TextContent(type="text", text=json.dumps(body))])
+
+    class TestProwl(ObservedProwl):
+        async def __aenter__(self):
+            self._session = Session()
+            return self
+
+        async def __aexit__(self, *exc):
+            return None
+
+    class TestLLM(ObservedLLM):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._client = httpx.AsyncClient(transport=httpx.MockTransport(provider))
+
+    monkeypatch.setattr(runtime_mod, "ObservedProwl", TestProwl)
+    monkeypatch.setattr(runtime_mod, "ObservedLLM", TestLLM)
+    store = Store(tmp_path)
+    rt = Runtime(store)
+    try:
+        request = {"kind": "research", "runbook": "mini-teardown", "inputs": {"competitors": ["example.com"]}}
+        first = rt.create(dict(request, max_llm_usd=2.0), "first")
+        rt.decide(first["id"], first["proposal"]["digest"], True)
+        await asyncio.gather(*list(rt.tasks.values()))
+        assert store.job(first["id"])["status"] == "failed"
+        assert len(dispatched) == 1
+        with pytest.raises(ValueError, match="another runbook|names no job"):
+            rt.create(dict(request, runbook="mini-teardown", resumeJobId="nope"), "bad")
+        state["writer_down"] = False
+        second = rt.create(dict(request, resumeJobId=first["id"]), "resume")
+        assert second["status"] == "input_required"  # a resume can spend: the operator still decides
+        rt.decide(second["id"], second["proposal"]["digest"], True)
+        await asyncio.gather(*list(rt.tasks.values()))
+        done = store.job(second["id"])
+        assert done["status"] == "completed", done.get("error")
+        assert len(dispatched) == 1  # the paid step was not sent again
+        checkpoint = ArtifactStore(tmp_path / "runs" / first["id"]).load_checkpoint()
+        assert checkpoint.status == "complete" and checkpoint.llm_cap_usd == 2.0
+        with pytest.raises(ValueError, match="only an ended, unfinished job"):
+            rt.create(dict(request, resumeJobId=second["id"]), "again")
+        from research_agent.service.protocol import artifact
+        assert artifact(store, second["id"], "report.md")["content"].startswith("# Report")
+        with pytest.raises(ValueError, match="max_llm_usd"):
+            rt.create(dict(request, max_llm_usd=0), "zero")
+    finally:
+        await rt.close()
+        store.db.close()

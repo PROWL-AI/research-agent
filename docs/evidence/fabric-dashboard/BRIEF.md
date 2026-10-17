@@ -19,7 +19,7 @@ no further approval is needed for reversible implementation.
 - Existing Prowl agent at 9a7f14bb: CLI, stdio MCP, Orchestrator, local run artifacts.
 - Kimi remediation queue: 12 open defects; service adaptation does not silently
   close them or call baseline tests live acceptance.
-- Fabric Agent Contract 0.1.0, pinned 623bf61358c339cb10297807b3f024b5d9f1f327:
+- Fabric Agent Contract 0.1.0, pinned 7a14a4877ca7d7b28cc33a0f52beaa14b38e1d92 (was 623bf61 until provider revision 6):
   service + interop, jobs, trace context, descriptor, auth and usage.
 - Fabric Dashboards source: host displays a service-owned same-origin dashboard;
   app never starts an arbitrary background process; launchd owns supervision.
