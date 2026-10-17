@@ -29,7 +29,7 @@ Fabric owns ordering between agents. Prowl owns one bounded job. The journal kee
 
 | MCP tool | Input | Result |
 |---|---|---|
-| `research.run` | runbook, inputs, idempotencyKey, optional context | durable job handle |
+| `research.run` | runbook, inputs, idempotencyKey, optional context, optional `max_llm_usd` (the run's LLM cap), optional `resumeJobId` (continue an ended research job's run: saved raw, attempt ledger and cap carry over; nothing already paid is dispatched again; the operator still approves) | durable job handle |
 | `research.tools.call` | tool, params, idempotencyKey, optional context | durable job handle |
 | `research.tutorial` | idempotencyKey, optional context | synthetic job handle; no provider traffic |
 | `research.list_runbooks` | empty object | result envelope containing local runbooks and input definitions |
@@ -76,9 +76,13 @@ prowl-research-service serve --root /absolute/private/test-data --port 18765
 
 Open through Fabric Dashboards' resolved `open_link`; direct HTTP without host login is intentionally unauthenticated. Fabric host main process exchanges its token for a single-use login code. Browser sessions last eight hours; restarting does not silently approve pending jobs. Decisions expire after one hour and are tied to the exact request/config snapshot.
 
-Provider secrets must be supplied by an Observatory-managed consumer launch, outside Git, dashboard fields and plist values. Required names: PROWL_API_KEY and RESEARCH_LLM_API_KEY (or OPENROUTER_API_KEY). No keys means degraded-but-usable tutorial/inspection, not a healthy paid runtime. Local install intentionally does not copy parent `.env` files or reuse unrelated agent credentials.
+Provider secrets must be supplied by an Observatory-managed consumer launch, outside Git, dashboard fields and plist values: `python3 scripts/install-fabric-service.py --vault-project <folder>` launches `serve` through `use_secret.py run --vault-only --env prod <folder> PROWL_API_KEY,RESEARCH_LLM_API_KEY -- …` and refuses to install while a slot is missing; `--dry-run` prints that argv and the missing slots. Required names: PROWL_API_KEY and RESEARCH_LLM_API_KEY (or OPENROUTER_API_KEY). On the operator's machine the slots are not issued yet (B-042: the registry maps this repository ambiguously; B-043: no door issues `prowl_` keys), so the service runs degraded. No keys means degraded-but-usable tutorial/inspection, not a healthy paid runtime. Local install intentionally does not copy parent `.env` files or reuse unrelated agent credentials.
 
 MCP registration: the `prowl-research` entry lives in each agent client's own configuration — on the operator's machine, Claude Code, Cursor, OpenCode and Codex (see [verification, machine integration footprint](evidence/fabric-dashboard/VERIFICATION.md#machine-integration-footprint)). Registering new servers in a shared gateway file (`~/.config/agentgateway/servers.yaml`) is a retired route on that machine; do not add this service there. Each client entry points at a scoped gateway profile named `prowl` (launchd label `dev.agentgateway.prowl`), which fronts this service with the service's agent token. The host token never goes into a client or gateway configuration. Client configurations, gateway configuration and tokens are machine-local and are not committed here. A client session started before its entry was added does not see the tools; restart it, and a new session discovers the 7 tools listed above. A gateway route is not Fabric hub admission.
+
+**Delegation (DEC-0039, FD-12).** Callers call this service directly; the estate hub only issues delegation tokens. A loopback caller with the service's agent token is T0 and needs no token; a delegation token it sends is still verified and recorded on the job. A caller with only a delegation token, or off the machine, is T2 and must present a valid one. Configure `RESEARCH_DELEGATION_ISSUER`, `RESEARCH_DELEGATION_JWKS` (and optionally `RESEARCH_DELEGATION_AUDIENCE`, default `prowl-research.default`); the well-known document then declares `auth.delegation`. Without them a presented token is refused (fail closed). `serve --host` beyond loopback is refused without delegation. Route, refusals and the pending host-chain receipt: [HUB-PACKET](evidence/fabric-dashboard/HUB-PACKET.md).
+
+**Dashboard.** The page uses `fabric-dashboard-kit@1.1.0` (DEC-0036): kit chrome and navigation, the estate themes and scheme (the host's appearance wins), fluid grids and keyboard-reachable scroll boxes; the well-known document declares the dashboard extension (minWidth 360). Layout probe: `check_dashboard_layout.mjs` 17 rules PASS at 320–1280 px (2026-10-17).
 
 ## Names
 

@@ -796,6 +796,30 @@
       "closable_in_one_pass": true,
       "wave": 6,
       "release": "this"
+    },
+    {
+      "id": "B-042",
+      "title": "Observatory registry maps this repository ambiguously; the OpenRouter door refuses to issue RESEARCH_LLM_API_KEY",
+      "source": "wave-5 build 2026-10-17 · openrouter.py issue refusal; prop:b4cdcb8465684ce9",
+      "status": "open — external",
+      "area": "service",
+      "node": "N-EXT",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": null,
+      "release": "external"
+    },
+    {
+      "id": "B-043",
+      "title": "No Observatory door issues prowl_ keys (prowl.chat POST /api/v1/keys with an account JWT)",
+      "source": "wave-5 build 2026-10-17 · prowl.chat /api/v1/keys",
+      "status": "open — external",
+      "area": "service",
+      "node": "N-EXT",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": null,
+      "release": "external"
     }
   ]
 }

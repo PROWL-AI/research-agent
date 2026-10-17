@@ -16,7 +16,7 @@ Design route: super-ux → sheleg-design / copywriting → task-pipeline. Produc
 
 ## Layout and visual decisions
 
-Desktop ≥1100: 208px left navigation, content max 1480px, journal plus detail page with persistent breadcrumbs. Medium: 160px navigation; mobile ≤760: horizontal scrollable navigation above content, single column; tables scroll inside their container. Native host title remains outside service UI. Header names Prowl Research, health and freshness, one primary “Новый запрос” action.
+Layout (wave 5, `fabric-dashboard-kit@1.1.0`, DEC-0036): sticky kit chrome (title, service chip, freshness, refresh, theme and scheme pickers) with the section navigation below it; links that do not fit fold into the kit's More menu — never a sideways-scrolling strip. Content in `.fd-page`; grids are fluid (`auto-fit` columns), tables scroll in their own labelled `.fd-scroll` box; usable from 360 CSS px. Colours come only from the kit tokens; the estate theme and scheme follow the host's appearance. Journal plus detail page with persistent breadcrumbs. Native host title remains outside service UI. Header names Prowl Research, health and freshness, one primary “Новый запрос” action.
 
 Signature: a readable research dossier: compact request rows followed by an ordered evidence trail. Cream surfaces, hairline dividers, sage for action, text state badges. Display Fraunces/Georgia, content Newsreader/Georgia, data JetBrains Mono/monospace. Font assets remain local; no CDN/network dependency. Focus ring 2px; targets ≥40px; labels always visible; colour never carries state alone. Page heading ceiling 40px desktop, 30px mobile. Motion 120/180ms, reduced-motion disables transitions.
 
@@ -26,7 +26,7 @@ Loading: heading and explicit loading line; no invented metrics. Empty: explain 
 
 ## Trust and limits
 
-The adapter reuses the existing research core. Prior KA-03…KA-12 findings remain tracked until individually fixed; evidence labels are reported as model/ledger claims, not independently verified truth. Local service discovery does not establish hub admission. Budget charts are accounting, not hard caps. A submitted tool job accepts arbitrary tool parameters within upstream schema/authorization; calls are bounded by timeout and operator approval. Cross-agent chaining belongs to Fabric `agent.call`, with this service returning job handles and machine-readable results.
+The adapter reuses the existing research core. KA-03…KA-12 are fixed in the core (waves 2–4); a ledger `verified` means a quote located in the stored source or two independent sources (ledger schema 2), not an independently audited truth, and live acceptance is wave 6. Local service discovery does not establish hub admission; the callee side of delegation is built (wave 5) and the host chain waits for the estate issuer. Budget figures are accounting; the run's limits are pre-call checks (tools by the runbook budget, models by `max_llm_usd`) and can overshoot by one call. A submitted tool job accepts arbitrary tool parameters within upstream schema/authorization; calls are bounded by timeout and operator approval. Other agents call this service directly with delegation tokens (DEC-0039); it returns job handles and machine-readable results.
 
 ## Acceptance
 

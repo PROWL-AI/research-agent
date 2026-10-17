@@ -14,7 +14,8 @@ Runtime source and installed build: **891fbc995cb382ec6ccaed5f1b91611918b931c7**
 | Installed end-to-end tutorial | PASS — gateway → service job → operator session decision → 3 rows, stable trace; 0 provider calls | [installed tutorial](raw/installed-tutorial.log); synthetic receipts excluded from real usage |
 | Fabric Dashboards host | available 0.6.7; resolver and OS dispatch accepted | [host receipt](raw/fabric-host.log) |
 | Native page rendering | NOT_VERIFIED | `cua.getApp("Fabric Dashboards")` twice timed out at 30 seconds. No browser fallback was used as a replacement host acceptance |
-| Fabric hub chain/admission | BLOCKED_BY_HOST_CAPABILITY | [FD-12 packet](HUB-PACKET.md): hub only connects fabric-inbox; no active hub.json observed |
+| Fabric delegation, callee side | PASS (offline, test key) | `tests/test_delegation.py`; [FD-12 packet](HUB-PACKET.md) |
+| Fabric host chain (issuer → caller → service) | NOT_RUN — host issuer absent | hub `fabric-hub/0.1` publishes no JWKS (404, 2026-10-17); KA-G03, wave 6 |
 | Paid provider acceptance | NOT_RUN | New supervised service has no provider credentials; no funds spent by these probes |
 | UX docs | PASS, exit 0 | `python3 <super-ux-0.59.1>/scripts/ux_lint.py` returned `OK — docs/ux is consistent` |
 | Hosted CI | NOT_RUN | `.github/workflows/nightly.yml` now exists (added 2026-10-11, B-031): nightly schedule plus manual dispatch, no push/PR triggers, per the estate nightly CI policy. First scheduled run pending; stays NOT_RUN until a run is read green. GitHub runs a schedule from the default branch only, so the file on this unmerged branch does not run until it reaches the default branch |
