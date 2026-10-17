@@ -482,7 +482,7 @@
       "id": "FD-13",
       "title": "Provider wiring: PROWL_API_KEY and an LLM key through an Observatory consumer; none exist in any vault slot for prowl-research",
       "source": "research_agent/service/app.py:55-57; observatory names (prowl-research: none)",
-      "status": "open — LLM key in vault prowl-research-agent (2026-10-17); prowl_ key blocked (B-043); installer launches with the slots the folder holds",
+      "status": "open — LLM key wired (installed d868706 launches with vault prowl-research-agent RESEARCH_LLM_API_KEY; health degraded for prowl only); prowl_ key blocked (B-043)",
       "area": "fabric",
       "node": "N-FAB",
       "blocked_by": [
@@ -834,13 +834,14 @@
       "id": "B-044",
       "title": "Installed service fails well-known.fast under machine saturation (load avg 175–250); handler answers in ~4 ms when the CPU is free",
       "source": "wave-5 install probe 2026-10-17 · docs/evidence/fabric-dashboard/raw/service-probe-12ad137.json",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — re-probe on d868706, 30 PASS / 0 FAIL"
     },
     {
       "id": "B-045",
