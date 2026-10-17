@@ -9,14 +9,14 @@ import secrets
 import time
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
 
 from research_agent.evidence.store import ArtifactStore
 from research_agent.evidence.ledger import Ledger
 from research_agent.agent.orchestrator import Orchestrator, build_brief
-from research_agent.config import Config, ConfigError
+from research_agent.config import Config, ConfigError, resolve_llm_cap
+from research_agent.service.delegation import require_owner
 from research_agent.llm import LLMClient, LLMError
-from research_agent.prowl_client import ProwlClient, ProwlError, ToolCallError, _call_timeout
+from research_agent.prowl_client import ProwlClient, ToolCallError
 from research_agent.runbook import get_runbook, list_runbooks
 from .store import Store, Conflict, digest, now
 
@@ -146,8 +146,9 @@ def bounded(value, limit=64000):
 
 
 def validate_request(request):
-    if not isinstance(request, dict) or set(request) - {"kind", "runbook", "inputs", "tool", "params", "context"}:
-        raise ValueError("Request fields: kind, runbook, inputs, tool, params, context")
+    if not isinstance(request, dict) or set(request) - {"kind", "runbook", "inputs", "tool", "params", "context",
+                                                         "max_llm_usd", "resumeJobId"}:
+        raise ValueError("Request fields: kind, runbook, inputs, tool, params, context, max_llm_usd, resumeJobId")
     kind = request.get("kind")
     if kind not in {"research", "tool", "tutorial"}:
         raise ValueError("kind must be research, tool or tutorial")
@@ -160,6 +161,19 @@ def validate_request(request):
         if not isinstance(request.get("runbook"), str) or not isinstance(request.get("inputs"), dict):
             raise ValueError("research requires runbook and inputs")
         build_brief(get_runbook(request["runbook"]), request["inputs"])
+        if isinstance(request.get("max_llm_usd"), bool):
+            raise ValueError("max_llm_usd must be a number")
+        try:
+            # The caller's cap and the service's RESEARCH_MAX_LLM_USD are checked
+            # here, before an approvable job exists (the stdio surface does the same).
+            resolve_llm_cap(request.get("max_llm_usd"), None, None)
+        except ConfigError as exc:
+            raise ValueError(str(exc)) from exc
+        if "resumeJobId" in request and (not isinstance(request["resumeJobId"], str)
+                                         or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", request["resumeJobId"])):
+            raise ValueError("resumeJobId must be a job id")
+    elif {"max_llm_usd", "resumeJobId"} & set(request):
+        raise ValueError("max_llm_usd and resumeJobId apply to research requests only")
     if kind == "tool":
         if not isinstance(request.get("tool"), str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", request["tool"]):
             raise ValueError("Invalid tool name")
@@ -180,18 +194,50 @@ class Runtime:
         self.tasks = {}
         self.stopping = False
 
-    def create(self, request, key, trace=None):
+    def create(self, request, key, trace=None, delegation=None, via="mcp"):
         if self.stopping:
             raise Conflict("Service is stopping")
         if not isinstance(key, str) or not 1 <= len(key) <= 128:
             raise ValueError("idempotencyKey must contain 1–128 characters")
         request = validate_request(request)
+        run_dir = self._check_resumable(request, delegation) if request.get("resumeJobId") else None
         if request["kind"] != "tutorial":
             try:
                 Config.from_env(require_llm=request["kind"] == "research")
             except ConfigError as exc:
                 raise ValueError("Provider credentials are not connected. Use the tutorial or configure the supervised service through Observatory.") from exc
-        return self.store.create(request, key, child_trace(trace))[0]
+        return self.store.create(request, key, child_trace(trace), delegation=delegation, run_dir=run_dir, via=via)[0]
+
+    def _check_resumable(self, request, delegation=None):
+        """B-039: a resume continues an ENDED, unfinished research job's run and
+        answers the run directory it continues — the root of a chain of resumes,
+        never a new one. Refused: another principal's job, another runbook, other
+        inputs than the run's (the operator approves what will run), a job the
+        operator rejected, a finished run, a run another resume already holds."""
+        try:
+            previous = self.store.job(request["resumeJobId"])
+        except Exception as exc:  # noqa: BLE001 — unknown id
+            raise ValueError("resumeJobId names no job of this service") from exc
+        require_owner(previous, delegation)
+        if previous["request"].get("kind") != "research":
+            raise ValueError("resumeJobId must name a research job")
+        if previous["request"].get("runbook") != request["runbook"]:
+            raise ValueError("resumeJobId belongs to another runbook")
+        if previous["request"].get("inputs") != request["inputs"]:
+            raise ValueError("a resume continues the run's own inputs; send them unchanged (a new run takes new inputs)")
+        if previous.get("phase") == "rejected":
+            raise ValueError(f"job {previous['id']} was rejected by the operator; nothing ran to continue")
+        run_dir = run_dir_name(previous)
+        if previous["status"] in {"input_required", "working"}:
+            raise ValueError(f"job {previous['id']} is {previous['status']}; only an ended job can be resumed")
+        if previous["status"] == "completed":
+            checkpoint = ArtifactStore(self.store.root / "runs" / run_dir).load_checkpoint()
+            if checkpoint is None or checkpoint.status == "complete":
+                raise ValueError(f"job {previous['id']} finished its run; nothing is left to continue")
+        for other in self.store.jobs():
+            if other["status"] in {"input_required", "working"} and run_dir_name(other) == run_dir:
+                raise ValueError(f"run {run_dir} is already being continued by job {other['id']}")
+        return run_dir
 
     def decide(self, job_id, proposal_digest, approve):
         job = self.store.decide(job_id, proposal_digest, approve)
@@ -250,7 +296,7 @@ class Runtime:
         job view and research.artifact.get name the same outcome (docs/FABRIC.md,
         "Job phase and run terminal state")."""
         try:
-            checkpoint = ArtifactStore(self.store.root / "runs" / job_id).load_checkpoint()
+            checkpoint = ArtifactStore(self.store.root / "runs" / run_dir_name(self.store.job(job_id))).load_checkpoint()
         except (ValueError, OSError):
             checkpoint = None
         if checkpoint is not None and checkpoint.terminal_code:
@@ -292,8 +338,12 @@ class Runtime:
                 return {"data": bounded(clean), "artifact": "result.json", "quality": "provider response; not independently verified"}
             async with ObservedLLM(cfg.llm_base_url, cfg.llm_api_key, cfg.llm_model, cfg.llm_model_strong).observe(self.store, job) as llm:
                 orch = Orchestrator(prowl, llm, self.store.root / "runs", max_workers=settings["max_workers"])
-                result = await orch.run(req["runbook"], req["inputs"], run_id=job["id"])
-                folder = self.store.root / "runs" / job["id"]
+                # A resume runs on the earlier job's run directory: its saved raw,
+                # attempt ledger and recorded cap carry over (B-039).
+                run_id = run_dir_name(job)
+                result = await orch.run(req["runbook"], req["inputs"], run_id=run_id,
+                                        max_llm_usd=req.get("max_llm_usd"))
+                folder = self.store.root / "runs" / run_id
                 return {"research": result.model_dump(), "report": (folder / "report.md").read_text()[:200000],
                         # The compact view inline; the whole schema-2 ledger (quotes,
                         # spans, source identity) is the ledger.json artifact (B-036).
@@ -313,12 +363,28 @@ class Runtime:
         outcome, statement = outcome_for(output)
         envelope = {"id": "urn:prowl:result:" + job["id"], "contractVersion": "0.1.0", "outcome": outcome,
                     "done": [{"claimId": "RUN_COMPLETED", "statement": statement}],
-                    "proof": [], "scope": scope, "notVerified": [{"claim": "Fabric admission and chain attribution", "reason": "Caller-declared context is not a verified hub binding"},
+                    "proof": [], "scope": scope, "notVerified": [attribution_gap(job),
                     {"claim": "Research claims", "reason": output.get("quality", "not independently verified")}],
                     "artifacts": [], "createdAt": now(), "producer": producer, "output": output, "usage": usage}
         if job.get("traceparent"):
             envelope["trace"] = {"traceparent": job["traceparent"]}
         return envelope
+
+
+def attribution_gap(job):
+    """What the envelope cannot vouch for about who asked. A verified delegation
+    (DEC-0039) proves the principal and the caller; a hub binding is still not
+    presented, so admission stays unverified either way."""
+    if job.get("delegation"):
+        return {"claim": "Fabric admission", "reason": "The delegation token was verified offline and its principal and "
+                "caller recorded; no hub binding receipt was presented"}
+    return {"claim": "Fabric admission and chain attribution", "reason": "Caller-declared context is not a verified hub binding"}
+
+
+def run_dir_name(job):
+    """The run directory a job writes: its own id, or — for a resume (B-039) —
+    the root run of the chain it continues, fixed when the resume was created."""
+    return job.get("runDir") or job["id"]
 
 
 def outcome_for(output):

@@ -115,6 +115,7 @@ def main():
         build = json.loads(args.build.read_text()) if args.build else None
         app = create_app(args.root, token(args.root, "host.token"), token(args.root, "agent.token"), args.port, build)
         # Never log request URLs: the host's one-use login code is in its URL.
+        # Loopback only: the dashboard login and the own-token tier (T0) assume it.
         uvicorn.run(app, host="127.0.0.1", port=args.port, access_log=False, log_level="warning", timeout_graceful_shutdown=8)
     finally:
         os.close(fd)

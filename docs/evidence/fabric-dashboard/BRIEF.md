@@ -19,7 +19,7 @@ no further approval is needed for reversible implementation.
 - Existing Prowl agent at 9a7f14bb: CLI, stdio MCP, Orchestrator, local run artifacts.
 - Kimi remediation queue: 12 open defects; service adaptation does not silently
   close them or call baseline tests live acceptance.
-- Fabric Agent Contract 0.1.0, pinned 623bf61358c339cb10297807b3f024b5d9f1f327:
+- Fabric Agent Contract 0.1.0, pinned 7a14a4877ca7d7b28cc33a0f52beaa14b38e1d92 (was 623bf61 until provider revision 6):
   service + interop, jobs, trace context, descriptor, auth and usage.
 - Fabric Dashboards source: host displays a service-owned same-origin dashboard;
   app never starts an arbitrary background process; launchd owns supervision.
@@ -45,11 +45,11 @@ no further approval is needed for reversible implementation.
 | FD-09 | Tutorials | Safe sample request with labeled synthetic results, no provider calls or real spend | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
 | FD-10 | Detailed design, responsive keyboard UI | Scenarios, screen states, token source, browser walkthrough with receipts | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
 | FD-11 | Delivery and operator entry point | Tests, schema/semantic/runtime gate table, registered service/host link or exact unresolved gate | delivered locally; gates in [VERIFICATION](VERIFICATION.md) |
-| FD-12 | Callee side of DEC-0039 delegation tokens, by trust tier | On this machine and the operator's enrolled machines the operator's instruction is the authority: no delegation token is required; a token a local caller does send is verified and recorded for attribution only. A token is required only for callers across the machine boundary or another person's calls (Fabric ADR-0144 amendment 4, Fabric commit `19ad05ca`, operator decision 2026-10-11) | open — wave 5 ([canvas §2 N-FAB](../../specs/2026-10-11-waves-canvas.md)); Fabric host issuer not built yet; host-chain acceptance is KA-G03, wave 6 |
-| FD-13 | Provider wiring through an Observatory consumer | Service launched vault-only with `PROWL_API_KEY` and `RESEARCH_LLM_API_KEY`; status leaves `degraded` | open — wave 5, agent work since the canvas revision of 2026-10-11: the LLM key is issued through an Observatory door; the `prowl_` key has no door yet, and wave 5 adds one or records the gap |
+| FD-12 | Callee side of DEC-0039 delegation tokens, by trust tier | On this machine and the operator's enrolled machines the operator's instruction is the authority: no delegation token is required; a token a local caller does send is verified and recorded for attribution only. A token is required only for callers across the machine boundary or another person's calls (Fabric ADR-0144 amendment 4, Fabric commit `19ad05ca`, operator decision 2026-10-11) | callee side built — wave 5, `198a227` (`tests/test_delegation.py`, [HUB-PACKET](HUB-PACKET.md)). As built: the service binds loopback only; the own agent token from loopback is T0 (no delegation token required, one sent is verified and recorded); any other caller must present a valid token. Host-chain acceptance is KA-G03, wave 6: the hub publishes no keys yet (JWKS 404, 2026-10-17) |
+| FD-13 | Provider wiring through an Observatory consumer | Service launched vault-only with `PROWL_API_KEY` and `RESEARCH_LLM_API_KEY`; status leaves `degraded` | installer ready — `install-fabric-service.py --vault-project <folder>` launches through `use_secret.py serve --consumer chat.prowl.research` (dry-run shows the argv). Key issuing blocked: Observatory's registry maps this repo's folder ambiguously (B-042); the `prowl_` key has no door (B-043) |
 | FD-14 | Native panel rendering in the Fabric Dashboards host | The service page observed inside the host app, not a browser stand-in | NOT_VERIFIED — wave 6; installed host 0.6.7, current 0.7.1; host upgrade is the operator's administration |
 
-FD-12 originally assumed a hub-forwarding route (the host relays a call to this service). Fabric ADR-0144 (passioncode-ai/fabric, accepted 2026-10-11) retired that route: the hub issues the delegation chain and callers call this service directly. [HUB-PACKET](HUB-PACKET.md) still describes the retired route and is rewritten in wave 5 (B-014).
+FD-12 originally assumed a hub-forwarding route (the host relays a call to this service). Fabric ADR-0144 (passioncode-ai/fabric, accepted 2026-10-11) retired that route: the hub issues the delegation chain and callers call this service directly. [HUB-PACKET](HUB-PACKET.md) was rewritten around direct calls in wave 5 (B-014).
 
 ## Architecture decisions
 

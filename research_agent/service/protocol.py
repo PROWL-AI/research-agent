@@ -2,9 +2,9 @@
 from __future__ import annotations
 import base64
 import json
-from pathlib import Path
 from jsonschema import Draft202012Validator
-from .runtime import child_trace, runbooks
+from .delegation import Refused, recorded, refusal_tool_result, require_owner
+from .runtime import child_trace, run_dir_name, runbooks
 from .store import Conflict
 
 VERSION = "2026-07-28"
@@ -21,7 +21,14 @@ STRING = {"type": "string", "minLength": 1, "maxLength": 128}
 CONTEXT = obj({k: {"type": "string", "maxLength": 256} for k in ["requester", "chain", "project", "node", "parent"]})
 COMMON = {"idempotencyKey": STRING, "context": CONTEXT}
 SCHEMAS = {
- "research.run": obj(dict(COMMON, runbook=STRING, inputs={"type": "object"}), ["idempotencyKey", "runbook", "inputs"]),
+ "research.run": obj(dict(COMMON, runbook=STRING, inputs={"type": "object"},
+                          max_llm_usd={"type": "number", "exclusiveMinimum": 0, "maximum": 1000,
+                                       "description": "Cap on this run's own LLM spend (USD), checked before every LLM call; "
+                                                      "unset: the service's RESEARCH_MAX_LLM_USD, the runbook's, else 5."},
+                          resumeJobId={"type": "string", "minLength": 1, "maxLength": 128,
+                                       "description": "Continue the run of an ended research job of the same runbook: "
+                                                      "saved evidence is reused, nothing already paid is dispatched again."}),
+                     ["idempotencyKey", "runbook", "inputs"]),
  "research.tools.call": obj(dict(COMMON, tool=STRING, params={"type": "object"}), ["idempotencyKey", "tool", "params"]),
  "research.tutorial": obj(COMMON, ["idempotencyKey"]),
  "research.list_runbooks": obj(),
@@ -42,10 +49,19 @@ HANDLE_SCHEMA = obj({"job": obj({"id": dict(STRING, pattern="^[A-Za-z0-9._:-]+$"
 
 OUTPUTS = {name: {"$id": BASE + name + ".output.json", **({"type": "object"} if name in JOBS else RESULT_SCHEMA)} for name in CAPABILITIES}
 
+def tool_effect(name):
+    """Each tool's declared effect class — the manifest's, and the delegation
+    gate's ceiling check reads the same map."""
+    return "charge" if name in {"research.run", "research.tools.call"} else "draft" if name in JOBS else "none"
+
+
+EFFECTS = {name: tool_effect(name) for name in SCHEMAS}
+
+
 def tools_list():
     tools = []
     for name, schema in SCHEMAS.items():
-        effect = "charge" if name in {"research.run", "research.tools.call"} else "draft" if name in JOBS else "none"
+        effect = tool_effect(name)
         out = {"type": "object", "oneOf": [{**RESULT_SCHEMA, "properties": {"output": OUTPUTS[name]}}, HANDLE_SCHEMA]} if name in JOBS else OUTPUTS[name] if name in CAPABILITIES else {"type": "object", "required": ["job"]}
         tools.append({"name": name, "description": {
             "research.run": "Run a research runbook; durable job, operator approval required before paid work.",
@@ -79,10 +95,10 @@ def job_view(job, origin="http://127.0.0.1:18764"):
 
 
 def artifact(store, job_id, name):
-    store.job(job_id)
+    job = store.job(job_id)
     if name not in {"report.md", "ledger.json", "checkpoint.json", "result.json"}:
         raise ValueError("Allowed artifacts: report.md, ledger.json, checkpoint.json, result.json")
-    root = (store.root / "runs" / job_id).resolve()
+    root = (store.root / "runs" / run_dir_name(job)).resolve()
     path = root / name
     if not path.is_file() or path.is_symlink() or path.resolve().parent != root:
         raise KeyError("artifact-not-found")
@@ -95,7 +111,10 @@ class Protocol:
     def __init__(self, runtime):
         self.runtime = runtime
 
-    async def handle(self, body, headers):
+    async def handle(self, body, headers, authorize=None):
+        """`authorize(tool)` answers the delegation verdict for one tools/call
+        (service.delegation.DelegationPolicy.check); a refusal is the call's
+        result, never a transport error."""
         if not isinstance(body, dict) or body.get("jsonrpc") != "2.0" or not isinstance(body.get("method"), str):
             return self.error(None, -32600, "Invalid Request"), 400
         rid, method, params = body.get("id"), body["method"], body.get("params", {})
@@ -139,11 +158,19 @@ class Protocol:
                 name, args = params.get("name"), params.get("arguments", {})
                 if name not in SCHEMAS:
                     return self.error(rid, -32602, "Unknown tool"), 400
+                verdict = authorize(name) if authorize is not None else {"ok": True}
+                if not verdict.get("ok"):
+                    result = refusal_tool_result(verdict, child_trace(meta.get("traceparent")))
+                    if modern:
+                        result["resultType"] = "complete"
+                    return {"jsonrpc": "2.0", "id": rid, "result": result}, 200
                 try:
                     Draft202012Validator(SCHEMAS[name]).validate(args)
-                    data, stored_trace = self.call(name, args, meta.get("traceparent"))
+                    data, stored_trace = self.call(name, args, meta.get("traceparent"), recorded(verdict))
                     trace = stored_trace or trace
                     result = {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False)}], "structuredContent": data, "isError": False}
+                except Refused as exc:
+                    result = refusal_tool_result(exc.verdict, trace)
                 except (ValueError, KeyError, Conflict) as exc:
                     code = exc.args[0] if isinstance(exc, KeyError) else "request-rejected"
                     result = {"content": [{"type": "text", "text": str(code)}], "structuredContent": {"error": {"code": str(code), "message": str(exc)[:300]}}, "isError": True}
@@ -166,21 +193,25 @@ class Protocol:
             err["data"] = data
         return {"jsonrpc": "2.0", "id": rid, "error": err}
 
-    def call(self, name, args, trace):
+    def call(self, name, args, trace, delegation=None):
         rt = self.runtime
         if name in JOBS:
             req = {k: v for k,v in args.items() if k != "idempotencyKey"}
             req["kind"] = {"research.run": "research", "research.tools.call": "tool", "research.tutorial": "tutorial"}[name]
-            job = rt.create(req, args["idempotencyKey"], trace)
+            job = rt.create(req, args["idempotencyKey"], trace, delegation=delegation)
             return {"job": {"id": job["id"], "status": "working"}}, job.get("traceparent")
         if name.startswith("fabric.job."):
             if args.get("inputResponses"):
                 raise ValueError("Decisions require the operator session in Fabric Dashboards; MCP caller credentials cannot approve their own jobs")
+            # A delegated caller reads and cancels only the jobs it started for its
+            # principal (the kit's rule for job tools); refused with the DL-19 code.
+            require_owner(rt.store.job(args["id"]), delegation)
             job = rt.cancel(args["id"]) if name.endswith("cancel") else rt.store.job(args["id"])
             return job_view(job, getattr(rt, "origin", "http://127.0.0.1:18764")), job.get("traceparent")
         if name == "research.list_runbooks":
             output = {"runbooks": runbooks()}
         else:
+            require_owner(rt.store.job(args["id"]), delegation)
             output = artifact(rt.store, args["id"], args["name"])
         fake_job = {"id": "read-" + __import__('secrets').token_hex(8), "request": {}, "traceparent": child_trace(trace)}
         return rt.envelope(fake_job, output, 0), fake_job["traceparent"]

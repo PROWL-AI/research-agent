@@ -41,6 +41,18 @@
     },
     "inputs": {
       "type": "object"
+    },
+    "max_llm_usd": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1000,
+      "description": "Cap on this run's own LLM spend (USD), checked before every LLM call; unset: the service's RESEARCH_MAX_LLM_USD, the runbook's, else 5."
+    },
+    "resumeJobId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Continue the run of an ended research job of the same runbook: saved evidence is reused, nothing already paid is dispatched again."
     }
   },
   "required": [

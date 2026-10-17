@@ -2,7 +2,7 @@
 
 # Prowl Research × Fabric — implementation handoff
 
-Status: installed local service + dashboard + gateway verified; Fabric hub admission remains open. Objective, authority and requirement IDs: [BRIEF](BRIEF.md). Design entry: [dashboard specification](../../design/fabric-dashboard.md). User explicitly chose a working interface in Fabric, without a separate Figma mockup.
+Status: installed local service + dashboard + gateway verified at `891fbc9`; wave 5 (`198a227`: contract revision 6, delegation callee side, resume, kit 1.1.0, vault `serve` installer) is reinstalled from its merge commit — see the [repository handoff](../../HANDOFF.md). Fabric hub admission remains open. Objective, authority and requirement IDs: [BRIEF](BRIEF.md). Design entry: [dashboard specification](../../design/fabric-dashboard.md). User explicitly chose a working interface in Fabric, without a separate Figma mockup.
 
 Implemented modules and operating guide: [FABRIC](../../FABRIC.md). Existing research core is reused; separate direct-tool jobs accept tool parameters. SQLite stores jobs, config snapshots, exact-proposal decisions, call receipts and host events. The operator dashboard provides overview, searchable jobs, readable result tables/report/source ledger/raw output, chain attribution, costs, model/worker/timeout settings and a safe tutorial.
 
@@ -16,7 +16,7 @@ Agent configurations now have the named MCP server through a scoped gateway prof
 
 ## Open work and exact next task
 
-**FD-12 / KA-G03: Fabric hub support and admission.** Start with [HUB-PACKET](HUB-PACKET.md), which names the exact host allowlist and forwarding code. The current host supports only fabric-inbox as a connected callee and no hub.json was active. Do not relabel a gateway call as a Fabric hub chain. A descriptor, manifest and successful discovery are insufficient.
+**FD-12 / KA-G03: direct calls with delegation tokens.** The callee side is built and tested (wave 5); [HUB-PACKET](HUB-PACKET.md) describes the route and what the host-chain receipt must record once the hub publishes keys. Do not relabel a gateway call or a local test as a Fabric host chain.
 
 Next gates: delegated human approval with authoritative bindings; scoped unattended grants if requested; Observatory provider wiring and a concrete budgeted live run; native host page acceptance. Existing KA-01…KA-12 remediation remains prioritized in the parent repository, and these local adapter controls do not close the original core defects globally. No merge or deployment of the parent Prowl product occurred.
 

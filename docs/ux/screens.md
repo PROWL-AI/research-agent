@@ -4,7 +4,7 @@
 
 ## Design system
 - **Web surfaces:** no — authenticated local operator dashboard
-- **Axes:** viewport: 1440x1000, 390x844; theme: light; text: default, long; locale: ru
+- **Axes:** viewport: 1440x1000, 390x844, 360x740; theme: kit themes (graphite default), scheme auto/light/dark; text: default, long; locale: ru
 
 ## Index
 | ID | Screen | Status |
@@ -23,7 +23,7 @@
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 
 ### SCR-02: Запросы
@@ -32,7 +32,7 @@
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 
 ### SCR-03: Детали
@@ -41,7 +41,7 @@
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 
 ### SCR-04: Цепочки
@@ -50,7 +50,7 @@
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 
 ### SCR-05: Расходы
@@ -59,7 +59,7 @@
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 
 ### SCR-06: Настройки
@@ -68,7 +68,7 @@
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 
 ### SCR-07: Обучение
@@ -77,6 +77,6 @@
 **Figma:** disabled — working interface is primary artifact.
 **Wireframe:** ../design/fabric-dashboard.md
 **States:** default, loading, empty, error, offline, long-content, first-run
-**Coverage:** scripts/test-dashboard.mjs — observed subset at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+**Coverage:** scripts/test-dashboard.mjs — observed subset at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 **Resources:** ../brand/voice.md, ../brand/facts.md
 

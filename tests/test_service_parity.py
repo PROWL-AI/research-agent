@@ -223,7 +223,7 @@ async def test_a_service_research_job_journals_exactly_the_attempts_its_run_ledg
 
 
 async def test_journal_and_ledger_agree_across_a_429(tmp_path, monkeypatch, patched_runbooks):
-    from test_llm_budget import Provider, _completion
+    from test_llm_budget import Provider
 
     provider = Provider(cost=0.02, plan_steps=1, script=[(429, {"error": "rate"})])
     done, journal, checkpoint = await _service_research_job(tmp_path, monkeypatch, provider)
@@ -287,3 +287,122 @@ def test_failover_sentences(body, gaps):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert module.failover_gaps(body, [], ["serp_bing", "moz_da", "google_search"]) == gaps
+
+
+async def test_a_failed_service_job_is_resumed_without_paying_again(tmp_path, monkeypatch, patched_runbooks):
+    """B-039: research.run with resumeJobId continues the ended job's run: the
+    paid tool step is not dispatched again; only the writer runs."""
+    import asyncio
+
+    import research_agent.service.runtime as runtime_mod
+    from research_agent.evidence.store import ArtifactStore
+    from research_agent.service.runtime import Runtime
+    from test_llm_budget import Provider
+
+    monkeypatch.setenv("PROWL_API_KEY", "test-not-a-key")
+    monkeypatch.setenv("RESEARCH_LLM_API_KEY", "test-not-a-key")
+    monkeypatch.setenv("RESEARCH_NO_SUBAGENTS", "1")
+    monkeypatch.delenv("RESEARCH_MAX_LLM_USD", raising=False)
+    dispatched = []
+    healthy = Provider(cost=0.01, plan_steps=1)
+    state = {"writer_down": True}
+
+    def provider(request):
+        body = json.loads(request.content)
+        if state["writer_down"] and "response_format" not in body:
+            return httpx.Response(400, json={"error": "writer unavailable"})
+        return healthy(request)
+
+    class Session:
+        async def call_tool(self, name, arguments, **kwargs):
+            if name == "prowl_list_tools":
+                body = {"tools": ["spyfu_get_domain_stats", "dataforseo_bl_summary"]}
+            else:
+                if name == "prowl_call_tool":
+                    dispatched.append(arguments)
+                body = {"success": True, "data": {"visits": 42}, "billing": {"actual_cost_usd": 0.05}}
+            return CallToolResult(content=[TextContent(type="text", text=json.dumps(body))])
+
+    class TestProwl(ObservedProwl):
+        async def __aenter__(self):
+            self._session = Session()
+            return self
+
+        async def __aexit__(self, *exc):
+            return None
+
+    class TestLLM(ObservedLLM):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._client = httpx.AsyncClient(transport=httpx.MockTransport(provider))
+
+    monkeypatch.setattr(runtime_mod, "ObservedProwl", TestProwl)
+    monkeypatch.setattr(runtime_mod, "ObservedLLM", TestLLM)
+    store = Store(tmp_path)
+    rt = Runtime(store)
+    try:
+        request = {"kind": "research", "runbook": "mini-teardown", "inputs": {"competitors": ["example.com"]}}
+        first = rt.create(dict(request, max_llm_usd=2.0), "first")
+        rt.decide(first["id"], first["proposal"]["digest"], True)
+        await asyncio.gather(*list(rt.tasks.values()))
+        assert store.job(first["id"])["status"] == "failed"
+        assert len(dispatched) == 1
+        with pytest.raises(ValueError, match="another runbook|names no job"):
+            rt.create(dict(request, runbook="mini-teardown", resumeJobId="nope"), "bad")
+        with pytest.raises(ValueError, match="own inputs"):
+            rt.create(dict(request, inputs={"competitors": ["other.example"]}, resumeJobId=first["id"]), "other")
+        # the writer is still down: the resume fails too, and a resume of THAT resume continues the same run
+        second = rt.create(dict(request, resumeJobId=first["id"]), "resume")
+        assert second["status"] == "input_required"  # a resume can spend: the operator still decides
+        rt.decide(second["id"], second["proposal"]["digest"], True)
+        await asyncio.gather(*list(rt.tasks.values()))
+        assert store.job(second["id"])["status"] == "failed"
+        state["writer_down"] = False
+        third = rt.create(dict(request, resumeJobId=second["id"]), "resume-2")
+        with pytest.raises(ValueError, match="already being continued"):
+            rt.create(dict(request, resumeJobId=first["id"]), "concurrent")
+        rt.decide(third["id"], third["proposal"]["digest"], True)
+        await asyncio.gather(*list(rt.tasks.values()))
+        done = store.job(third["id"])
+        assert done["status"] == "completed", done.get("error")
+        assert len(dispatched) == 1  # the paid step was sent once across the whole chain
+        assert done["runDir"] == first["id"] == store.job(second["id"])["runDir"]
+        assert not (tmp_path / "runs" / second["id"]).exists() and not (tmp_path / "runs" / third["id"]).exists()
+        checkpoint = ArtifactStore(tmp_path / "runs" / first["id"]).load_checkpoint()
+        assert checkpoint.status == "complete" and checkpoint.llm_cap_usd == 2.0
+        with pytest.raises(ValueError, match="nothing is left to continue"):
+            rt.create(dict(request, resumeJobId=third["id"]), "again")
+        from research_agent.service.protocol import artifact
+        assert artifact(store, third["id"], "report.md")["content"].startswith("# Report")
+        with pytest.raises(ValueError, match="max_llm_usd"):
+            rt.create(dict(request, max_llm_usd=0), "zero")
+    finally:
+        await rt.close()
+        store.db.close()
+
+
+def test_a_resume_respects_the_principal_and_the_operators_rejection(tmp_path, monkeypatch, patched_runbooks):
+    from research_agent.service.delegation import Refused
+    from research_agent.service.runtime import Runtime
+
+    monkeypatch.setenv("PROWL_API_KEY", "test-not-a-key")
+    monkeypatch.setenv("RESEARCH_LLM_API_KEY", "test-not-a-key")
+    store = Store(tmp_path)
+    rt = Runtime(store)
+    alice = {"principal": "urn:person:a", "caller": "caller-a.default", "chain": [], "kid": "k1", "tier": "T2"}
+    bob = dict(alice, caller="caller-b.default")
+    request = {"kind": "research", "runbook": "mini-teardown", "inputs": {"competitors": ["example.com"]}}
+    try:
+        job = rt.create(request, "same-key", delegation=alice)
+        # the idempotency key is per principal: another caller's same key is another job
+        assert rt.create(request, "same-key", delegation=bob)["id"] != job["id"]
+        assert rt.create(request, "same-key", delegation=alice)["id"] == job["id"]
+        rt.decide(job["id"], job["proposal"]["digest"], False)
+        assert store.job(job["id"])["phase"] == "rejected"
+        with pytest.raises(Refused) as refused:
+            rt.create(dict(request, resumeJobId=job["id"]), "steal", delegation=bob)
+        assert refused.value.verdict["code"] == "scope-not-granted"
+        with pytest.raises(ValueError, match="rejected by the operator"):
+            rt.create(dict(request, resumeJobId=job["id"]), "again", delegation=alice)
+    finally:
+        store.db.close()

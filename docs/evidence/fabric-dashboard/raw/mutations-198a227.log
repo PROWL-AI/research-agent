@@ -1,0 +1,12 @@
+metadata-auth      KILLED  1 failed, 15 passed in 5.62s
+artifact-owner     KILLED  1 failed, 12 passed in 5.14s
+resume-inputs      KILLED  1 failed, 18 passed in 5.94s
+resume-rejected    KILLED  1 failed, 19 passed in 4.18s
+resume-concurrent  KILLED  1 failed, 18 passed in 3.89s
+resume-root        KILLED  1 failed, 18 passed in 4.30s
+resume-owner       KILLED  1 failed, 19 passed in 5.76s
+idem-namespace     KILLED  1 failed, 19 passed in 3.90s
+jwks-uri           KILLED  1 failed, 13 passed in 2.33s
+attribution        KILLED  1 failed, 19 passed in 3.25s
+vault-serve        KILLED  1 failed in 0.27s
+slot-exact         KILLED  1 failed, 1 passed in 0.22s

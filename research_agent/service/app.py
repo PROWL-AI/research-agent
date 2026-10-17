@@ -13,7 +13,8 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
 from starlette.middleware.base import BaseHTTPMiddleware
-from .protocol import Protocol, CAPABILITIES, artifact
+from .delegation import DelegationPolicy, is_loopback, refusal_http
+from .protocol import EFFECTS, Protocol, CAPABILITIES, artifact
 from .runtime import Runtime, runbooks
 from .store import Store, Conflict, now
 
@@ -29,7 +30,15 @@ def code_digest():
     return "sha256:" + value.hexdigest()
 
 
-def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=None):
+#: The dashboard's declaration (ED-9, DEC-0036): the kit it ships and the
+#: estate themes the host may apply.
+DASHBOARD_EXTENSION = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
+DASHBOARD_KIT = "fabric-dashboard-kit@1.1.0"
+DASHBOARD_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
+
+
+def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=None, delegation=None):
+    delegation = delegation if delegation is not None else DelegationPolicy.from_env(EFFECTS)
     store = Store(root)
     store.recover()
     rt = Runtime(store)
@@ -63,7 +72,10 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
         return {"protocol": "fabric-service/0.1", "service": {"id": "prowl-research", "instance": "default", "name": "Prowl Research", "version": "0.2.0", "build": build},
                 "process": {"pid": os.getpid(), "startedAt": started}, "status": "stopping" if rt.stopping else "degraded" if reasons else "ready", "degraded": reasons,
                 "surfaces": {"dashboard": {"path": "/dashboard", "login": True}, "mcp": {"path": "/mcp", "transport": "streamable-http", "auth": "own", "capabilities": CAPABILITIES},
-                             "events": {"path": "/fabric/v1/events"}, "usage": {"path": "/fabric/v1/usage"}}, "update": {"available": None}}
+                             "events": {"path": "/fabric/v1/events"}, "usage": {"path": "/fabric/v1/usage"}}, "update": {"available": None},
+                "extensions": {DASHBOARD_EXTENSION: {"minWidth": 360, "appearance": ["scheme", "theme"],
+                                                     "themes": list(DASHBOARD_THEMES), "kit": DASHBOARD_KIT}},
+                **({"auth": {"delegation": delegation.declaration()}} if delegation.declaration() else {})}
 
     def token_matches(request, token):
         return secrets.compare_digest(request.headers.get("authorization", ""), "Bearer " + token)
@@ -82,6 +94,13 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
         if not isinstance(value, dict):
             raise ValueError("JSON object required")
         return value
+
+    def delegation_refusal(code, detail):
+        return {"ok": False, "code": code, "detail": detail}
+
+    def refused(verdict):
+        status, headers, payload = refusal_http(verdict)
+        return Response(payload, status, headers=headers)
 
     async def endpoint(request: Request):
         path = request.url.path
@@ -110,13 +129,26 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
             after = request.query_params.get("after")
             return JSONResponse(store.events(int(after) if after is not None else None, limit))
         if path == "/mcp":
-            if not token_matches(request, agent_token):
-                return JSONResponse({"error": "agent token required"}, 401)
-            data, status = await proto.handle(await body(request), request.headers)
+            own = token_matches(request, agent_token)
+            if not own and not DelegationPolicy.carries_token(request.headers):
+                return refused(delegation_refusal("unauthenticated", "no-token"))
+            loopback = is_loopback(request.client.host if request.client else None)
+            message = await body(request)
+            # A tools/call is judged per capability by the gate; any other method
+            # (initialize, tools/list, ping) still needs an authentic, current token.
+            if not own and message.get("method") != "tools/call" and not delegation.authenticate(request.headers):
+                code = "unauthenticated" if delegation.configured else "issuer-unavailable"
+                return refused(delegation_refusal(code, "token-not-verified" if delegation.configured else "no-trusted-issuer"))
+
+            def authorize(tool):
+                return delegation.check(tool, request.headers, own_token=own, loopback=loopback)
+
+            data, status = await proto.handle(message, request.headers, authorize=authorize)
             return JSONResponse(data, status) if data is not None else Response(status_code=status)
         if path.startswith("/static/"):
             name = path.removeprefix("/static/")
-            if name not in {"app.js", "styles.css", "Fraunces.ttf", "Newsreader.ttf", "JetBrainsMono.ttf"}:
+            if name not in {"app.js", "styles.css", "fabric-dashboard.css", "fabric-dashboard.js",
+                            "Fraunces.ttf", "Newsreader.ttf", "JetBrainsMono.ttf"}:
                 return Response(status_code=404)
             return FileResponse(STATIC / name)
         if not operator(request):
@@ -134,11 +166,12 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
                 calls = store.calls(job["id"])
                 costs = [c["costUsd"] for c in calls if c["costUsd"] is not None]
                 summaries.append({k: job[k] for k in ["id", "status", "phase", "createdAt", "updatedAt", "request"]} | {
+                    "delegation": job.get("delegation"), "via": job.get("via"), "runDir": job.get("runDir"),
                     "costUsd": sum(costs) if costs else None, "unpricedCalls": sum(c["costUsd"] is None for c in calls), "calls": len(calls)})
             return JSONResponse({"at": now(), "health": health(), "jobs": summaries, "config": store.config(), "usage": store.usage(), "runbooks": runbooks()})
         if path == "/api/jobs" and request.method == "POST":
             data = await body(request)
-            return JSONResponse(rt.create(data["request"], data["idempotencyKey"]), 201)
+            return JSONResponse(rt.create(data["request"], data["idempotencyKey"], via="dashboard"), 201)
         if path.startswith("/api/jobs/"):
             job_id = request.path_params["job_id"]
             if request.method == "GET":

@@ -1,27 +1,46 @@
-# FD-12 — admit Prowl through Fabric hub
+# FD-12 — callers reach Prowl Research directly, with delegation tokens (DEC-0039)
 
-Status: BLOCKED_BY_HOST_CAPABILITY, not an operator permission request. Owner: passioncode-ai/fabric. Prowl service side is available on branch feat/fabric-dashboard-20261010, runtime commit 891fbc995cb382ec6ccaed5f1b91611918b931c7. This packet does not change Fabric's working tree, production pins or grants.
+Status (2026-10-17, wave 5): **callee side built and tested; host-chain acceptance waits for the Fabric
+issuer** (KA-G03, wave 6). This packet replaces the 2026-10-10 hub-forwarding packet: Fabric ADR-0144
+(accepted 2026-10-11, amendment 4 at Fabric `19ad05ca`) retired forwarding — the hub **issues** the
+delegation chain, and callers call this service **directly**.
 
-## Concrete blocking evidence
+## The route
 
-Fabric source inspected at `a7fa444cace6be4a38f0e42cdea659e43a2e7ed6`:
+```
+caller agent ──token exchange──▶ Fabric hub (issuer) ──delegation token (≤10 min)──▶ caller
+caller agent ──POST /mcp, Authorization: Bearer <token> (or Fabric-Delegation)──▶ prowl-research.default
+prowl-research.default ──verify offline against the estate JWKS──▶ act for `sub`, record the chain on the job
+```
 
-- [`apps/desktop/src/shared/access.ts:29`](https://github.com/passioncode-ai/fabric/blob/a7fa444cace6be4a38f0e42cdea659e43a2e7ed6/apps/desktop/src/shared/access.ts#L29): `CONNECTABLE_PRODUCTS = ['fabric-inbox']`.
-- [`apps/desktop/src/main/hubCall.ts:305`](https://github.com/passioncode-ai/fabric/blob/a7fa444cace6be4a38f0e42cdea659e43a2e7ed6/apps/desktop/src/main/hubCall.ts#L305): other callees return `unknown-callee` before forwarding.
-- [`apps/desktop/src/main/hub.ts:64`](https://github.com/passioncode-ai/fabric/blob/a7fa444cace6be4a38f0e42cdea659e43a2e7ed6/apps/desktop/src/main/hub.ts#L64): running app publishes hub.json and a separate door token. Local read on 2026-10-10 found no hub.json in the registry root. No credential was sent to a guessed port.
+## What this service does (contract `fabric-agent-contract` `7a14a48`, docs/specification/delegation.md)
 
-A service descriptor makes Prowl visible in Fabric Dashboards. It does not extend CONNECTABLE_PRODUCTS, authorize a new callee or install a trusted binding. Calling the service through the local agentgateway is demonstrated separately; do not label that call `Fabric agent.call`.
+| Caller | Tier (DL-25) | Needs a token | Behaviour |
+|---|---|---|---|
+| this machine, the service's own agent token | T0 | no | a token it also sends is verified and recorded; a bad one is refused |
+| delegation token only, or a caller off the machine | T2 | yes | verified in DL-13 order; refused with the contract code (DL-19 shape) |
+| a token with no trusted issuer configured | any | — | refused `issuer-unavailable` / `no-trusted-issuer` (fail closed) |
 
-## Bounded host change
+- Verifier: the adapter kit's `fabric_delegation.py`, vendored unchanged (`research_agent/service/vendor/`,
+  digest in `VENDORED.md`); policy in `research_agent/service/delegation.py`.
+- Configuration: `RESEARCH_DELEGATION_ISSUER` (`urn:fabric:estate:<id>`), `RESEARCH_DELEGATION_JWKS` (https,
+  loopback http or a file), `RESEARCH_DELEGATION_AUDIENCE` (default `prowl-research.default`). Configured, the
+  well-known document declares `auth.delegation` (DL-16); `surfaces.mcp.auth` stays `own` (the own agent token
+  keeps working for T0 callers).
+- The service binds loopback only (no bind option). T2 here means a loopback caller without the service's own token.
+- A job started under a token records `{principal, caller, chain, kid, tier}` (never the token); a delegated
+  caller reads and cancels only the jobs it started (`scope-not-granted` otherwise).
+- Approval stays the operator's in the dashboard for every job; `approval/1` documents are not accepted from MCP
+  yet (DL-17 support is a later step, not needed while every job waits for the dashboard decision).
 
-1. In an isolated Fabric checkout, define a generic registered-MCP service product adapter or an explicit Prowl adapter. Do not merely append a string to the allowlist: current resource/grant/forwarding semantics are Inbox-specific.
-2. Specify the credential exchange: Prowl's descriptor token belongs only to the dashboard host. Agents use a separate token; supplying the host token to agent.call must still fail. Store the callee credential in the host's authorized vault/consumer mechanism, never a capability argument.
-3. Bind the admitted manifest revision/hash and exact capability set. Preserve read vs charge effects, permitted runbooks/tools, caller identity, expiry and revocation. Decide which scopes allow unattended requests; current service intentionally requires operator session decisions before every job.
-4. Carry authoritative caller/project/node/binding provenance and trace through submission, polling, cancellation and result collection. Keep untrusted caller labels separate.
-5. Define delegated `inputResponses` authorization before enabling form approval from MCP. A model assertion that its operator said yes is not an approval receipt. UI decisions already work against an expiring proposal digest.
-6. Enroll a disposable synthetic-only caller and execute: caller → research.tutorial → human decision → job result → next no-effect fixture step. Verify denied capability, expired/revoked binding, changed idempotency input, lost reply, cancellation and no automatic duplicate dispatch.
-7. Only after that gate, request a concrete budgeted provider run. The known research-core audit defects must be assessed before presenting results as verified.
+Tests: `tests/test_delegation.py` (good token, wrong audience, expired, broken signature, unknown key, scope and
+effect ceilings, no issuer, own token on loopback, T2 off the machine, job isolation, well-known declaration,
+bind guard), tokens minted with a test Ed25519 key.
 
-## Acceptance and handoff
+## What waits (KA-G03, wave 6)
 
-Record host source/build commit, provider manifest/hash, binding revision, caller identity, invocation/job/trace ids, decisions, raw effect receipts and all denial controls. No secrets in the packet. A passing SDK call, installed configuration or opened dashboard is not the chain acceptance receipt. Keep this row open in the parent Kimi remediation queue under FD-12 / KA-G03.
+The estate hub does not publish keys yet: `http://127.0.0.1:<hub>/.well-known/jwks.json` answered 404 on
+2026-10-17 (`hub.json` protocol `fabric-hub/0.1`). When it does: set the issuer and JWKS on the service, have a
+synthetic caller mint a token for `research.tutorial`, call directly, and record the host build, provider
+manifest hash (`fabric-agent.json`, revision 6), token `kid`, job id, trace and the recorded chain. A descriptor,
+a manifest or a passing local test is not that receipt.

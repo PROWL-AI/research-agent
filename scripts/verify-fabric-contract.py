@@ -10,7 +10,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 from research_agent.service.app import create_app
 from research_agent.service.protocol import job_view, tools_list, OUTPUTS
-PIN='623bf61358c339cb10297807b3f024b5d9f1f327'
+PIN='7a14a4877ca7d7b28cc33a0f52beaa14b38e1d92'
 
 async def main():
  p=argparse.ArgumentParser();p.add_argument('contract',type=Path);a=p.parse_args()
