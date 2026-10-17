@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "~/.local/share/prowl-research/releases/<commit>/venv/bin/python",
+    "-m",
+    "research_agent.service.cli",
+    "serve",
+    "--root",
+    "~/Library/Application Support/prowl-research",
+    "--port",
+    "18764",
+    "--build",
+    "~/.local/share/prowl-research/releases/<commit>/build.json",
+    "--log-dir",
+    "~/Library/Logs/prowl-research"
+  ],
+  "slots": [],
+  "missing": [],
+  "keys": "none: the service starts degraded"
+}

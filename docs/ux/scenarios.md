@@ -14,6 +14,7 @@
 | SCN-006 | Учёт расходов | implemented |
 | SCN-007 | Настройки | implemented |
 | SCN-008 | Безопасное обучение | implemented |
+| SCN-009 | Внешний вид, навигация и состояние сервиса | implemented |
 
 ### SCN-001: Обзор и свежесть
 - **Status:** implemented
@@ -30,7 +31,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Обзор
 
 ### SCN-002: Найти запрос
@@ -48,7 +49,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Запросы
 
 ### SCN-003: Прочитать результат
@@ -66,7 +67,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Детали
 
 ### SCN-004: Решение человека
@@ -79,12 +80,12 @@
 - **Preconditions:** Запрос ожидает решение.
 - **Steps:**
   1. Сверить вход и модели; разрешить или отклонить.
-- **Expected result:** Действует только непросроченный digest этого запроса; повтор не запускает работу дважды.
-- **Acceptance criteria:** Действует только непросроченный digest этого запроса; повтор не запускает работу дважды; доказательства записываются в verification.
+- **Expected result:** Действует только непросроченный digest этого запроса; повтор не запускает работу дважды. Карточка решения называет инициатора: проверенного по токену делегирования принципала и агента, «Оператор (панель)» для запроса из панели, или заявленное имя с пометкой «заявлено».
+- **Acceptance criteria:** Действует только непросроченный digest этого запроса; повтор не запускает работу дважды; инициатор назван и его источник различим; доказательства записываются в verification.
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Детали
 
 ### SCN-005: Отмена
@@ -102,7 +103,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Детали
 
 ### SCN-006: Учёт расходов
@@ -120,7 +121,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Расходы
 
 ### SCN-007: Настройки
@@ -138,7 +139,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Настройки
 
 ### SCN-008: Безопасное обучение
@@ -156,8 +157,26 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 891fbc9; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Обучение
+
+### SCN-009: Внешний вид, навигация и состояние сервиса
+- **Status:** implemented
+- **Product:** unobserved
+- **Feature:** Fabric dashboard
+- **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
+- **Entry point:** Fabric Dashboards → Prowl Research
+- **Persona:** P-01
+- **Preconditions:** Панель открыта; ширина окна от 360 px.
+- **Steps:**
+  1. Прочитать состояние сервиса в шапке; сменить тему и цветовую схему; открыть разделы, в том числе через «Ещё» на узком экране; пролистать широкую таблицу.
+- **Expected result:** Чип в шапке называет состояние сервиса («Работает», «Работает с ограничениями», «Останавливается»), подсказка — причины ограничений. Тема и схема выбираются по-русски и запоминаются набором Fabric Dashboards; внутри хоста Fabric Dashboards их задаёт хост. На 360 px страница не прокручивается вбок; не поместившиеся разделы уходят в «Ещё»; широкая таблица прокручивается внутри своей рамки и помечена, когда не помещается.
+- **Acceptance criteria:** Состояние, подписи и прокрутка как выше; без ошибок страницы; доказательства записываются в verification.
+- **States covered:** loading, empty, error, success
+- **Errors & recovery:** Нет связи — чип и снимок остаются, свежесть говорит «Нет свежих данных».
+- **UI elements:** Чип состояния, выбор темы и схемы, навигация с «Ещё», рамка прокрутки таблицы.
+- **Coverage:** scripts/test-dashboard.mjs (checks status-chip, russian-kit-labels, scroll-box-prepared, requests-360-no-overflow) — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Screen:** Все
 
 ## Core agent scenarios (CORE)
 
@@ -185,8 +204,8 @@
 | CORE-12 | Переписать отчёт активного прогона нельзя | 1 | PASS@583f1d1 |
 | CORE-13 | Судья отвергает заведомо плохой отчёт | 6 | UNVERIFIED |
 | CORE-14 | Повторная отправка тем же ключом не оплачивается дважды на сервере | 6 | UNVERIFIED |
-| CORE-15 | Вызов с токеном делегирования: проверка, отказ, запись цепочки | 5 | PASS@W5 |
-| CORE-16 | Продолжение завершившегося задания сервиса без повторной оплаты | 5 | PASS@W5 |
+| CORE-15 | Вызов с токеном делегирования: проверка, отказ, запись цепочки | 5 | PASS@198a227 |
+| CORE-16 | Продолжение завершившегося задания сервиса без повторной оплаты | 5 | PASS@198a227 |
 
 ### CORE-01: Запуск до терминального состояния (CLI, stdio MCP)
 - **Status:** PASS@583f1d1
@@ -361,26 +380,26 @@
 - **Coverage:** —
 
 ### CORE-15: Вызов с токеном делегирования: проверка, отказ, запись цепочки
-- **Status:** PASS@W5
+- **Status:** PASS@198a227
 - **Actor:** вызывающий агент (с токеном, выпущенным hub по DEC-0039)
 - **Trigger:** `tools/call` на `/mcp` сервиса `prowl-research.default` с `Authorization: Bearer <токен делегирования>` или `Fabric-Delegation`
 - **Preconditions:** заданы `RESEARCH_DELEGATION_ISSUER` и `RESEARCH_DELEGATION_JWKS` (иначе любой предъявленный токен отклоняется).
 - **Steps:**
   1. Вызвать `research.tutorial` с действующим токеном; затем с токеном другой аудитории, просроченным, с чужой подписью, без нужной способности.
-- **Expected result:** действующий токен принят; задание хранит `principal`, `caller`, цепочку и `kid`, но не сам токен; вызывающий видит только свои задания. Свой токен агента с loopback (T0) работает без токена делегирования; предъявленный рядом токен всё равно проверяется.
-- **Failure outcome:** неверный токен — отказ кодом контракта (`wrong-audience`, `token-expired`, `unauthenticated`, `scope-not-granted`, `effect-above-ceiling`, `issuer-unavailable`) как результат вызова, задание не создаётся; вызов не с этой машины без токена — `unauthenticated`; запуск на адресе вне loopback без настроенной проверки запрещён.
+- **Expected result:** действующий токен принят; задание хранит `principal`, `caller`, цепочку и `kid`, но не сам токен, а панель показывает инициатора как проверенного. Вызывающий видит, отменяет и читает артефакты только своих заданий; его ключ идемпотентности не пересекается с чужим. Методы без способности (`initialize`, `tools/list`) тоже требуют подлинного действующего токена. Свой токен агента с loopback (T0) работает без токена делегирования; предъявленный рядом токен всё равно проверяется.
+- **Failure outcome:** неверный токен — отказ кодом контракта (`wrong-audience`, `token-expired`, `unauthenticated`, `scope-not-granted`, `effect-above-ceiling`, `issuer-unavailable`) как результат вызова, задание не создаётся; чужое задание — `scope-not-granted`; метод без способности с неверным токеном — HTTP 401 с `WWW-Authenticate` (без доверенного издателя — 503 `issuer-unavailable`); нет ни своего токена, ни токена делегирования — 401 `unauthenticated`. Сервис слушает только loopback.
 - **Wave:** 5 (N-FAB, FD-12); цепочка через живой hub — волна 6 (KA-G03)
-- **Coverage:** `tests/test_delegation.py` (все 15 тестов)
+- **Coverage:** `tests/test_delegation.py` (все тесты файла)
 
 ### CORE-16: Продолжение завершившегося задания сервиса без повторной оплаты
-- **Status:** PASS@W5
-- **Actor:** оператор (P-01) или вызывающий агент
-- **Trigger:** `research.run` с `resumeJobId` упавшего, отменённого или прерванного исследовательского задания того же runbook
-- **Preconditions:** исходное задание не работает и не завершено успешно.
+- **Status:** PASS@198a227
+- **Actor:** вызывающий агент (только MCP: в панели продолжения нет; оператор одобряет его там)
+- **Trigger:** `research.run` с `resumeJobId` упавшего, отменённого или прерванного исследовательского задания того же runbook и с теми же входными данными
+- **Preconditions:** исходное задание не ждёт решения, не работает и не закончило прогон.
 - **Steps:**
   1. Создать задание-продолжение; оператор одобряет его в панели.
-- **Expected result:** новое задание продолжает прогон исходного: сохранённые ответы только извлекаются, уже оплаченный шаг не отправляется снова, журнал попыток и лимит LLM переходят; отчёт и артефакты читаются через новое задание.
-- **Failure outcome:** неизвестный id, чужой runbook, живое или успешно завершённое задание — отказ при создании, с причиной.
+- **Expected result:** новое задание продолжает прогон исходного: сохранённые ответы только извлекаются, уже оплаченный шаг не отправляется снова, журнал попыток и лимит LLM переходят. Продолжение продолжения пишет в прогон корня цепочки, а не заводит новый; отчёт и артефакты читаются через любое задание цепочки.
+- **Failure outcome:** отказ при создании, с причиной: неизвестный id; чужой runbook или другие входные данные; задание, которое ждёт решения или работает; прогон, который уже закончен; задание, отклонённое оператором; прогон, который уже продолжает другое задание; задание другого принципала — `scope-not-granted`.
 - **Wave:** 5 (N-FAB, B-039)
-- **Coverage:** `tests/test_service_parity.py::test_a_failed_service_job_is_resumed_without_paying_again`
+- **Coverage:** `tests/test_service_parity.py::test_a_failed_service_job_is_resumed_without_paying_again`, `::test_a_resume_respects_the_principal_and_the_operators_rejection`
 

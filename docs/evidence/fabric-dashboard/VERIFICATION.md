@@ -20,6 +20,22 @@ Runtime source and installed build: **891fbc995cb382ec6ccaed5f1b91611918b931c7**
 | UX docs | PASS, exit 0 | `python3 <super-ux-0.59.1>/scripts/ux_lint.py` returned `OK — docs/ux is consistent` |
 | Hosted CI | NOT_RUN | `.github/workflows/nightly.yml` now exists (added 2026-10-11, B-031): nightly schedule plus manual dispatch, no push/PR triggers, per the estate nightly CI policy. First scheduled run pending; stays NOT_RUN until a run is read green. GitHub runs a schedule from the default branch only, so the file on this unmerged branch does not run until it reaches the default branch |
 
+## Wave 5 — Fabric contract revision 6, 2026-10-17
+
+Code commit **198a227** (fix round after the three blind certifications of `77a0621`). Receipts are from that commit; home and temporary paths normalized to `~` / `<tmp>`; no tokens.
+
+| Gate | Result | Evidence |
+|---|---|---|
+| Whole Python suite | PASS — 515 tests | [pytest](raw/pytest-198a227.log); `.venv/bin/python -m pytest tests/ -q` |
+| Planted mutations of the fix-round defenses | 12 / 12 killed | [mutations](raw/mutations-198a227.log): metadata authentication, artifact ownership, resume inputs / rejected / concurrent / chain root / owner, idempotency namespace, JWKS URI, envelope attribution, installer `serve` consumer, exact slot match |
+| Browser behavior | PASS — WebKit, 1440×1000, 390×844, 360×740; zero page errors | [browser receipt](raw/webkit-198a227.log); `node scripts/test-dashboard.mjs` (screenshots to a temporary folder; this receipt's PNGs were not committed) |
+| External contract schemas at the pin | PASS, clean `7a14a48` | [contract](raw/contract-198a227.json); `scripts/verify-fabric-contract.py <clean clone>` |
+| Installer launch argv | dry run, no vault (degraded start) | [dry run](raw/installer-dry-run-198a227.json). With `--vault-project` the argv is `use_secret.py serve --env prod --consumer chat.prowl.research <folder> PROWL_API_KEY,RESEARCH_LLM_API_KEY -- …` under Observatory's interpreter (`tests/test_installer.py`); no folder of this service holds both slots yet (B-042) |
+| UX docs | PASS | super-ux 0.60.0 `ux_lint.py`: `OK — docs/ux is consistent` |
+| Delegation, callee side | PASS (offline, test Ed25519 key) | `tests/test_delegation.py` |
+| Host chain (issuer → caller → service) | NOT_RUN — host issuer publishes no JWKS | KA-G03, wave 6 |
+| Installed service on revision 6 | pending the merge | reinstall from the merge commit, then the adapter's `check_service.py`; recorded in [HANDOFF](HANDOFF.md) |
+
 ## Corrections discovered during verification
 
 - Browser navigation initially rendered a form before its pending refresh completed, which erased a typed model. Navigation now presents a loading state until that refresh finishes; the WebKit dirty-settings regression passes.

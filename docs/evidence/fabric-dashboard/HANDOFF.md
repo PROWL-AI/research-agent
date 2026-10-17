@@ -2,7 +2,7 @@
 
 # Prowl Research × Fabric — implementation handoff
 
-Status: installed local service + dashboard + gateway verified; Fabric hub admission remains open. Objective, authority and requirement IDs: [BRIEF](BRIEF.md). Design entry: [dashboard specification](../../design/fabric-dashboard.md). User explicitly chose a working interface in Fabric, without a separate Figma mockup.
+Status: installed local service + dashboard + gateway verified at `891fbc9`; wave 5 (`198a227`: contract revision 6, delegation callee side, resume, kit 1.1.0, vault `serve` installer) is reinstalled from its merge commit — see the [repository handoff](../../HANDOFF.md). Fabric hub admission remains open. Objective, authority and requirement IDs: [BRIEF](BRIEF.md). Design entry: [dashboard specification](../../design/fabric-dashboard.md). User explicitly chose a working interface in Fabric, without a separate Figma mockup.
 
 Implemented modules and operating guide: [FABRIC](../../FABRIC.md). Existing research core is reused; separate direct-tool jobs accept tool parameters. SQLite stores jobs, config snapshots, exact-proposal decisions, call receipts and host events. The operator dashboard provides overview, searchable jobs, readable result tables/report/source ledger/raw output, chain attribution, costs, model/worker/timeout settings and a safe tutorial.
 

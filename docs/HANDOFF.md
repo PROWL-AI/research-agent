@@ -8,7 +8,7 @@ Objective: close every open item of this agent in its final form, in waves
 - Plan: [`specs/2026-10-11-waves-canvas.md`](specs/2026-10-11-waves-canvas.md) — target state, seams,
   waves with exit criteria, §7a wave status, operator questions (§8).
 - Inventory: [`specs/2026-10-11-waves-inventory.json`](specs/2026-10-11-waves-inventory.json)
-  (`python3 scripts/plan/assign_waves.py --check`; 23 of 58 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
+  (`python3 scripts/plan/assign_waves.py --check`; 25 of 60 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
 - **Wave 1 closed** (merged to `main` by PR #1): run-lock ownership (KA-06, B-009, B-010),
   terminal_code, structured events, honest docs, CORE scenarios, nightly CI.
 - **Wave 2 closed** on branch `wip/wave2-checkpoint-v2` (PR #2): checkpoint schema 2 — immutable
@@ -31,11 +31,22 @@ Objective: close every open item of this agent in its final form, in waves
   keeps a reserve, `rewrite` spends from the same ledger. The service runs the core's transports;
   envelope outcome follows the run; events go to a rotating `events.log`. KA-G01, B-003/004/005/
   029/035/036/038 closed; B-040/B-041 filed for wave 6. Suite 490 passed.
-- **Exact next task:** wave 5 — write `specs/waves/W5-T1-fabric-contract.md` from canvas §2 N-FAB
-  (contract pin to the latest `fabric-agent-contract` main, callee-side delegation verification by
-  trust tier, `max_llm_usd` in the service's `research.run` input with the manifest rebuild,
-  vault-only installer consumer, provider keys through Observatory doors, dashboard kit 1.0.0,
-  service resume B-039, reinstall B-037), then build it; its seam tier re-reads wave 4's fix round.
+- **Wave 5 closed** (PR from `feat/wave5-fabric-contract`, build `eb1751b` + `77a0621`, fix round
+  `198a227`): contract pin `7a14a48`, manifest revision 6 (`research.run` gains `max_llm_usd` ≤ 1000 and
+  `resumeJobId`); callee side of DEC-0039 by trust tier — own token from loopback is T0, any other
+  caller presents a delegation token (verified offline, DL-19 refusals, chain recorded on the job,
+  per-principal job isolation and idempotency); loopback-only bind; service resume (B-039) with chain
+  rules; dashboard on fabric-dashboard-kit 1.1.0 (estate themes, «Ещё», 360 px, verified initiator,
+  service chip); installer under `use_secret.py serve --consumer chat.prowl.research`. Suite 515
+  passed; mutations 12/12; WebKit PASS. Receipts: `evidence/fabric-dashboard/VERIFICATION.md` § Wave 5.
+- **Exact next task:** reinstall the service from the merge commit
+  (`python3 scripts/install-fabric-service.py`, no `--vault-project` until B-042 resolves — the
+  service starts degraded without keys and says so), run the adapter's `check_service.py` against
+  it and record every NOT_RUN (B-037: the installed pre-wave-3 build must not touch schema-2
+  ledgers). Then wave 6 offline work: meter the judge's LLM calls (B-041), planted-bad judge
+  fixtures (KA-G02, B-017). Live acceptance (KA-G03 host chain, FD-13 keys, FD-14 host update,
+  CORE-13/14) waits on: the Fabric issuer publishing JWKS, B-042 (registry) and B-043
+  (`prowl_` key door), the operator's host update.
 - Operator decisions (canvas §8) answered 2026-10-12: Q1 PR-per-wave merges, Q2 kit in wave 5,
   Q4 USD 15, Q5 host update at wave 6, Q6 no history rewrite. Q3 closed from sources.
 - Cross-agent: B-001 (model profiles, waits on Fabric T1–T3), B-020 (the contract owner adds

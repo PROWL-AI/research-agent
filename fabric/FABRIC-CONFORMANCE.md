@@ -1,8 +1,10 @@
-# Current adapter — revision 5 (2026-10-10)
+# Current adapter — revision 6 (2026-10-17, wave 5)
 
-The active manifest now describes the separate loopback Fabric service, not legacy stdio. Contract pin: `7a14a4877ca7d7b28cc33a0f52beaa14b38e1d92` (wave 5, 2026-10-17; was `623bf61` until revision 5). Exact tool definitions generate their schemas and manifest via `scripts/build-fabric-manifest.py`. `provider.contentHash` is SHA256 of compact, key-sorted UTF-8 manifest JSON before inserting that contentHash; runtime producer references use the same generated manifest. Installed build commit/digest identifies implementation separately.
+The active manifest describes the separate loopback Fabric service, not legacy stdio. Contract pin: `7a14a4877ca7d7b28cc33a0f52beaa14b38e1d92` (was `623bf61` until revision 5). Exact tool definitions generate their schemas and manifest via `scripts/build-fabric-manifest.py`; `tests/test_delegation.py::test_the_published_schemas_are_the_ones_the_service_lists` fails when the published schemas and the served `tools/list` differ. `provider.contentHash` is SHA256 of compact, key-sorted UTF-8 manifest JSON before inserting that contentHash; runtime producer references use the same generated manifest. Installed build commit/digest identifies implementation separately.
 
-Current evidence and open gates: [Fabric handoff](../docs/evidence/fabric-dashboard/HANDOFF.md). Prior receipts below are historical and do not certify revision 5. Admission fixtures remain discovery-only proposals; no charge-capability admission is claimed from their declarations. All declared schemas resolve locally beside the manifest.
+Revision 6 adds to `research.run` the fields `max_llm_usd` (number > 0, at most 1000) and `resumeJobId` (continue an ended job's run, [docs/FABRIC.md#resume-b-039](../docs/FABRIC.md)); every tool keeps its effect class. Delegation (DEC-0039) is verified offline by the callee with the adapter kit's verifier (`research_agent/service/vendor/`); refusals use the contract's DL-19 codes.
+
+Current evidence and open gates: [Fabric handoff](../docs/evidence/fabric-dashboard/HANDOFF.md). Prior receipts below are historical and do not certify revision 6. Admission fixtures remain discovery-only proposals; no charge-capability admission is claimed from their declarations. All declared schemas resolve locally beside the manifest.
 
 ---
 
@@ -96,8 +98,14 @@ receipts assert behavior, not host interop.
   `tests/test_llm_budget.py::test_stdio_run_schema_matches_the_tool_signature`.
   `capability-output.schema.json` already lists `budget_llm`. Neither file is
   referenced by `fabric-agent.json`, so the provider `contentHash` is unchanged;
-  the service's `research.run` input gains the field with the wave-5 manifest
-  rebuild.
+  the service's `research.run` input gained the field in revision 6 (wave 5).
+
+## 2026-10-17 — wave 5 (revision 6)
+
+- `capability-input.schema.json`: `max_llm_usd` gains `maximum: 1000`, the bound
+  `resolve_llm_cap` enforces for a caller's value. Not referenced by
+  `fabric-agent.json`.
+- Service manifest revision 6 (see the top of this file).
 
 ## Canary binding expectation
 

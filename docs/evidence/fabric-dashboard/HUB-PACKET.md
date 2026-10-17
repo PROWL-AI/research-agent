@@ -27,7 +27,7 @@ prowl-research.default ──verify offline against the estate JWKS──▶ act
   loopback http or a file), `RESEARCH_DELEGATION_AUDIENCE` (default `prowl-research.default`). Configured, the
   well-known document declares `auth.delegation` (DL-16); `surfaces.mcp.auth` stays `own` (the own agent token
   keeps working for T0 callers).
-- The service binds loopback; `serve --host` beyond loopback is refused unless delegation is configured.
+- The service binds loopback only (no bind option). T2 here means a loopback caller without the service's own token.
 - A job started under a token records `{principal, caller, chain, kid, tier}` (never the token); a delegated
   caller reads and cancels only the jobs it started (`scope-not-granted` otherwise).
 - Approval stays the operator's in the dashboard for every job; `approval/1` documents are not accepted from MCP

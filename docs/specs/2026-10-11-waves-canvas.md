@@ -228,16 +228,16 @@ Claim v2 (+ fields)
 
 ### N-FAB — Fabric contract (wave 5)
 
-- Contract pin `623bf613` → `8e49fbd` (B-021); re-derive `contentHash`, keep provider ids.
+- Contract pin `623bf613` → `7a14a48` (B-021; later than the planned `8e49fbd`, §9); re-derive `contentHash`, keep provider ids.
 - **Callee side of DEC-0039, by trust tier** (FD-12; ADR-0144 amendment 4, Fabric `19ad05ca`,
-  the estate authority record, "Trust by machine"): the service binds loopback only,
-  so every caller is T0 (this machine) — the operator's instruction is the authority and a
-  delegation token is **optional, used for attribution only**: when present it is verified
-  offline (EdDSA, audience = this provider, actor chain, ≤10 min expiry) and its actor chain is
-  recorded on the job; a bad token is refused with the contract's DL code; absence is fine. Binding
-  beyond loopback **requires** delegation verification and is refused at startup without it: until
-  enrollment in the operator's agent network (T1) can be proven on the wire, every non-loopback
-  caller is treated as T2. The own agent token stays for outside callers. Tests mint tokens with a test key. Host-chain
+  the estate authority record, "Trust by machine"), **as built**: the service binds loopback only
+  (no bind option). T0 is the service's own agent token from loopback: no delegation token is
+  required, and one presented beside it is still verified and recorded. Any other caller is T2
+  and must present a valid token (offline EdDSA, audience = this provider, scope, effect ceiling,
+  ≤10 min expiry; refusals in the contract's DL-19 shape); methods that name no capability
+  (`initialize`, `tools/list`) need an authentic token too. The verified principal, caller, chain
+  and `kid` are recorded on the job (never the token); a delegated caller acts only on its own jobs
+  and its idempotency keys are its own. Tests mint tokens with a test key. Host-chain
   acceptance waits for the Fabric issuer (Fabric 0.4.0 wave 4) — KA-G03.
 - Installer launches the service through an Observatory consumer, vault-only (B-019); the
   required slots are named in FABRIC.md (`PROWL_API_KEY`, `RESEARCH_LLM_API_KEY`).
@@ -246,8 +246,10 @@ Claim v2 (+ fields)
   `openrouter.py issue --name prowl-research --limit <USD> --to vault:<project>/prod/RESEARCH_LLM_API_KEY`;
   the `prowl_` key has no Observatory door yet — wave 5 researches the prowl.chat issuing path
   (an account the door already holds) and adds a door or records the gap; never another agent's key.
-- Dashboard kit 1.0.0 (B-002, needs the operator's go): tokens, `.fd-grid`, `.fd-nav`,
-  `.fd-scroll`, well-known `extensions` — removes the fixed 208/160 px nav.
+- Dashboard kit 1.1.0 (B-002, operator go 2026-10-12): tokens, estate themes, `.fd-nav` with «Ещё»,
+  `.fd-scroll`, well-known `extensions` — removes the fixed 208/160 px nav; usable from 360 px.
+- Service resume (B-039): `research.run` with `resumeJobId` continues an ended job's run — same runbook
+  and inputs, one continuation at a time, every resume of a chain writes the root run.
 - HUB-PACKET/HANDOFF rewritten around ADR-0144 (B-014); FABRIC.md gateway rule fixed (B-013,
   wave 1).
 
@@ -346,6 +348,7 @@ only the REQ table, this canvas and the repository and rules whether the system 
 | 1 | **closed** | `675e769` build, `583f1d1` fix round, `12df501` privacy fix | unit pass; seam fail → 2 breaks fixed; product fail → 7 findings fixed (fix round re-tested by its own tests; blind re-reading folded into wave 2's seam tier) | suite 370 passed; deep probes 7 failed / 5 passed; inventory 38 of 48 open |
 | 2 | **closed** | `cffc2e0` build+tests, `0b0347b` docs, `4d81cf4` fix round, docs fix round | unit fail (2 breaks), seam fail (3 breaks), product fail (6 breaks) → all fixed in one round with tests; crash test found 2 more defects during the build; blind re-reading of the fix round folded into wave 3's seam tier | suite 402 passed; deep probes 4 failed (KA-07/08/09 + superseded cwd control) / 8 passed; inventory 30 of 49 open |
 | 3 | **closed** | `86e313e` build, `5fcf2f4` fix round | unit fail (6 breaks), seam fail (6 breaks, one of them wave 2's: MCP status serialization), product fail (5 breaks) → all fixed in one round, 25 tests watched failing on `86e313e`; planted mutations caught (3/3); blind re-reading of the fix round folded into wave 4's seam tier | suite 450 passed; deep probes 11 passed / 1 superseded control; inventory 28 of 55 open |
+| 5 | **closed** | `eb1751b` + `77a0621` build, `198a227` fix round | unit fail, seam fail, product fail on `77a0621` → all fixed in one round (job isolation, resume chain rules, metadata authentication, vault `serve`, loopback-only bind, dashboard initiator, docs); planted mutations 12/12 caught; blind re-reading of the fix round folded into wave 6's seam tier | suite 515 passed; dashboard WebKit PASS at 1440/390/360; contract schemas PASS at `7a14a48`; inventory 25 of 60 open; FD-13 blocked on keys (B-042, B-043) |
 | 4 | **closed** | `b045dca` build, `dfe395b` fix round | unit fail (3 breaks), seam fail (6 breaks), product fail (10 breaks) → all fixed in one round; planted mutations 12/12 caught across build and fix round; blind re-reading of the fix round folded into wave 5's seam tier | suite 490 passed; dashboard WebKit PASS; prices match the catalog; inventory 23 of 58 open |
 
 ## 8. Operator decisions (one batch)
@@ -371,6 +374,7 @@ the recommendation as **assumed**, and the waves that depend on it name it.
 
 | Date | Change | Why |
 |---|---|---|
+| 2026-10-17 | Wave 5 closed (`198a227`). Decided: pin `7a14a48` rather than the planned `8e49fbd` (`8e49fbd` predates the trust tiers DL-25/26 the callee side implements; `git grep DL-25` finds them only at the later pin); dashboard kit 1.1.0 rather than 1.0.0 (estate themes, ED-9 extension; same tokens); T0 = own token AND loopback, every other caller T2 — the bind option was removed instead of guarded, so the non-loopback clause of FD-12 is moot; a broken token chain is refused as `unauthenticated`, never downgraded to attribution; the installed service is reinstalled from the merge commit after the PR merges; FD-13 stays blocked (B-042 registry ambiguity; B-043 no `prowl_` key door) and the native panel (FD-14) moves with wave 6; dashboard surfaces for resume and per-principal views are deferred (resume is MCP-only, scenario CORE-16) | operator decision 2026-10-17: decide and record, do not wait |
 | 2026-10-17 | Wave 4 closed (`dfe395b`). Decided in code: LLM cost lives in `stats.llm_budget` (with refused stages), `stats.llm_usage` stays tokens; the cap resolves caller > `RESEARCH_MAX_LLM_USD` > recorded > runbook > 5 (the environment beats a resumed run's recorded cap, so an operator can raise or lower it host-wide); the cap is a pre-call check by estimate and may overshoot by one call's estimate error (documented, not called a hard ceiling); HTTP error responses are unbilled; the eval judge stays unmetered (B-041); B-040/B-041 filed | wave-4 certification |
 | 2026-10-17 | Wave-4 build decisions: model defaults follow the operator's model choice (cheap `deepseek/deepseek-v4.1-flash`, strong `xiaomi/mimo-v2.6-pro`, judge `anthropic/claude-haiku-5.5` — another vendor), prices from the OpenRouter catalog; the Fabric `research.run` input field `max_llm_usd` moves to wave 5 with the manifest rebuild (one contentHash change, not two) — under the service the cap resolves from env/runbook/default meanwhile; the service journal stays a second record written at the same boundary as the attempt ledger, proven equal by test, instead of being derived from it (the core does not know the service store); service resume of an interrupted run filed as B-039 | wave-4 build |
 | 2026-10-17 | Wave 3 closed (`5fcf2f4`). Decided in code: independence = publisher of a URL the raw names, or the upstream dataset with delivery wrappers removed (`google_trends` == `serpapi_google_trends`); claims of one step never corroborate; LLM-answer tools join transforms as no source; a missing unit is compatible; the conflict event field is `subject` (the events filter refuses names containing `key`); B-036…B-038 filed | wave-3 certification |

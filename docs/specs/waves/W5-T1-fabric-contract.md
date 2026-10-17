@@ -3,6 +3,13 @@
 Wave 5 of [`../2026-10-11-waves-canvas.md`](../2026-10-11-waves-canvas.md). **Read §2 N-FAB — it is the contract.**
 Builds on waves 1–4 (merged at `119e2fd`). Public repository: no absolute home paths or private names.
 
+**As built** (fix round `198a227`; canvas §9, 2026-10-17): pin `7a14a48` (item 1); the service binds
+loopback only — the bind option was removed, so item 2's non-loopback clause is moot, and a loopback caller
+without the own token is T2; resume (item 3) also requires the same inputs, refuses a rejected, waiting,
+working or finished run and a second concurrent continuation, and every resume writes the chain's root run;
+kit 1.1.0 instead of 1.0.0 (item 4); the consumer is `use_secret.py serve --consumer chat.prowl.research`,
+not `run` (item 5); keys stay blocked (B-042, B-043); the reinstall (item 7) runs from the merge commit.
+
 ## Exit criteria (canvas §7, written before the wave)
 
 Pin + contentHash re-derived and validated; delegation tests (good token, wrong audience, expired,

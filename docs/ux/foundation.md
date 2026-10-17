@@ -23,6 +23,8 @@
 
 ## 3. Customer journeys
 ### JRN-01: P-01 — наблюдение (JTBD-01)
+**Owner:** оператор (P-01) — владелец сервиса на своей машине
+
 | # | Stage | User action | Touchpoint | Emotion (1-5) | Pain | Opportunity |
 |---|---|---|---|---|---|---|
 | 1 | До | Открывает Fabric | Сервис | 3 | Непонятно, жив ли агент | Статус и свежесть |
@@ -37,7 +39,7 @@
 **Personas:** P-01
 **JTBD:** JTBD-01
 **Journey:** JRN-01
-**Acceptance criteria:** Сценарии SCN-001…SCN-008, локальные проверки в verification.
+**Acceptance criteria:** Сценарии SCN-001…SCN-009, локальные проверки в verification.
 **Kill criteria:** Не выводить автоматический запуск платной работы в production, если нельзя восстановить историю или различить неизвестную стоимость.
 
 ## 5. Design tooling
