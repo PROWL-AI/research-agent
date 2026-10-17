@@ -73,6 +73,8 @@ MUTANTS = [
     ("register-bracketed", J, '_CONFLICT_REGISTER_RE = re.compile(r"\\[CONFLICT\\]|', '_CONFLICT_REGISTER_RE = re.compile(r"\\bCONFLICT\\b|', JT),
     ("partially", "research_agent/agent/writer.py", r"\bpartial(?:ly)?\b", r"\bpartial\b", JT),
     ("dry-run-exit-2", "scripts/install-fabric-service.py", "if problem:raise SystemExit(2)", "if False:raise SystemExit(2)", JT),
+    # B-045
+    ("status-mislabel", J, 'add("status_mislabel", ref, line)', "pass", JT),
     ("dry-run-problem", "scripts/install-fabric-service.py", 'problem=None if held else f"vault', 'problem=None if True else f"vault',
      ["tests/test_installer.py"]),
     ("installer-held-slots", "scripts/install-fabric-service.py", "held=[s for s in SLOTS if s not in missing]", "held=list(SLOTS)",

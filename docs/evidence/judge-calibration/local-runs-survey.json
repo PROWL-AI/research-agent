@@ -27,13 +27,16 @@
   "run": "local-4",
   "claims": 149,
   "partial": false,
-  "defects": {}
+  "defects": {
+   "status_mislabel": 41
+  }
  },
  {
   "run": "local-5",
   "claims": 185,
   "partial": false,
   "defects": {
+   "status_mislabel": 45,
    "conflict_hidden": 1,
    "quote_not_in_ledger": 1
   }
