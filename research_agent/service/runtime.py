@@ -288,7 +288,7 @@ class Runtime:
                 folder = self.store.root / "runs" / job["id"]
                 return {"research": result.model_dump(), "report": (folder / "report.md").read_text()[:200000],
                         "ledger": bounded(scrub(json.loads((folder / "ledger.json").read_text()))),
-                        "quality": "ledger classifications are unverified; see KA-07..KA-09 audit findings"}
+                        "quality": "ledger statuses follow evidence rules v2, tested offline only; live acceptance pending (wave 6)"}
 
     def envelope(self, job, output, wall_ms):
         calls = self.store.calls(job["id"])

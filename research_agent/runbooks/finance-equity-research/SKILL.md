@@ -161,8 +161,9 @@ advocacy; refuse to produce it.
 ## Verification (hard rules)
 
 - Key numbers (revenue, margins, FCF, net debt, multiples): ≥2 independent
-  sources (e.g. `google_finance` vs `dataforseo_serp_google_finance_quote` vs
-  an IR scrape) or tag ASSUMED. Quote disagreement >2%, ratio disagreement
+  sources (e.g. Google Finance — `google_finance` or
+  `dataforseo_serp_google_finance_quote`, one upstream — vs an IR scrape or a
+  filing) or tag ASSUMED. The two Google Finance tools agreeing is one source. Quote disagreement >2%, ratio disagreement
   >5% → `[CONFLICT]`; one targeted extra lookup to resolve, else surface it.
 - Everything derived from aggregator summaries (not a filing or IR page) is
   ASSUMED by default — say so, and route it to the follow-up filings list.

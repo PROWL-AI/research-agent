@@ -259,19 +259,31 @@ async def extract_step(ctx: WorkerContext, record: StepRecord, result: Any | Non
     ledger is saved. Never dispatches."""
     checkpoint = ctx.checkpoint
     if result is None:
-        text = ctx.store.read_artifact(record.raw_ref, record.raw_sha256)
-        result = json.loads(text) if record.raw_ref.endswith(".json") else text
+        try:
+            text = ctx.store.read_artifact(record.raw_ref, record.raw_sha256)
+            result = json.loads(text) if record.raw_ref.endswith(".json") else text
+        except (OSError, ValueError) as exc:
+            # A raw that is gone or no longer matches its recorded sha256 is not
+            # evidence: the step is typed as a failed extraction (the run ends
+            # evidence_incomplete) and the other steps still finish.
+            record.extraction = {"status": "failed", "error": f"raw_unreadable: {exc}"[:300], "claim_ids": []}
+            emit(log, "evidence.incomplete", logging.WARNING, run_id=checkpoint.run_id,
+                 step_id=record.step_id, reason="raw_unreadable", error=exc)
+            save_state(checkpoint, ctx.store)
+            return 0
     # Claims of an earlier extraction of this step are replaced: found by the
-    # ids the step recorded AND by their raw ref — a crash between the ledger
-    # save and the checkpoint save leaves claims the step never recorded.
+    # ids the step recorded, by their step id, AND by their raw ref — a crash
+    # between the ledger save and the checkpoint save leaves claims the step
+    # never recorded.
     stale = set(record.extraction.get("claim_ids") or [])
+    stale |= {c.id for c in ctx.ledger.claims if c.step_id == record.step_id}
     raw_name = Path(record.raw_ref).name  # v1 claims carry cwd-relative or absolute refs
     stale |= {c.id for c in ctx.ledger.claims if c.raw_ref and Path(c.raw_ref).name == raw_name}
     ctx.ledger.remove_ids(sorted(stale))
-    before_ids = {c.id for c in ctx.ledger.claims}
     try:
         added = await ctx.extract_claims(
-            plan_item(record), result, Path(record.raw_ref), ctx.ledger, record.step_id
+            plan_item(record), result, Path(record.raw_ref), ctx.ledger, record.step_id,
+            raw_sha256=record.raw_sha256,
         ) or 0
     except Exception as exc:  # noqa: BLE001 — typed into the step, not swallowed
         record.extraction = {"status": "failed", "error": str(exc)[:300], "claim_ids": []}
@@ -279,7 +291,9 @@ async def extract_step(ctx: WorkerContext, record: StepRecord, result: Any | Non
              step_id=record.step_id, reason="extraction", error=exc)
         save_state(checkpoint, ctx.store)
         return 0
-    claim_ids = [c.id for c in ctx.ledger.claims if c.id not in before_ids]
+    # By the claim's own step id: under several workers the shared ledger
+    # also grows with other steps' claims during the await above.
+    claim_ids = [c.id for c in ctx.ledger.claims if c.step_id == record.step_id]
     record.extraction = {"status": "ok" if added else "empty", "error": None, "claim_ids": claim_ids}
     _set_state(checkpoint, record, COMPLETED)
     save_state(checkpoint, ctx.store, ctx.ledger)

@@ -119,25 +119,27 @@
       "id": "B-018",
       "title": "No wiki project card and no agent-estate entry for prowl-research (global rule: read/update before agent planning)",
       "source": "operator's projects wiki (private): no card for this agent",
-      "status": "in-flight — wiki card committed locally in the projects vault; push blocked by unrelated vault divergence (vault owner)",
+      "status": "closed",
       "area": "knowledge",
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "notes": "vault commit `870ff961` is an ancestor of obsidian-memory-vault `origin/master` `bf2fd5cd`; card `projects/prowl-research/prowl-research.md` and one `prowl-research.default` row in `synthesis/agent-estate.md` present there, measured 2026-10-16"
     },
     {
       "id": "B-024",
       "title": "Contract probes live outside tests/ (deep probes in docs/reports, resume probes only in prowl-app); move each into tests/ as its fix lands, keep the diagnostic cut",
       "source": "docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py; prowl-app probe_research_resume.py",
-      "status": "in-flight — KA-03..06/10..12 contracts in tests/ (waves 1-2); KA-07..09 move with wave 3",
+      "status": "closed",
       "area": "tests",
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "notes": "every deep-audit probe now has a ported contract in tests/ (KA-06 wave 1, KA-03..05/10..12 wave 2, KA-07..09 wave 3 at 5fcf2f4); the probe file stays as the audit's cut"
     },
     {
       "id": "B-030",
@@ -300,19 +302,20 @@
       "id": "KA-07",
       "title": "A valueless claim erases a numeric conflict (incremental status, last writer wins)",
       "source": "research_agent/evidence/ledger.py:169-209",
-      "status": "open — probe red at c0dfb6e",
+      "status": "closed",
       "area": "evidence",
       "node": "N-EVID",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 3,
-      "release": "this"
+      "release": "this",
+      "notes": "wave 3: 86e313e build + 5fcf2f4 fix round; contracts in tests/test_ka_contracts.py green; deep probes 11/12 (cwd control superseded by B-025)"
     },
     {
       "id": "KA-08",
       "title": "An LLM-asserted verbatim flag makes a fabricated quote verified; Claim has no quote/span",
       "source": "research_agent/agent/orchestrator.py:684-697; evidence/ledger.py:34-45,183-199",
-      "status": "open — probe red at c0dfb6e",
+      "status": "closed",
       "area": "evidence",
       "node": "N-EVID",
       "blocked_by": [
@@ -321,13 +324,14 @@
       ],
       "closable_in_one_pass": true,
       "wave": 3,
-      "release": "this"
+      "release": "this",
+      "notes": "wave 3: 86e313e build + 5fcf2f4 fix round; contracts in tests/test_ka_contracts.py green; deep probes 11/12 (cwd control superseded by B-025)"
     },
     {
       "id": "KA-09",
       "title": "Two delivery tools reading one document count as two independent sources",
       "source": "research_agent/evidence/ledger.py:201-207",
-      "status": "open — probe red at c0dfb6e",
+      "status": "closed",
       "area": "evidence",
       "node": "N-EVID",
       "blocked_by": [
@@ -335,19 +339,21 @@
       ],
       "closable_in_one_pass": true,
       "wave": 3,
-      "release": "this"
+      "release": "this",
+      "notes": "wave 3: 86e313e build + 5fcf2f4 fix round; contracts in tests/test_ka_contracts.py green; deep probes 11/12 (cwd control superseded by B-025)"
     },
     {
       "id": "B-007",
       "title": "Transform claims (an LLM summary of tool X) corroborate X itself",
       "source": "research_agent/evidence/ledger.py:201-203; orchestrator.py:586-589",
-      "status": "open",
+      "status": "closed",
       "area": "evidence",
       "node": "N-EVID",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 3,
-      "release": "this"
+      "release": "this",
+      "notes": "wave 3: 86e313e build + 5fcf2f4 fix round; contracts in tests/test_ka_contracts.py green; deep probes 11/12 (cwd control superseded by B-025)"
     },
     {
       "id": "KA-G01",
@@ -572,20 +578,21 @@
       "id": "B-023",
       "title": "audit/kimi-20261010 and feat/fabric-dashboard-20261010 are unmerged; origin/main is still 1dced8e",
       "source": "git log main..HEAD",
-      "status": "needs-operator",
+      "status": "closed",
       "area": "integration",
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "needs_operator": "integration policy: PR to main per wave, merged after the wave closes (recommended)",
       "wave": 1,
-      "release": "this"
+      "release": "this",
+      "notes": "All three branches are ancestors of origin/main 985db4f (PR #1, PR #2), measured 2026-10-16."
     },
     {
       "id": "B-020",
       "title": "prowl-research has no row in the Fabric delegation-model adoption plan (step 4: callee adopts)",
       "source": "Fabric delegation-model adoption plan (estate document)",
-      "status": "open — external ask",
+      "status": "in-flight — contract owner (fabric-agent-contract) accepted 2026-10-16: a 2026-10-16 cut of `docs/evidence/adoption.md` adds PROWL-AI/research-agent (pin `623bf61`, DEC-0001…0031; DEC-0039 not in pin → B-021); lands with its PR #113, commit to follow",
       "area": "fabric",
       "node": "N-EXT",
       "blocked_by": [],
@@ -598,13 +605,14 @@
       "id": "B-026",
       "title": "Observatory use_secret.py names prints its ambiguity message one character per line",
       "source": "Observatory use_secret.py names",
-      "status": "open — external defect",
+      "status": "closed",
       "area": "external",
       "node": "N-EXT",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": null,
-      "release": "external"
+      "release": "external",
+      "notes": "Installed engine project-observatory 0.24.5 prints the ambiguity message on one line (`use_secret.py names prowl-research | wc -l` = 1), measured 2026-10-16."
     },
     {
       "id": "KA-01",
@@ -670,6 +678,80 @@
       ],
       "closable_in_one_pass": false,
       "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-033",
+      "title": "This checkout is not a Fabric project: fabric_whoami refuses, so the project board (com.*) and work claims are unreachable",
+      "source": "fabric_whoami 2026-10-16",
+      "status": "open — external",
+      "area": "external",
+      "node": "N-EXT",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "notes": "Operator step in Fabric: + Project → Open a project. Until then the board is this file.",
+      "wave": null,
+      "release": "external"
+    },
+    {
+      "id": "B-034",
+      "title": "Observatory attributes 3 critical leaked-unrotated keys (CIVITAI_API_TOKEN, HF_TOKEN, REPLICATE_API_TOKEN, slot 0xDEV/local, seen 2026-09-14) to this project; none is used by research-agent",
+      "source": "observatory_findings project:prowl-research 2026-10-16",
+      "status": "open — external",
+      "area": "external",
+      "node": "N-EXT",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "notes": "Owner: the 0xDEV/local slot (not this repo). Rotate through Observatory doors and settle with vault.py settle; or re-scope the finding away from prowl-research.",
+      "wave": null,
+      "release": "external"
+    },
+    {
+      "id": "B-035",
+      "title": "Service configures no logging: INFO events never reach service.log; launchd stdout log has no size cap or rotation",
+      "source": "infra check 2026-10-17 · research_agent/service/cli.py; launchd plist StandardOutPath",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-036",
+      "title": "Ledger v2 is ~1.6x the bytes of v1: the service inlines it under a 64 KB bound (~80 claims instead of ~126) and as_prompt_json grows ~25% in every writer/repair/judge prompt, unbounded",
+      "source": "wave-3 seam certification 2026-10-17 · research_agent/service/runtime.py bounded(); writer.py as_prompt_json",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-037",
+      "title": "A pre-wave-3 build (the installed service release) loads a schema-2 ledger and re-saves it as schema 1, dropping quote/span/source; schema-2 claims then read assumed",
+      "source": "wave-3 seam certification 2026-10-17 · ledger.py load guard exists only in the new build",
+      "status": "open",
+      "area": "service",
+      "node": "N-FAB",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 5,
+      "release": "this"
+    },
+    {
+      "id": "B-038",
+      "title": "Ledger.recompute rescans every claim on each add (quadratic); measured fine at 455 claims, unmeasured beyond",
+      "source": "wave-3 seam certification 2026-10-17 · research_agent/evidence/ledger.py recompute",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 4,
       "release": "this"
     }
   ]

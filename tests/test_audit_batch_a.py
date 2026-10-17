@@ -230,11 +230,11 @@ class TestLedgerCorroboration:
         ledger = Ledger(tmp_path / "l.json")
         ledger.add(
             claim="example.com traffic", value=100, unit="visitors",
-            subject="example.com monthly organic traffic", source_tool="tool_a",
+            subject="example.com monthly organic traffic", source_tool="spyfu_a",
         )
         second = ledger.add(
             claim="example.com traffic", value=100, unit="visitors",
-            subject="example.com organic traffic monthly", source_tool="tool_b",
+            subject="example.com organic traffic monthly", source_tool="dataforseo_b",
         )
         assert second.status.value == "verified"
 
@@ -244,20 +244,22 @@ class TestLedgerCorroboration:
         second = ledger.add(claim="c", value=5, unit="M", subject="s metric", source_tool="tool_b")
         assert second.status.value == "conflict"
 
-    def test_verbatim_keeps_verified_through_a_conflict(self, tmp_path: Path):
+    def test_located_quote_keeps_verified_through_a_conflict(self, tmp_path: Path):
+        # Was test_verbatim_keeps_verified_*: an extractor flag verified (KA-08);
+        # now a quote located in the stored raw does, and keeps doing so.
         ledger = Ledger(tmp_path / "l.json")
-        first = ledger.add(claim='"great product"', subject="s reviews", source_tool="tool_a", verbatim=True)
+        first = ledger.add(claim='"great product"', subject="s reviews", source_tool="tool_a", quote="great product", quote_span=(0, 13))
         assert first.status.value == "verified"
         ledger.add(claim="different value", value=1, unit="x", subject="s reviews", source_tool="tool_b")
         assert first.status.value == "verified"
 
 
 class TestLedgerValuelessClaims:
-    def test_verbatim_quote_does_not_conflict_with_numeric_claim(self, tmp_path: Path):
+    def test_located_quote_does_not_conflict_with_numeric_claim(self, tmp_path: Path):
         ledger = Ledger(tmp_path / "l.json")
         quote = ledger.add(
             claim='"traffic grew a lot"', subject="s traffic",
-            source_tool="tool_a", verbatim=True,
+            source_tool="tool_a", quote="traffic grew a lot", quote_span=(0, 18),
         )
         numeric = ledger.add(
             claim="s traffic is 42000", value=42000, unit="visits",
@@ -274,18 +276,18 @@ class TestLedgerValuelessClaims:
         )
         quote = ledger.add(
             claim='"traffic grew a lot"', subject="s traffic",
-            source_tool="tool_b", verbatim=True,
+            source_tool="tool_b", quote="traffic grew a lot", quote_span=(0, 18),
         )
         assert quote.status.value == "verified"
 
-    def test_new_verbatim_entry_stays_verified_inside_a_conflict(self, tmp_path: Path):
+    def test_new_located_quote_stays_verified_inside_a_conflict(self, tmp_path: Path):
         ledger = Ledger(tmp_path / "l.json")
         ledger.add(claim="c", value=5, unit="%", subject="s metric", source_tool="tool_a")
         conflicted = ledger.add(claim="c", value=9, unit="%", subject="s metric", source_tool="tool_b")
         assert conflicted.status.value == "conflict"
         quote = ledger.add(
             claim='"about five percent"', subject="s metric",
-            source_tool="tool_c", verbatim=True,
+            source_tool="tool_c", quote="traffic grew a lot", quote_span=(0, 18),
         )
         assert quote.status.value == "verified"
 

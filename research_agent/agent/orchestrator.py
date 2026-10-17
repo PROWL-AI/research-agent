@@ -19,7 +19,22 @@ from pydantic import BaseModel, Field
 from research_agent.agent.writer import produce_report
 from research_agent.events import emit
 from research_agent.evidence import terminal
-from research_agent.evidence.ledger import Ledger, _atomic_write_text
+from research_agent.evidence.ledger import (
+    QUOTE_LLM_ANSWER,
+    QUOTE_NOT_FOUND,
+    QUOTE_TRANSFORM,
+    Claim,
+    Ledger,
+    _atomic_write_text,
+)
+from research_agent.evidence.source import (
+    TRANSFORM_TOOLS,
+    find_quote,
+    flatten_text,
+    is_llm_answer,
+    normalize_space,
+    url_in_text,
+)
 from research_agent.evidence.runlock import RunLock
 from research_agent.evidence.store import (
     COMPLETED,
@@ -47,7 +62,6 @@ log = logging.getLogger(__name__)
 _RAW_SNIPPET_CHARS = 12_000
 _TRANSFORM_CONTEXT_CHARS = 4_000
 _TRANSFORM_CONTEXT_ARTIFACTS = 3
-TRANSFORM_TOOLS = frozenset({"transform", "llm_transform"})
 #: Each transform is an LLM call outside every budget — the planner does not
 #: get to spawn them without bound.
 _MAX_TRANSFORM_STEPS = 25
@@ -398,6 +412,7 @@ class Orchestrator:
         store: ArtifactStore,
     ) -> RunResult:
         ledger = Ledger.load(store.run_dir / "ledger.json")
+        ledger.run_id = run_id
         try:
             checkpoint = store.load_checkpoint()
         except CheckpointMigrationError as exc:
@@ -818,21 +833,25 @@ class Orchestrator:
 
     async def _extract_claims(
         self, item: PlanItem, result: Any, raw_path: Path, ledger: Ledger,
-        step_id: str | None = None,
+        step_id: str | None = None, raw_sha256: str | None = None,
     ) -> int:
         """Extract ledger claims from a raw result; returns how many were added
         (the caller's accounting must not diff a shared ledger under fan-out).
-        The step_id is accepted for callers that record which claims a step
-        produced (research_agent.agent.subagent.extract_step)."""
-        raw_text = json.dumps(
-            _strip_envelope_meta(result), ensure_ascii=False, default=str
-        )[:_RAW_SNIPPET_CHARS]
+
+        The extractor sees the first _RAW_SNIPPET_CHARS of the raw and returns a
+        `quote` per claim; the quote is then searched in the WHOLE stored raw
+        (KA-08). Nothing the extractor says about itself verifies a claim."""
+        stripped = _strip_envelope_meta(result)
+        raw_text = json.dumps(stripped, ensure_ascii=False, default=str)[:_RAW_SNIPPET_CHARS]
         system = (
             "You extract evidence-ledger claims from a raw tool result. Output JSON: "
             '{"claims": [{"claim": "...", "subject": "...", "value": "...", "unit": "...", '
-            '"source_url": "...", "verbatim": true|false}]}. '
+            '"source_url": "...", "quote": "..."}]}. '
             "Include ONLY facts present in the raw text — no outside knowledge. "
-            "Each claim needs either a verbatim quote (verbatim=true) or a value+unit. "
+            "'quote' is the exact text of the raw result the claim rests on, copied "
+            "character for character (it is checked against the stored raw; a quote "
+            "that is not there leaves the claim unverified). A numeric claim's value "
+            "must appear inside its quote. "
             "'subject' is a short stable key grouping claims about the same metric "
             "(e.g. 'example.com monthly organic traffic'). Return at most 8 claims; "
             "prefer numbers and quotable findings. If nothing is extractable, return "
@@ -851,31 +870,72 @@ class Orchestrator:
         )
         payload = _parse_json_object(text)
         claims = payload.get("claims", []) if isinstance(payload, dict) else []
+        # The whole raw, once per step, in both shapes a quote can be copied
+        # from: its values (what a page says) and its JSON (what the extractor saw).
+        texts = {
+            "values": flatten_text(stripped),
+            "json": normalize_space(json.dumps(stripped, ensure_ascii=False, default=str)),
+        }
+        args_text = json.dumps(item.arguments or {}, ensure_ascii=False, default=str).casefold()
+        transform = item.tool.lower() in TRANSFORM_TOOLS
         added = 0
         for raw_claim in claims[:8]:
             if not isinstance(raw_claim, dict) or not raw_claim.get("claim"):
                 continue
             try:
-                self._add_claim(ledger, item, raw_claim, raw_path)
+                entry = self._add_claim(ledger, item, raw_claim, raw_path, texts, args_text,
+                                        transform=transform, step_id=step_id, raw_sha256=raw_sha256)
             except ValueError as exc:
                 # One malformed claim (e.g. a NaN value) is dropped on its own;
                 # it must not cost the step its other evidence.
                 log.warning("claim dropped for %s: %s", item.tool, exc)
                 continue
+            if entry.quote_check == QUOTE_NOT_FOUND:
+                emit(log, "claim.quote_not_found", logging.INFO, run_id=ledger.run_id,
+                     claim_id=entry.id, step_id=step_id)
             added += 1
         return added
 
     @staticmethod
-    def _add_claim(ledger: Ledger, item: PlanItem, raw_claim: dict[str, Any], raw_path: Path) -> None:
-        ledger.add(
+    def _add_claim(
+        ledger: Ledger, item: PlanItem, raw_claim: dict[str, Any], raw_path: Path,
+        texts: dict[str, str], args_text: str,
+        *, transform: bool, step_id: str | None, raw_sha256: str | None,
+    ) -> Claim:
+        quote = raw_claim.get("quote")
+        quote = quote.strip() if isinstance(quote, str) and quote.strip() else None
+        span, check, basis = None, None, None
+        if transform:
+            # A transform's raw is its own LLM note: finding the quote there
+            # proves only that the note said it (B-007).
+            check = QUOTE_TRANSFORM
+        elif is_llm_answer(item.tool):
+            check = QUOTE_LLM_ANSWER
+        elif quote is not None:
+            for basis, text in texts.items():
+                span = find_quote(quote, text)
+                if span is not None:
+                    break
+            if span is None:
+                basis, check = None, QUOTE_NOT_FOUND
+        # Independence comes from where the data came from, never from the
+        # extractor's say-so: a URL counts only if the raw or the request names it.
+        url = raw_claim.get("source_url")
+        url = url if isinstance(url, str) and url_in_text(url, texts["values"], texts["json"], args_text) else None
+        return ledger.add(
             claim=str(raw_claim["claim"]),
             value=raw_claim.get("value"),
             unit=raw_claim.get("unit"),
             subject=raw_claim.get("subject"),
             source_tool=item.tool,
-            source_url=raw_claim.get("source_url"),
+            source_url=url,
             raw_ref=str(raw_path),
-            verbatim=bool(raw_claim.get("verbatim")),
+            step_id=step_id,
+            quote=quote,
+            quote_span=span,
+            quote_basis=basis,
+            quote_check=check,
+            document_sha256=raw_sha256,
         )
 
     @staticmethod

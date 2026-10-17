@@ -252,3 +252,22 @@ async def test_repair_retryable_error_still_raises(
         await write_and_repair(
             fake_llm, get_runbook("mini-teardown"), ledger, {"competitors": ["a.com"]}
         )
+
+
+async def test_conflict_reaches_the_writer_with_both_sides_and_the_rule(tmp_path, fake_llm, mini_runbooks_dir, monkeypatch):
+    # CORE-10, report side: both disagreeing claims reach the writer as
+    # status "conflict", and the prompt orders [CONFLICT] and no chart.
+    import json as _json
+
+    from research_agent.agent.writer import write_report
+    from research_agent.runbook import get_runbook
+
+    monkeypatch.setattr("research_agent.runbook.RUNBOOKS_DIR", mini_runbooks_dir)
+    ledger = Ledger(tmp_path / "ledger.json")
+    ledger.add(claim="100 visits", value=100, unit="visits", subject="a.com visits", source_tool="spyfu_a")
+    ledger.add(claim="200 visits", value=200, unit="visits", subject="a.com visits", source_tool="dataforseo_b")
+    await write_report(fake_llm, get_runbook("mini-teardown"), ledger, {"competitors": ["a.com"]})
+    system = fake_llm.calls[-1]["messages"][0]["content"]
+    rows = [r for r in _json.loads(ledger.as_prompt_json()) if r["subject"] == "a.com visits"]
+    assert {r["status"] for r in rows} == {"conflict"} and ledger.as_prompt_json() in system
+    assert "[CONFLICT]" in system and "never chart it" in system

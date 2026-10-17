@@ -137,6 +137,8 @@ what does that mean for timing.
 - Trend direction disagreement between `google_trends` and
   `serpapi_google_trends`, or news-volume disagreement between `google_news`
   and `bing_news` >2x → `[CONFLICT]`, report both, never average silently.
+  Agreement between `google_trends` and `serpapi_google_trends` is one
+  upstream index read twice — it does not triangulate.
 - Every trend figure carries geo + window; every spike carries a named
   driver or the tag UNEXPLAINED.
 - Error bands: trend indices are relative (0-100), never absolute volume —
