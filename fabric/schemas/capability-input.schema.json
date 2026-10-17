@@ -41,6 +41,11 @@
     "trace_id": {
       "type": "string",
       "description": "Caller trace id (fabric-interop/0.1); logged with every line of the run"
+    },
+    "max_llm_usd": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Cap on this run's own LLM spend in USD, checked before every LLM call (retries included). Unset: RESEARCH_MAX_LLM_USD, the cap a resumed run recorded, the runbook's budget.max_llm_usd, else 5."
     }
   },
   "required": [

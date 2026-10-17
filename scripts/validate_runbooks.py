@@ -11,9 +11,11 @@ Exit codes: 0 = all runbooks valid, 1 = validation failed, 2 = usage or
 network/config error (so CI can tell "runbook invalid" apart from "could not
 reach the catalog").
 
-TODO: warn when a runbook's allowlist misses the declared failover alternatives
-of its tools (trap T2) once a machine-readable alternatives map is available
-from the live catalog.
+Warns (trap T2) when a runbook's prose declares a failover tool — a backticked
+catalog tool after "fallback", "failover", "falls back" or "if … fails" — that its
+`tools:` allowlist does not carry: the planner can only call allowlisted tools,
+so that fallback can never run. A warning, not a failure: the prose may name a
+tool on purpose as out of scope.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -38,6 +41,30 @@ def check_tools_against_catalog(
 ) -> list[str]:
     live = set(catalog)
     return [name for name in tools if name not in live]
+
+
+_FAILOVER = re.compile(r"fall[\s-]?back|failover|falls back|if [^.]{0,80}fails", re.IGNORECASE)
+_NEGATED = re.compile(r"\b(no|without( a)?|never)\s+(fall[\s-]?back|failover)", re.IGNORECASE)
+_TICKED = re.compile(r"`([a-z][a-z0-9_]{2,})`")
+_ABBREVIATIONS = re.compile(r"\b(e\.g|i\.e|etc|vs|cf)\.", re.IGNORECASE)
+_SENTENCE = re.compile(r"(?<=[.;!?])\s+(?=[A-Z`(])")
+
+
+def failover_gaps(body: str, allowlist: list[str], catalog: list[str]) -> list[str]:
+    """Catalog tools a runbook names in a fallback sentence that its allowlist
+    misses. The whole sentence counts (a fallback can be named before the
+    keyword); a negated one ("no fallback for `x`") does not."""
+    live, allowed = set(catalog), set(allowlist)
+    gaps: list[str] = []
+    for item in re.split(r"\n\s*\n|\n(?=\s*(?:\d+\.|-)\s)", body):
+        text = _ABBREVIATIONS.sub(lambda m: m.group(1), " ".join(item.split()))
+        for sentence in _SENTENCE.split(text):
+            if not _FAILOVER.search(sentence) or _NEGATED.search(sentence):
+                continue
+            for name in _TICKED.findall(sentence):
+                if name in live and name not in allowed and name not in gaps:
+                    gaps.append(name)
+    return gaps
 
 
 def _budget_problems(budget: object) -> list[str]:
@@ -107,6 +134,10 @@ def main(argv: list[str] | None = None) -> int:
             failures += 1
         else:
             print(f"OK:   {runbook.name}: {len(runbook.meta.tools)} tools all present")
+        gaps = failover_gaps(runbook.body, runbook.meta.tools, catalog)
+        if gaps:
+            print(f"WARN: {runbook.name}: fallback tools not in the allowlist (they can never run): "
+                  f"{', '.join(gaps)}")
 
     if failures:
         print(f"\n{failures} validation failure(s)", file=sys.stderr)

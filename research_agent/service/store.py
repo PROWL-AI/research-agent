@@ -11,6 +11,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from research_agent.config import DEFAULT_LLM_MODEL, DEFAULT_LLM_MODEL_STRONG
+
 TERMINAL = {"completed", "failed", "cancelled"}
 
 
@@ -28,8 +30,8 @@ class Conflict(ValueError):
 
 class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    cheap_model: str = Field(default="google/gemini-2.5-flash", min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9/_.:-]+$")
-    strong_model: str = Field(default="anthropic/claude-sonnet-4.5", min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9/_.:-]+$")
+    cheap_model: str = Field(default=DEFAULT_LLM_MODEL, min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9/_.:-]+$")
+    strong_model: str = Field(default=DEFAULT_LLM_MODEL_STRONG, min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9/_.:-]+$")
     parallel_jobs: int = Field(default=1, ge=1, le=4)
     timeout_minutes: int = Field(default=15, ge=1, le=60)
     max_workers: int = Field(default=1, ge=1, le=5)

@@ -37,7 +37,7 @@ from research_agent.agent.orchestrator import (
     RunResult,
     build_brief,
 )
-from research_agent.config import Config, ConfigError
+from research_agent.config import Config, ConfigError, resolve_llm_cap
 from research_agent.events import emit
 from research_agent.evidence import terminal
 from research_agent.evidence.runlock import is_locked_elsewhere, reconcile_orphans
@@ -109,7 +109,8 @@ def _validate_run_request(runbook: str, inputs: dict[str, Any]) -> None:
 
 
 async def _execute_run(
-    runbook: str, inputs: dict[str, Any], run_id: str, trace_id: str | None
+    runbook: str, inputs: dict[str, Any], run_id: str, trace_id: str | None,
+    max_llm_usd: float | None = None,
 ) -> RunResult:
     """Run one job and report its outcome. Writes nothing itself.
 
@@ -126,7 +127,7 @@ async def _execute_run(
         config = _config_from_env()
         async with _make_prowl(config) as prowl, _make_llm(config) as llm:
             orchestrator = Orchestrator(prowl, llm, runs_root=_runs_root())
-            result = await orchestrator.run(runbook, inputs, run_id=run_id)
+            result = await orchestrator.run(runbook, inputs, run_id=run_id, max_llm_usd=max_llm_usd)
         emit(
             log, "mcp.run.finished", run_id=run_id,
             status=result.status, terminal_code=result.terminal_code,
@@ -161,9 +162,17 @@ async def research_run(
     run_id: str | None = None,
     wait: bool = False,
     trace_id: str | None = None,
+    max_llm_usd: float | None = None,
 ) -> dict[str, Any]:
-    """Execute a research runbook. wait=false returns a job handle immediately."""
+    """Execute a research runbook. wait=false returns a job handle immediately.
+    max_llm_usd caps the run's own LLM spend (USD)."""
     _validate_run_request(runbook, inputs)
+    try:
+        # Before a job handle exists: a bad cap (argument or RESEARCH_MAX_LLM_USD)
+        # is the caller's error now, not a failed run later.
+        resolve_llm_cap(max_llm_usd, None, None)
+    except ConfigError as exc:
+        raise ValueError(str(exc)) from exc
     try:
         _config_from_env()
     except ConfigError as exc:
@@ -220,12 +229,12 @@ async def research_run(
         assert current is not None
         _TASKS[run_id] = current
         try:
-            result = await _execute_run(runbook, inputs, run_id, trace_id)
+            result = await _execute_run(runbook, inputs, run_id, trace_id, max_llm_usd)
         finally:
             _TASKS.pop(run_id, None)
         return _result_envelope(result)
 
-    task = asyncio.create_task(_execute_run(runbook, inputs, run_id, trace_id))
+    task = asyncio.create_task(_execute_run(runbook, inputs, run_id, trace_id, max_llm_usd))
     _TASKS[run_id] = task
 
     def _observe(done: asyncio.Task) -> None:

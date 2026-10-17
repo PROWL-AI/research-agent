@@ -359,7 +359,7 @@
       "id": "KA-G01",
       "title": "No LLM budget: Budget has tool calls/USD/minutes only; LLM usage is in-memory tokens without USD; transforms uncapped in money",
       "source": "research_agent/runbook.py:36-43; llm.py:58-99; orchestrator.py:388-390",
-      "status": "implementation gap",
+      "status": "closed",
       "area": "cost",
       "node": "N-LLMB",
       "blocked_by": [
@@ -367,7 +367,7 @@
         "KA-12"
       ],
       "closable_in_one_pass": true,
-      "notes": "Operator approved a max_llm mechanism (kimi export 2026-10-09 :7310). Designed so B-001 later swaps the key route, not the limit.",
+      "notes": "wave 4: b045dca build + dfe395b fix round; max_llm_usd checked before every LLM attempt and recorded in the attempt ledger (tests/test_llm_budget.py)",
       "wave": 4,
       "release": "this"
     },
@@ -375,49 +375,53 @@
       "id": "B-003",
       "title": "ObservedLLM duplicates LLMClient without retries, max_tokens-scaled timeout or LLMError mapping; one 429 fails a paid service run",
       "source": "research_agent/service/runtime.py:91-122; llm.py:144-149",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-SVC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 4,
-      "release": "this"
+      "release": "this",
+      "notes": "wave 4: b045dca build + dfe395b fix round; ObservedLLM observes LLMClient._post: one transport (test_service_llm_retries_a_429_like_the_core_and_journals_each_attempt)"
     },
     {
       "id": "B-004",
       "title": "ObservedProwl._rpc never reconnects; meta calls lose the client's retry under the service",
       "source": "research_agent/service/runtime.py:51-58",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-SVC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 4,
-      "release": "this"
+      "release": "this",
+      "notes": "wave 4: b045dca build + dfe395b fix round; metadata calls reconnect through the core _rpc; paid calls single-shot (test_service_metadata_calls_reconnect_but_a_paid_call_is_sent_once)"
     },
     {
       "id": "B-005",
       "title": "Runtime.envelope hard-codes outcome partial; research status is buried in output.research.status",
       "source": "research_agent/service/runtime.py:278",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-SVC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 4,
-      "release": "this"
+      "release": "this",
+      "notes": "wave 4: b045dca build + dfe395b fix round; envelope outcome follows the run (test_envelope_outcome_follows_the_run, test_a_service_job_stopped_by_the_llm_cap_reports_partial); table in FABRIC.md"
     },
     {
       "id": "B-029",
       "title": "validate_runbooks does not warn when a runbook's allowlist misses its declared failover alternatives",
       "source": "scripts/validate_runbooks.py:14",
-      "status": "open",
+      "status": "closed",
       "area": "runbooks",
       "node": "N-SVC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 4,
-      "release": "this"
+      "release": "this",
+      "notes": "wave 4: b045dca build + dfe395b fix round; validate_runbooks warns on fallback tools missing from the allowlist (test_failover_sentences)"
     },
     {
       "id": "B-014",
@@ -710,25 +714,27 @@
       "id": "B-035",
       "title": "Service configures no logging: INFO events never reach service.log; launchd stdout log has no size cap or rotation",
       "source": "infra check 2026-10-17 · research_agent/service/cli.py; launchd plist StandardOutPath",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-SVC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 4,
-      "release": "this"
+      "release": "this",
+      "notes": "wave 4: b045dca build + dfe395b fix round; structured events to a rotating events.log (5 x 5 MB, test_service_events_reach_a_rotating_log_file); service.log keeps only launchd stdio (uvicorn warnings, crash tracebacks) and is not rotated by design"
     },
     {
       "id": "B-036",
       "title": "Ledger v2 is ~1.6x the bytes of v1: the service inlines it under a 64 KB bound (~80 claims instead of ~126) and as_prompt_json grows ~25% in every writer/repair/judge prompt, unbounded",
       "source": "wave-3 seam certification 2026-10-17 · research_agent/service/runtime.py bounded(); writer.py as_prompt_json",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-SVC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 4,
-      "release": "this"
+      "release": "this",
+      "notes": "wave 4: b045dca build + dfe395b fix round; compact claim rows in prompts and the service output; full ledger is the ledger.json artifact (dashboard links it)"
     },
     {
       "id": "B-037",
@@ -746,12 +752,49 @@
       "id": "B-038",
       "title": "Ledger.recompute rescans every claim on each add (quadratic); measured fine at 455 claims, unmeasured beyond",
       "source": "wave-3 seam certification 2026-10-17 · research_agent/evidence/ledger.py recompute",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-SVC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 4,
+      "release": "this",
+      "notes": "wave 4: b045dca build + dfe395b fix round; per-subject group index in the ledger"
+    },
+    {
+      "id": "B-039",
+      "title": "The service cannot resume an interrupted run; a new request starts a new run that pays again",
+      "source": "wave-4 build 2026-10-17 · research_agent/service/runtime.py (run_id = job id)",
+      "status": "open",
+      "area": "service",
+      "node": "N-FAB",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 5,
+      "release": "this"
+    },
+    {
+      "id": "B-040",
+      "title": "The USD 5 default max_llm_usd is not measured against a heavy runbook (80-90 steps); measure one live run's stats.llm_budget and record it beside the default",
+      "source": "wave-4 product certification 2026-10-17 · research_agent/config.py DEFAULT_MAX_LLM_USD",
+      "status": "open",
+      "area": "service",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-041",
+      "title": "The eval judge's own LLM calls are unmetered (evals/judge.py runs without a meter): its spend is in no attempt ledger",
+      "source": "wave-4 unit certification 2026-10-17 · evals/judge.py",
+      "status": "open",
+      "area": "service",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
       "release": "this"
     }
   ]

@@ -60,9 +60,12 @@ Rules:
   — never zero); a known cost never discards the other attempts' estimates, and
   a billed failure's cost survives a resume. Under worker fan-out the USD check
   can still overshoot by the in-flight calls' unknown cost. All three budgets
-  cap **Prowl tool spend only** — the agent's own LLM calls (planning, claim
-  extraction, transforms, writing, citation repair) are metered separately and
-  reported under `stats.llm_usage`; `max_usd` does not bound them. Size budgets
+  cap **Prowl tool spend** — the agent's own LLM calls (planning, claim
+  extraction, transforms, writing, citation repair) are capped by the optional
+  `max_llm_usd` budget key (a caller or `RESEARCH_MAX_LLM_USD` overrides it; the
+  default is USD 5) and reported under `stats.llm_budget`; `max_usd` does not
+  bound them. Set `max_llm_usd` when a runbook's synthesis is heavy (many
+  transforms, long reports) so the default does not stop it early. Size budgets
   for the scenario's real cost, not aspirationally, and give the runbook a drop
   order for the day the fan-out outgrows them.
 

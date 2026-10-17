@@ -30,7 +30,7 @@ price is never 0; service parity tests (429 retry, reconnect, outcome mapping); 
    default) priced at the route's model.
 5. Resume reads LLM spend from the checkpoint's attempt ledger (survives restarts like KA-12).
 6. `stats.llm_usage` keeps its token view and gains `cost_usd` + `cost_source`.
-7. **Models** (operator guide `synthesis/llm-models.md`, 2026-10-14): defaults move to the guide —
+7. **Models** (the operator's model choice, 2026-10-14): defaults move to —
    strong tier (planner, writer, judge) `xiaomi/mimo-v2.6-pro`, cheap tier (extraction, transforms)
    `deepseek/deepseek-v4.1-flash`; the judge defaults to a **different vendor** than the writer
    (`qwen/qwen3.8-flash` when the writer is mimo). Env overrides stay. The price table carries these five plus

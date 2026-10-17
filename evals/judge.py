@@ -231,6 +231,7 @@ async def judge_run(
         json_mode=True,
         max_tokens=2000,
         temperature=0.0,
+        stage="judge",
     )
     payload = _parse_judge_json(text)
     raw_scores = payload.get("scores")

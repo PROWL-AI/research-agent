@@ -43,7 +43,17 @@ Other environment knobs (all optional):
 
 - `PROWL_MCP_URL` — Prowl MCP endpoint (default `https://prowl.chat/mcp`).
 - `RESEARCH_LLM_MODEL_STRONG` — the strong-tier model (planning, writing,
-  repair); `RESEARCH_LLM_MODEL` covers the cheap tier.
+  repair; default `xiaomi/mimo-v2.6-pro`); `RESEARCH_LLM_MODEL` covers the cheap
+  tier (claim extraction, transforms, citation checks; default
+  `deepseek/deepseek-v4.1-flash`); `RESEARCH_JUDGE_MODEL` the eval judge (default
+  `anthropic/claude-haiku-5.5` — another vendor than the default writer, so a
+  report is not graded by the family that wrote it; keep that true if you change
+  the writer). Defaults apply to new installs and the environment: an installed
+  service keeps the models saved in its settings. Judge scores before and after
+  the judge default changed (2026-10-17, from the strong model) are not
+  comparable. Prices for the cost estimate are in `research_agent/pricing.py`
+  (OpenRouter catalog, read 2026-10-17; `scripts/check_prices.py` re-reads it).
+- `RESEARCH_MAX_LLM_USD` — the run's LLM spend ceiling (see "How it works").
 - `RESEARCH_RUNS_DIR` — where runs are written, for the stdio MCP server and
   every CLI command alike (`run`, `status`, `report`, `rewrite`, `export`,
   `prune`). Default `./runs` relative to the process; set it explicitly in MCP
@@ -52,7 +62,7 @@ Other environment knobs (all optional):
 - `RESEARCH_PROWL_CALL_TIMEOUT_S` — read timeout in seconds for each Prowl
   MCP call (default 180; a hung server fails the call instead of parking it).
 
-CLI subcommands: `run <runbook> [--run-id <id>] [--key value …]`,
+CLI subcommands: `run <runbook> [--run-id <id>] [--max-llm-usd <usd>] [--key value …]`,
 `list-runbooks`, `status <run_id>`, `report <run_id>`, `rewrite <run_id>`,
 `export <run_id> [--format html|md]`, `prune [--older-than 30d] [--keep-last N]
 [--yes]`, `validate [--online]`, `mcp`.
@@ -119,7 +129,7 @@ the run stopped (`null` while it is live). The set is closed:
 |---|---|---|
 | `completed` | `complete` (or `partial` when a disclosed omission remains, e.g. a step excluded because its tool left the catalog) | every runnable step ran and its evidence was saved |
 | `budget_tools` / `budget_usd` / `budget_minutes` | `partial` | a runbook budget ran out; the report marks what is missing |
-| `budget_llm` | `partial` | LLM-spend budget (reserved; not set yet) |
+| `budget_llm` | `partial` | the next LLM call would cross `max_llm_usd` (minus the writer reserve for research stages), or a report-stage call (writer, repair, citation check) was refused; the report is written from what was gathered, or is the evidence ledger listed |
 | `step_failed` | `partial` | a step failed hard or a worker crashed |
 | `evidence_incomplete` | `partial` | evidence is missing with no other stop: a claim extraction failed (the resume finishes it from the saved raw, no new paid call), or a required step's raw could not be written (the resume fetches it again — a new, paid call; an optional step is `skipped_on_error` instead) |
 | `cancelled` | `partial` | any cancellation of the owning task: a caller or service cancel, the service timeout (job error `timeout`), Ctrl-C, a client closing its session or a graceful service shutdown |
@@ -185,10 +195,28 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   too. Spend = server-reported actual costs + estimates for calls without one
   (the catalog price, else the runbook's per-call share of `max_usd`, never zero);
   `stats.cost_source` says `server`, `mixed`, `estimate`, or `null` before any tool attempt.
-  Budgets cap **Prowl tool calls only**: the agent's own LLM usage (planning,
-  claim extraction, transforms, writing, citation repair) is billed by your
-  LLM provider on top of `max_usd` — it is metered, not capped, and reported
-  under `stats.llm_usage` in every run's output.
+  The runbook budget caps **Prowl tool calls**; the agent's own LLM spend
+  (planning, claim extraction, transforms, writing, repair, citation checks) is
+  capped separately by **`max_llm_usd`**: `--max-llm-usd` / MCP `max_llm_usd`,
+  else `RESEARCH_MAX_LLM_USD`, else the cap a resumed run recorded, else the
+  runbook's `budget.max_llm_usd`, else **USD 5**. It is a check **before every
+  LLM HTTP attempt** (retries included), against an estimate of that call: the
+  last call it admits can overshoot by its actual cost minus its estimate, so
+  `stats.llm_budget.spend_usd` can end slightly above the cap. Each attempt is
+  recorded in the attempt ledger with the provider's `usage.cost` (OpenRouter is
+  asked for it), else a price-table estimate (`research_agent/pricing.py`; an
+  unlisted model is priced at USD 15 / 75 per 1M tokens, above every listed
+  model — never 0); an HTTP error response (429, 5xx) is recorded as unbilled.
+  Research stages stop at the cap minus a writer reserve (25%, at most USD 1)
+  with `terminal_code=budget_llm`, and once a research call is refused no further
+  tool is dispatched; the writer, repair and citation passes may spend the
+  reserve — a refusal there also ends the run `partial` / `budget_llm` — and if
+  even that is gone the report is the evidence ledger as gathered. A resume reads
+  the spend and cap already recorded (also after a re-plan) and keeps an
+  existing report when it gathered nothing new and cannot afford a writer.
+  `rewrite --max-llm-usd` spends from the same ledger. `stats.llm_budget` reports
+  cap, reserve, spend, cost source and refused stages; `stats.llm_usage` the
+  tokens.
 - **Evidence statuses (ledger schema 2).** A claim's status is recomputed over
   its whole subject group on every change and on load, so it never depends on
   arrival order. `verified` needs either:
@@ -216,7 +244,7 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   `rewrite_report`, which also re-saves the ledger; judge status shares are
   not comparable across this change. Events: `claim.verified`,
   `claim.conflict`, `claim.quote_not_found` (with `run_id`; under the service
-  they reach `service.log` once B-035 lands).
+  they go to `~/Library/Logs/prowl-research/events.log`, rotated at 5 × 5 MB).
 - Charts are rendered deterministically from ledger data, never described by
   the LLM.
 

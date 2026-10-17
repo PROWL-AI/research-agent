@@ -35,6 +35,8 @@ from pydantic import BaseModel, Field
 
 from research_agent.agent.orchestrator import PlanItem
 from research_agent.events import emit
+from research_agent.evidence.store import CheckpointWriteError  # noqa: F401 — re-exported
+from research_agent.llm import LLMBudgetExceeded
 from research_agent.evidence.ledger import Ledger
 from research_agent.evidence.store import (
     COMPLETED,
@@ -112,9 +114,7 @@ class WorkerContext:
     )
 
 
-class CheckpointWriteError(Exception):
-    """The run's state could not be persisted. Not a step failure: continuing
-    would spend money no checkpoint records, so the run stops as `failed`."""
+# CheckpointWriteError lives in evidence.store (the LLM meter raises it too).
 
 
 def partition_workers(items: list[StepRecord], n_workers: int) -> list[list[StepRecord]]:
@@ -287,6 +287,11 @@ async def extract_step(ctx: WorkerContext, record: StepRecord, result: Any | Non
         ) or 0
     except Exception as exc:  # noqa: BLE001 — typed into the step, not swallowed
         record.extraction = {"status": "failed", "error": str(exc)[:300], "claim_ids": []}
+        if isinstance(exc, LLMBudgetExceeded):
+            # The raw stays saved: a resume with a larger max_llm_usd extracts
+            # it without paying for the tool again.
+            checkpoint.partial = True
+            checkpoint.stop_reason = checkpoint.stop_reason or str(exc).split(" (", 1)[0]
         emit(log, "evidence.incomplete", logging.WARNING, run_id=checkpoint.run_id,
              step_id=record.step_id, reason="extraction", error=exc)
         save_state(checkpoint, ctx.store)

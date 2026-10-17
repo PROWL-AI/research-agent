@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from research_agent.evidence.store import ArtifactStore
+from research_agent.evidence.ledger import Ledger
 from research_agent.agent.orchestrator import Orchestrator, build_brief
 from research_agent.config import Config, ConfigError
 from research_agent.llm import LLMClient, LLMError
@@ -49,14 +50,12 @@ class ObservedProwl(ProwlClient):
         self.store, self.job = store, job
         return self
 
-    async def _rpc(self, name, arguments=None, *, retry=True):
-        # One attempt on every service call. A lost reply is not permission to pay again.
-        session = self._session
-        if session is None:
-            raise ProwlError("Prowl connection unavailable")
+    def _call_meta(self):
+        # The core's _rpc keeps its retry and reconnect for metadata calls; a
+        # paid prowl_call_tool is still one attempt per idempotency key there
+        # (a lost reply is not permission to pay again) — B-004.
         trace = child_trace(self.job.get("traceparent"))
-        return await session.call_tool(name, arguments or {}, read_timeout_seconds=_call_timeout(),
-                                       meta={"traceparent": trace} if trace else None)
+        return {"traceparent": trace} if trace else None
 
     async def _invoke(self, prowl_tool, arguments, *, record=None):
         # Metadata lookups are observable but excluded from paid usage receipts.
@@ -94,37 +93,46 @@ class ObservedProwl(ProwlClient):
 
 
 class ObservedLLM(LLMClient):
+    """Journals each HTTP attempt of the core client (retries included) and adds
+    trace headers. Retries, Retry-After, the max_tokens-scaled read timeout and
+    LLMError mapping are LLMClient's own — one transport (B-003)."""
+
     def observe(self, store, job):
         self.store, self.job = store, job
         return self
 
-    async def complete(self, messages, tier="cheap", json_mode=False, max_tokens=None, temperature=0.2):
+    def _before_send(self):
+        # Before the run's meter records an attempt: a refusal here sent
+        # nothing and costs nothing, in the journal and the run ledger alike.
         if len(self.store.calls(self.job["id"])) >= 256:
-            raise LLMError("Service call limit reached (256)", retryable=False)
-        model = self.model_for(tier)
-        call = self.store.start_call(self.job["id"], "llm", model,
-                                    {"tier": tier, "messages": len(messages), "max_tokens": max_tokens})
-        payload = dict(model=model, messages=messages, temperature=temperature)
-        if json_mode:
-            payload["response_format"] = {"type": "json_object"}
-        if max_tokens is not None:
-            payload["max_tokens"] = max_tokens
+            raise LLMError("Service call limit reached (256); nothing was sent", retryable=False)
+
+    async def _post(self, payload, request_kwargs):
+        call = self.store.start_call(self.job["id"], "llm", payload["model"],
+                                    {"messages": len(payload["messages"]), "max_tokens": payload.get("max_tokens")})
+        trace = child_trace(self.job.get("traceparent"))
+        kwargs = dict(request_kwargs)
+        if trace:
+            kwargs["headers"] = {**kwargs.get("headers", {}), "traceparent": trace}
         start, fields = time.monotonic(), {"status": "failed"}
         try:
-            trace = child_trace(self.job.get("traceparent"))
-            response = await self._client.post(self.base_url + "/chat/completions", json=payload,
-                                                headers={"traceparent": trace} if trace else {})
-            data = response.json()
-            usage = data.get("usage") or {}
+            response = await super()._post(payload, kwargs)
+            try:
+                data = response.json() or {}
+            except ValueError:
+                data = {}
+            usage = (data.get("usage") or {}) if isinstance(data, dict) else {}
             cost = money(usage.get("cost"))
             fields.update(costUsd=cost, costBasis="provider" if cost is not None else "unknown",
                           inputTokens=max(0, int(usage.get("prompt_tokens") or 0)),
                           outputTokens=max(0, int(usage.get("completion_tokens") or 0)))
-            response.raise_for_status()
-            self._record_usage(tier, data)
-            content = self._extract(data)
-            fields["status"] = "completed"
-            return content
+            if response.status_code < 400:
+                try:
+                    self._extract(data)  # a truncated or empty completion is a failed call
+                    fields["status"] = "completed"
+                except LLMError:
+                    pass
+            return response
         except asyncio.CancelledError:
             fields["status"] = "unknown"
             raise
@@ -287,7 +295,10 @@ class Runtime:
                 result = await orch.run(req["runbook"], req["inputs"], run_id=job["id"])
                 folder = self.store.root / "runs" / job["id"]
                 return {"research": result.model_dump(), "report": (folder / "report.md").read_text()[:200000],
-                        "ledger": bounded(scrub(json.loads((folder / "ledger.json").read_text()))),
+                        # The compact view inline; the whole schema-2 ledger (quotes,
+                        # spans, source identity) is the ledger.json artifact (B-036).
+                        "ledger": bounded(scrub({"claims": Ledger.load(folder / "ledger.json").compact_rows()})),
+                        "ledgerArtifact": "ledger.json",
                         "quality": "ledger statuses follow evidence rules v2, tested offline only; live acceptance pending (wave 6)"}
 
     def envelope(self, job, output, wall_ms):
@@ -299,14 +310,31 @@ class Runtime:
         # Local scope is explicitly not a Fabric admission/binding receipt.
         scope = {"project": "urn:prowl:local", "run": "urn:prowl:job:" + job["id"], "node": "urn:prowl:node:local",
                  "binding": {"id": "urn:prowl:binding:unverified-local", "revision": 1, "contentHash": "sha256:" + digest(job["request"].get("context", {}))}, "writeScopes": []}
-        envelope = {"id": "urn:prowl:result:" + job["id"], "contractVersion": "0.1.0", "outcome": "partial",
-                    "done": [{"claimId": "RUN_COMPLETED", "statement": "Requested local execution completed; inspect output quality separately."}],
+        outcome, statement = outcome_for(output)
+        envelope = {"id": "urn:prowl:result:" + job["id"], "contractVersion": "0.1.0", "outcome": outcome,
+                    "done": [{"claimId": "RUN_COMPLETED", "statement": statement}],
                     "proof": [], "scope": scope, "notVerified": [{"claim": "Fabric admission and chain attribution", "reason": "Caller-declared context is not a verified hub binding"},
                     {"claim": "Research claims", "reason": output.get("quality", "not independently verified")}],
                     "artifacts": [], "createdAt": now(), "producer": producer, "output": output, "usage": usage}
         if job.get("traceparent"):
             envelope["trace"] = {"traceparent": job["traceparent"]}
         return envelope
+
+
+def outcome_for(output):
+    """The envelope outcome from what the job produced (B-005; table in docs/FABRIC.md).
+
+    A research job reports its run: `complete` → succeeded, `partial` → partial
+    (the run's terminal_code says why). Tool and tutorial jobs that returned
+    succeeded. Failed, cancelled and interrupted jobs never reach the envelope:
+    they end with a typed job error instead."""
+    research = output.get("research") if isinstance(output, dict) else None
+    if isinstance(research, dict):
+        status, code = research.get("status"), research.get("terminal_code")
+        if status == "complete":
+            return "succeeded", "Research run completed every planned step."
+        return "partial", f"Research run ended partial (terminal_code={code}); the report discloses what is missing."
+    return "succeeded", "Requested local execution completed; inspect output quality separately."
 
 
 def runbooks():

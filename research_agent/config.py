@@ -2,18 +2,66 @@
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass
 from typing import Mapping
 
 DEFAULT_PROWL_MCP_URL = "https://prowl.chat/mcp"
 DEFAULT_LLM_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_LLM_MODEL = "google/gemini-2.5-flash"
-DEFAULT_LLM_MODEL_STRONG = "anthropic/claude-sonnet-4.5"
+#: Model defaults: the cheap tier
+#: (claim extraction, transforms — high volume) runs the lite model, the strong
+#: tier (planner, writer) the strongest listed model, and the judge a model of a
+#: DIFFERENT vendor, so a report is not graded by the family that wrote it.
+DEFAULT_LLM_MODEL = "deepseek/deepseek-v4.1-flash"
+DEFAULT_LLM_MODEL_STRONG = "xiaomi/mimo-v2.6-pro"
+DEFAULT_JUDGE_MODEL = "anthropic/claude-haiku-5.5"
+#: The run's LLM spend ceiling when neither the caller, the environment
+#: (RESEARCH_MAX_LLM_USD) nor the runbook sets one — never unlimited.
+DEFAULT_MAX_LLM_USD = 5.0
+#: Share of the LLM ceiling held back for the writer, repair and citation
+#: passes, so a run that spends its research allowance still writes a report.
+WRITER_RESERVE_SHARE = 0.25
+WRITER_RESERVE_MAX_USD = 1.0
 
 
 class ConfigError(Exception):
     pass
+
+
+def resolve_llm_cap(
+    explicit: float | None, recorded: float | None, runbook_cap: float | None,
+    environ: Mapping[str, str] | None = None,
+) -> tuple[float, str]:
+    """(cap, source): the caller's value, then RESEARCH_MAX_LLM_USD, then the
+    cap a resumed run recorded, then the runbook's, then DEFAULT_MAX_LLM_USD."""
+    env = os.environ if environ is None else environ
+
+    def valid(value: object, name: str) -> float:
+        # Finite and positive: an infinite cap is no cap (and does not even
+        # serialize into the checkpoint).
+        try:
+            number = float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError) as exc:
+            raise ConfigError(f"{name} is not a number: {value!r}") from exc
+        if not (math.isfinite(number) and number > 0):
+            raise ConfigError(f"{name} must be a finite number > 0, got {value!r}")
+        return number
+
+    if explicit is not None:
+        return valid(explicit, "max_llm_usd"), "caller"
+    raw = env.get("RESEARCH_MAX_LLM_USD", "").strip()
+    if raw:
+        return valid(raw, "RESEARCH_MAX_LLM_USD"), "env"
+    if recorded is not None:
+        return valid(recorded, "the run's recorded llm_cap_usd"), "checkpoint"
+    if runbook_cap is not None:
+        return valid(runbook_cap, "the runbook's budget.max_llm_usd"), "runbook"
+    return DEFAULT_MAX_LLM_USD, "default"
+
+
+def writer_reserve(cap: float) -> float:
+    return round(min(WRITER_RESERVE_MAX_USD, cap * WRITER_RESERVE_SHARE), 6)
 
 
 @dataclass(frozen=True)
@@ -24,8 +72,8 @@ class Config:
     llm_api_key: str
     llm_model: str
     llm_model_strong: str
-    #: Independent judge model (RESEARCH_JUDGE_MODEL) — empty means "use the
-    #: strong model", so a report need not be graded by the model that wrote it.
+    #: Independent judge model (RESEARCH_JUDGE_MODEL); unset means
+    #: DEFAULT_JUDGE_MODEL, a vendor other than the default writer's.
     llm_model_judge: str = ""
 
     @classmethod
@@ -71,5 +119,5 @@ class Config:
             llm_model=env.get("RESEARCH_LLM_MODEL", DEFAULT_LLM_MODEL).strip()
             or DEFAULT_LLM_MODEL,
             llm_model_strong=model_strong,
-            llm_model_judge=env.get("RESEARCH_JUDGE_MODEL", "").strip() or model_strong,
+            llm_model_judge=env.get("RESEARCH_JUDGE_MODEL", "").strip() or DEFAULT_JUDGE_MODEL,
         )

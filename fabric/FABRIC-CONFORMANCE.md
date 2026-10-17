@@ -89,6 +89,16 @@ receipts assert behavior, not host interop.
   provider `contentHash` is unchanged. Coverage:
   `tests/test_ka_contracts.py::test_wait_true_envelope_validates_against_the_published_schema`.
 
+## 2026-10-17 — wave 4 (LLM budget)
+
+- `capability-input.schema.json`: gains `max_llm_usd` (number > 0), the run's LLM
+  cap; the stdio `research.run` signature and this schema are compared by
+  `tests/test_llm_budget.py::test_stdio_run_schema_matches_the_tool_signature`.
+  `capability-output.schema.json` already lists `budget_llm`. Neither file is
+  referenced by `fabric-agent.json`, so the provider `contentHash` is unchanged;
+  the service's `research.run` input gains the field with the wave-5 manifest
+  rebuild.
+
 ## Canary binding expectation
 
 When a Fabric host admits this provider, it enters under a canary binding — a
