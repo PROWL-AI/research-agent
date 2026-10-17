@@ -8,7 +8,7 @@ Objective: close every open item of this agent in its final form, in waves
 - Plan: [`specs/2026-10-11-waves-canvas.md`](specs/2026-10-11-waves-canvas.md) — target state, seams,
   waves with exit criteria, §7a wave status, operator questions (§8).
 - Inventory: [`specs/2026-10-11-waves-inventory.json`](specs/2026-10-11-waves-inventory.json)
-  (`python3 scripts/plan/assign_waves.py --check`; 19 of 62 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
+  (`python3 scripts/plan/assign_waves.py --check`; 21 of 64 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
 - **Wave 1 closed** (merged to `main` by PR #1): run-lock ownership (KA-06, B-009, B-010),
   terminal_code, structured events, honest docs, CORE scenarios, nightly CI.
 - **Wave 2 closed** on branch `wip/wave2-checkpoint-v2` (PR #2): checkpoint schema 2 — immutable
