@@ -1,4 +1,10 @@
-"""Minimal async OpenAI-compatible chat client."""
+"""Minimal async OpenAI-compatible chat client.
+
+Every HTTP attempt (retries included) can be metered: when a run attaches an
+`LlmMeter`, each attempt is checked against the run's LLM ceiling before it is
+sent and recorded in the run's attempt ledger (kind `llm`) with its tokens and
+cost — provider-reported `usage.cost`, else the price table's estimate, never 0.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +13,12 @@ import logging
 import random
 from typing import Any, Literal
 
+from dataclasses import dataclass, field
+from typing import Callable
+
 import httpx
+
+from research_agent import pricing
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +45,83 @@ class LLMError(Exception):
         self.content = content
 
 
+class LLMBudgetExceeded(LLMError):
+    """The next call would cross the run's LLM ceiling; nothing was sent."""
+
+    def __init__(self, message: str, *, stage: str) -> None:
+        super().__init__(message, retryable=False)
+        self.stage = stage
+
+
+#: Stages that may spend into the writer reserve: they turn what was gathered
+#: into a report, so the run still produces one after research spent its share.
+REPORT_STAGES = frozenset({"writer", "repair", "citations", "rewrite"})
+
+
+@dataclass
+class LlmMeter:
+    """The run's LLM ceiling and the attempt ledger it is enforced from.
+
+    `attempts` is the checkpoint's attempt list (persisted), `persist` saves the
+    checkpoint, `new_id` names an attempt. Spend = Σ actual + Σ estimate of
+    unfinished/unpriced attempts, read from the list — so it survives resume."""
+
+    max_usd: float
+    reserve_usd: float
+    attempts: list[Any]
+    persist: Callable[[], None]
+    record_type: Any
+    new_id: Callable[[], str] = field(default=lambda: "llm")
+
+    def spend(self) -> float:
+        return round(sum(a.spend_usd for a in self.attempts if a.kind == "llm"), 6)
+
+    def limit_for(self, stage: str) -> float:
+        return self.max_usd if stage in REPORT_STAGES else max(0.0, self.max_usd - self.reserve_usd)
+
+    def research_exhausted(self) -> bool:
+        return self.spend() >= self.limit_for("research")
+
+    def check(self, stage: str, model: str, estimate: float) -> None:
+        spent = self.spend()
+        limit = self.limit_for(stage)
+        if spent + estimate > limit:
+            raise LLMBudgetExceeded(
+                f"max_llm_usd={self.max_usd} (spent {spent:.4f}, next {stage} call ~{estimate:.4f}, "
+                f"{'report' if stage in REPORT_STAGES else 'research'} limit {limit:.4f})",
+                stage=stage,
+            )
+
+    def start(self, stage: str, model: str, estimate: float, attempt_no: int) -> Any:
+        record = self.record_type(attempt_id=self.new_id(), step_id=stage, kind="llm",
+                                  attempt_no=attempt_no, model=model, estimate_usd=estimate)
+        self.attempts.append(record)
+        self.persist()
+        return record
+
+    def finish(self, record: Any, *, outcome: str, data: dict[str, Any] | None) -> None:
+        from datetime import datetime, timezone
+
+        usage = (data or {}).get("usage") or {}
+        tokens_in = int(usage.get("prompt_tokens") or 0)
+        tokens_out = int(usage.get("completion_tokens") or 0)
+        provider_cost = usage.get("cost")
+        record.ended_at = datetime.now(timezone.utc).isoformat()
+        record.outcome = outcome
+        if data is not None:
+            record.tokens_in, record.tokens_out = tokens_in, tokens_out
+        if isinstance(provider_cost, (int, float)) and not isinstance(provider_cost, bool) and provider_cost >= 0:
+            record.actual_usd, record.cost_basis = float(provider_cost), "actual"
+        elif data is not None and (tokens_in or tokens_out):
+            cost, known = pricing.cost_usd(record.model or "", tokens_in, tokens_out)
+            record.estimate_usd, record.cost_basis = cost, ("estimate" if known else "unknown")
+        else:
+            # Nothing came back to count: the pre-call estimate stands (a lost
+            # reply may still have been billed).
+            record.cost_basis = "unknown"
+        self.persist()
+
+
 class LLMClient:
     def __init__(
         self,
@@ -55,6 +143,8 @@ class LLMClient:
                 "Content-Type": "application/json",
             },
         )
+        #: Attached per run by the orchestrator; None = unmetered (tests, judge).
+        self.meter: LlmMeter | None = None
         # The agent's own LLM spend is real money the tool budgets never see;
         # it is accounted here and reported in run stats, not silently absent.
         self._usage: dict[str, Any] = {
@@ -123,6 +213,12 @@ class LLMClient:
             )
         return content
 
+    async def _post(self, payload: dict[str, Any], request_kwargs: dict[str, Any]) -> httpx.Response:
+        """One HTTP attempt. The service observer overrides it to journal the
+        attempt and add trace headers — retries, timeouts and error mapping stay
+        here, in one transport (B-003)."""
+        return await self._client.post(f"{self.base_url}/chat/completions", **request_kwargs)
+
     async def complete(
         self,
         messages: list[dict[str, str]],
@@ -130,6 +226,8 @@ class LLMClient:
         json_mode: bool = False,
         max_tokens: int | None = None,
         temperature: float = 0.2,
+        *,
+        stage: str = "research",
     ) -> str:
         payload: dict[str, Any] = {
             "model": self.model_for(tier),
@@ -148,18 +246,26 @@ class LLMClient:
             read_timeout = max(self._timeout, max_tokens / 20.0)
             request_kwargs["timeout"] = httpx.Timeout(read_timeout, connect=self._timeout)
 
+        model = payload["model"]
+        estimate = pricing.estimate_call_usd(model, messages, max_tokens)
         last_error: Exception | None = None
         for attempt in range(1, _MAX_ATTEMPTS + 1):
             # Reset per attempt: a stale response from a previous attempt must
             # not leak its Retry-After into a later transport failure.
             response: httpx.Response | None = None
+            record = None
+            if self.meter is not None:
+                # Before every attempt, retries included: each one can be billed.
+                self.meter.check(stage, model, estimate)
+                record = self.meter.start(stage, model, estimate, attempt)
+            data: dict[str, Any] | None = None
+            outcome = "transport_error"
             try:
-                response = await self._client.post(
-                    f"{self.base_url}/chat/completions", **request_kwargs
-                )
+                response = await self._post(payload, request_kwargs)
                 if response.status_code >= 500 or response.status_code in (408, 429):
                     raise LLMError(f"LLM HTTP {response.status_code}: {response.text[:300]}")
                 if response.status_code >= 400:
+                    outcome = "refused"
                     raise LLMError(
                         f"LLM HTTP {response.status_code}: {response.text[:300]}",
                         retryable=False,
@@ -171,7 +277,12 @@ class LLMClient:
                 # Truncated and null-content completions are still billed by
                 # the provider — account for them before _extract can raise.
                 self._record_usage(tier, data)
-                return self._extract(data)
+                content = self._extract(data)
+                outcome = "ok"
+                return content
+            except asyncio.CancelledError:
+                outcome = "cancelled"
+                raise
             except (httpx.TransportError, LLMError) as exc:
                 if isinstance(exc, LLMError) and not exc.retryable:
                     raise
@@ -186,4 +297,7 @@ class LLMClient:
                             pass
                     log.warning("LLM call failed (attempt %d): %s; retrying in %.0fs", attempt, exc, delay)
                     await asyncio.sleep(delay)
+            finally:
+                if record is not None and self.meter is not None:
+                    self.meter.finish(record, outcome=outcome, data=data)
         raise LLMError(f"LLM call failed after {_MAX_ATTEMPTS} attempts: {last_error}")

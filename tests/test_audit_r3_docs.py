@@ -71,8 +71,9 @@ class TestBudgetHonesty:
     def test_list_runbooks_marks_llm_separate(self, capsys):
         assert main(["list-runbooks"]) == 0
         out = capsys.readouterr().out
-        assert "tool calls only" in out
-        assert "LLM usage is metered separately" in out
+        # Wave 4: both ceilings are named — tools by the budget, LLM by max_llm_usd.
+        assert "budgets cap tool calls" in out
+        assert "max_llm_usd" in out
 
     def test_run_stats_mark_budget_scope_and_llm_usage(
         self, patched_runbooks, tmp_path: Path
@@ -100,7 +101,11 @@ class TestBudgetHonesty:
         result = asyncio.run(
             orchestrator.run("mini-teardown", {"competitors": ["a.com"]}, run_id="r1")
         )
-        assert "tool calls only" in result.stats["budget_scope"]
+        # Wave 4: LLM spend is capped too (max_llm_usd), and the stats say which
+        # ceiling bounds what.
+        assert "max_usd/max_tool_calls cap tool calls" in result.stats["budget_scope"]
+        assert "max_llm_usd caps LLM calls" in result.stats["budget_scope"]
+        assert result.stats["llm_budget"]["max_llm_usd"] > 0
         assert result.stats["llm_usage"]["calls"] == 2
 
 
@@ -258,11 +263,11 @@ class TestR4Docs:
 
     def test_readme_marks_llm_outside_budget(self):
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-        assert "stats.llm_usage" in readme
-        assert "Prowl tool calls only" in readme
+        assert "stats.llm_usage" in readme and "stats.llm_budget" in readme
+        assert "caps **Prowl tool calls**" in readme and "**`max_llm_usd`**" in readme
 
     def test_authoring_guide_marks_llm_outside_budget(self):
         authoring = (REPO_ROOT / "docs" / "runbook-authoring.md").read_text(
             encoding="utf-8"
         )
-        assert "stats.llm_usage" in authoring
+        assert "stats.llm_budget" in authoring and "`max_llm_usd`" in authoring

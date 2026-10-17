@@ -29,6 +29,7 @@
 | B-036 | Ledger v2 is ~1.6x the bytes of v1: the service inlines it under a 64 KB bound (~80 claims instead of ~126) and `as_prompt_json` grows ~25% in every writer/repair/judge prompt, unbounded | wave-3 seam certification 2026-10-17 · `research_agent/service/runtime.py` `bounded()`; `writer.py` | S | 2 | 2 | 0 | 4 | open | wave 4 |
 | B-037 | A pre-wave-3 build (the installed service release) loads a schema-2 ledger and re-saves it as schema 1, dropping quote/span/source | wave-3 seam certification 2026-10-17 · load guard exists only in the new build | S | 2 | 2 | 0 | 4 | open — closes with the service reinstall | wave 5 |
 | B-038 | `Ledger.recompute` rescans every claim on each add (quadratic); fine at 455 claims, unmeasured beyond | wave-3 seam certification 2026-10-17 · `research_agent/evidence/ledger.py` | S | 1 | 2 | 0 | 2 | open | wave 4 |
+| B-039 | The service cannot resume an interrupted run: a crashed job's checkpoint and paid raw stay in the service's runs dir, and a new request starts a new run that pays again | wave-4 build 2026-10-17 · `research_agent/service/runtime.py` (run_id = job id) | M | 2 | 2 | 0 | 4 | open | wave 5 |
 
 Prio = `Sev × Blast + age_bonus` (`age_bonus` 1 past 14 days, 2 past 30).
 

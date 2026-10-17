@@ -231,6 +231,11 @@ class Ledger:
         #: Carried on claim.* events: claim ids repeat in every run.
         self.run_id = run_id
         self.claims: list[Claim] = list(claims) if claims else []
+        #: subject key → its claims, so an add recomputes one group without
+        #: scanning the whole ledger (B-038).
+        self._groups: dict[str | None, list[Claim]] = {}
+        for claim in self.claims:
+            self._groups.setdefault(_norm_subject(claim.subject), []).append(claim)
         self.recompute_all(announce=False)
 
     @classmethod
@@ -271,6 +276,8 @@ class Ledger:
         drop = set(claim_ids)
         gone = [c for c in self.claims if c.id in drop]
         self.claims = [c for c in self.claims if c.id not in drop]
+        for key in {_norm_subject(c.subject) for c in gone}:
+            self._groups[key] = [c for c in self._groups.get(key, []) if c.id not in drop]
         for key in {_norm_subject(c.subject) for c in gone} - {None}:
             self.recompute(key)
         return len(gone)
@@ -316,14 +323,14 @@ class Ledger:
             source=_identity(source_tool, source_url, document_sha256),
         )
         self.claims.append(entry)
+        self._groups.setdefault(_norm_subject(subject), []).append(entry)
         self.recompute(_norm_subject(subject), only=None if subject else entry)
         return entry
 
     # ── status: one pure function of the group ───────────────────────────────
 
     def recompute_all(self, *, announce: bool = False) -> None:
-        keys = {_norm_subject(c.subject) for c in self.claims}
-        for key in keys:
+        for key in list(self._groups):
             self.recompute(key, announce=announce)
 
     def recompute(self, subject_key: str | None, *, only: Claim | None = None,
@@ -334,11 +341,11 @@ class Ledger:
         Order-independent by construction: nothing here reads a previous
         status except to announce a change."""
         if subject_key is None:
-            group = [only] if only is not None else [c for c in self.claims if _norm_subject(c.subject) is None]
+            group = [only] if only is not None else list(self._groups.get(None, []))
             for claim in group:
                 self._set(claim, *_alone(claim), announce=announce)
             return
-        group = [c for c in self.claims if _norm_subject(c.subject) == subject_key]
+        group = self._groups.get(subject_key, [])
         if not group:
             return
         valued = [c for c in group if c.value is not None]
@@ -387,24 +394,29 @@ class Ledger:
         if became_verified and announce:
             emit(log, "claim.verified", logging.INFO, run_id=self.run_id, claim_id=claim.id, method=method)
 
+    def compact_rows(self) -> list[dict[str, Any]]:
+        """One small row per claim: what a reader cites, with empty fields and
+        the default verification left out (B-036 — the writer prompt, every
+        repair pass, the judge and the service's inline ledger all read this)."""
+        rows = []
+        for c in self.claims:
+            row: dict[str, Any] = {"id": c.id, "claim": c.claim}
+            for key, value in (("value", c.value), ("unit", c.unit), ("subject", c.subject)):
+                if value is not None:
+                    row[key] = value
+            row["status"] = c.status.value
+            row["source_tool"] = c.source_tool
+            method = c.verification.get("method", "none")
+            if method != "none":
+                row["verification"] = method
+            rows.append(row)
+        return rows
+
     def as_prompt_json(self) -> str:
         # Compact: this lands in the writer's system prompt and in EVERY repair
-        # pass — indent and source_url cost hundreds of KB at a few hundred
-        # claims and buy the writer nothing it cites.
-        rows = [
-            {
-                "id": c.id,
-                "claim": c.claim,
-                "value": c.value,
-                "unit": c.unit,
-                "subject": c.subject,
-                "status": c.status.value,
-                "source_tool": c.source_tool,
-                "verification": c.verification["method"],
-            }
-            for c in self.claims
-        ]
-        return json.dumps(rows, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+        # pass — indent, nulls and source_url cost hundreds of KB at a few
+        # hundred claims and buy the writer nothing it cites.
+        return json.dumps(self.compact_rows(), ensure_ascii=False, separators=(",", ":"), allow_nan=False)
 
 
 def _alone(claim: Claim) -> tuple[ClaimStatus, str, str]:

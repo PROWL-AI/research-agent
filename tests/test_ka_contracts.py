@@ -1502,7 +1502,10 @@ def test_prompt_json_carries_verification_not_verbatim(tmp_path):
     ledger = Ledger(tmp_path / "ledger.json")
     ledger.add(claim="x", value=1, unit="u", subject="s", source_tool="spyfu_a")
     row = json.loads(ledger.as_prompt_json())[0]
-    assert row["verification"] == "none" and row["subject"] == "s" and "verbatim" not in row
+    # B-036: the default verification and empty fields are left out of the prompt.
+    assert "verification" not in row and row["subject"] == "s" and "verbatim" not in row
+    ledger.add(claim="x", value=1, unit="u", subject="s", source_tool="moz_b")
+    assert {r.get("verification") for r in json.loads(ledger.as_prompt_json())} == {"corroboration"}
     saved = (ledger.save(), json.loads((tmp_path / "ledger.json").read_text()))[1]
     assert "verbatim" not in saved["claims"][0] and saved["schema_version"] == 2
 

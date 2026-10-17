@@ -38,6 +38,9 @@ def main(argv: list[str] | None = None) -> int:
     run_p = sub.add_parser("run", help="execute a runbook")
     run_p.add_argument("runbook", help="runbook name")
     run_p.add_argument("--run-id", default=None, help="resume or reuse this run id")
+    run_p.add_argument("--max-llm-usd", type=float, default=None,
+                       help="cap this run's own LLM spend in USD (default: RESEARCH_MAX_LLM_USD, "
+                            "the runbook's max_llm_usd, else the built-in default)")
 
     val_p = sub.add_parser("validate", help="validate runbook frontmatter and tool names")
     val_p.add_argument(
@@ -97,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_list_runbooks()
     if args.command == "run":
         inputs = _parse_input_pairs(extra)
-        return asyncio.run(_cmd_run(args.runbook, inputs, args.run_id))
+        return asyncio.run(_cmd_run(args.runbook, inputs, args.run_id, args.max_llm_usd))
     if args.command == "validate":
         return _cmd_validate(online=args.online)
     if args.command == "mcp":
@@ -136,8 +139,8 @@ def _cmd_list_runbooks() -> int:
         description = rb.meta.description.strip().split("\n")[0]
         print(f"{rb.name:<{name_width}}  {budget_s:<28}  {description}")
     print(
-        "\nbudgets cap tool calls only — LLM usage is metered separately "
-        "(see stats.llm_usage in run output)"
+        "\nbudgets cap tool calls; the run's own LLM spend is capped by max_llm_usd "
+        "(--max-llm-usd, RESEARCH_MAX_LLM_USD, the runbook, else the default) — see stats.llm_budget"
     )
     return 0
 
@@ -179,7 +182,12 @@ def _reconcile(runs_root: Path) -> None:
         log.warning("reconciliation of %s skipped: %s", runs_root, exc)
 
 
-async def _cmd_run(runbook_name: str, inputs: dict[str, object], run_id: str | None) -> int:
+async def _cmd_run(
+    runbook_name: str, inputs: dict[str, object], run_id: str | None, max_llm_usd: float | None = None,
+) -> int:
+    if max_llm_usd is not None and not max_llm_usd > 0:
+        print(f"error: --max-llm-usd must be > 0, got {max_llm_usd}", file=sys.stderr)
+        return 2
     if run_id is not None:
         try:
             validate_run_id(run_id)
@@ -212,7 +220,7 @@ async def _cmd_run(runbook_name: str, inputs: dict[str, object], run_id: str | N
     ) as llm:
         orchestrator = Orchestrator(prowl, llm, runs_root=_runs_root())
         try:
-            result = await orchestrator.run(runbook_name, inputs, run_id=run_id)
+            result = await orchestrator.run(runbook_name, inputs, run_id=run_id, max_llm_usd=max_llm_usd)
         except RunbookError as exc:
             # Usage error (unknown/invalid runbook) — README promises exit 2.
             print(f"error: {exc}", file=sys.stderr)

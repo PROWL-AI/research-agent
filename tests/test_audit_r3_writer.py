@@ -271,13 +271,19 @@ class TestJudgeModelEnvOverride:
         assert config.llm_model_judge == "judge-model"
         assert config.llm_model_strong != "judge-model"
 
-    def test_judge_model_defaults_to_strong(self):
+    def test_judge_model_defaults_to_another_vendor_than_the_writer(self):
+        # Was test_judge_model_defaults_to_strong: the judge graded the report
+        # with the model that wrote it. Wave 4 (operator model guide): the
+        # default judge is another vendor's model.
+        from research_agent.config import DEFAULT_JUDGE_MODEL, DEFAULT_LLM_MODEL_STRONG
+
         config = Config.from_env({
             "PROWL_API_KEY": "p",
             "RESEARCH_LLM_API_KEY": "l",
             "RESEARCH_LLM_MODEL_STRONG": "strong-x",
         })
-        assert config.llm_model_judge == "strong-x"
+        assert config.llm_model_judge == DEFAULT_JUDGE_MODEL
+        assert DEFAULT_JUDGE_MODEL.split("/")[0] != DEFAULT_LLM_MODEL_STRONG.split("/")[0]
 
 
 class TestRewriteRefreshesHtml:

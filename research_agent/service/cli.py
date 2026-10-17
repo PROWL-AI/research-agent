@@ -15,6 +15,38 @@ def default_root():
     return Path.home() / "Library/Application Support/prowl-research" if sys.platform == "darwin" else Path.home() / ".local/share/prowl-research"
 
 
+#: Event log rotation: five files of 5 MB — the structured events (run.*,
+#: step.*, claim.*, budget.*, llm.budget) are INFO lines, secret-free by emit().
+EVENT_LOG_BYTES = 5 * 1024 * 1024
+EVENT_LOG_BACKUPS = 5
+
+
+def default_log_dir():
+    return Path.home() / "Library/Logs/prowl-research" if sys.platform == "darwin" else default_root() / "logs"
+
+
+def configure_logging(log_dir):
+    """INFO events to a size-capped rotating file of their own (B-035).
+
+    launchd's stdout/stderr file keeps only what escapes Python logging
+    (uvicorn warnings, a crash traceback): Python never rotates a file whose
+    descriptor launchd holds, so the events do not go there."""
+    import logging
+    from logging.handlers import RotatingFileHandler
+
+    log_dir = Path(log_dir)
+    log_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    handler = RotatingFileHandler(log_dir / "events.log", maxBytes=EVENT_LOG_BYTES,
+                                  backupCount=EVENT_LOG_BACKUPS, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    handler.setLevel(logging.INFO)
+    package = logging.getLogger("research_agent")
+    package.setLevel(logging.INFO)
+    package.addHandler(handler)
+    package.propagate = False
+    return log_dir / "events.log"
+
+
 def lock(root):
     if root.is_symlink():
         raise ValueError("Data directory must not be a symlink")
@@ -51,6 +83,7 @@ def main():
     parser.add_argument("--port", type=int, default=18764)
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--build", type=Path)
+    parser.add_argument("--log-dir", type=Path, default=default_log_dir())
     args = parser.parse_args()
     if not 1024 <= args.port <= 65535:
         parser.error("port must be between 1024 and 65535")
@@ -61,13 +94,15 @@ def main():
             response.raise_for_status()
             data = response.json()
             matched = data["service"]["id"] == "prowl-research" and data["service"]["instance"] == "default"
-            print(json.dumps({"reachable": True, "identityMatches": matched, "health": data}, ensure_ascii=False))
+            print(json.dumps({"reachable": True, "identityMatches": matched, "health": data,
+                              "eventLog": str(args.log_dir / "events.log")}, ensure_ascii=False))
             raise SystemExit(0 if matched else 1)
         except httpx.HTTPError as exc:
             print(json.dumps({"reachable": False, "error": type(exc).__name__}))
             raise SystemExit(1)
     fd = lock(args.root)
     os.umask(0o077)
+    configure_logging(args.log_dir)
     try:
         import uvicorn
         from .app import create_app

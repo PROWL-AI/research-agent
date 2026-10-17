@@ -16,7 +16,7 @@ COMPLETED = "completed"
 BUDGET_TOOLS = "budget_tools"
 BUDGET_USD = "budget_usd"
 BUDGET_MINUTES = "budget_minutes"
-#: LLM-spend budget stop (declared now, set from wave 4).
+#: LLM-spend budget stop: the run's max_llm_usd left no room for the next call.
 BUDGET_LLM = "budget_llm"
 #: A step failed hard (not on_error_skip) or a worker crashed.
 STEP_FAILED = "step_failed"
@@ -41,6 +41,7 @@ _BUDGET_FIELD = {
     BUDGET_TOOLS: "max_tool_calls",
     BUDGET_USD: "max_usd",
     BUDGET_MINUTES: "max_minutes",
+    BUDGET_LLM: "max_llm_usd",
 }
 _BUDGET_PREFIXES = tuple((f"{field}=", code) for code, field in _BUDGET_FIELD.items())
 

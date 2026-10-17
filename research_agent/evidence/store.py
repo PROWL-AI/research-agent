@@ -148,6 +148,9 @@ class Checkpoint(BaseModel):
     #: Why the run reached its terminal status — research_agent.evidence.terminal.
     terminal_code: str | None = None
     migrated_from: int | None = None
+    #: The run's resolved LLM ceiling (USD), recorded at start so a resume
+    #: keeps it unless the caller or the environment says otherwise.
+    llm_cap_usd: float | None = None
 
     # ── views (read-only; never persisted) ──────────────────────────────────
 

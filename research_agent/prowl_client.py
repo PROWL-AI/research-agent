@@ -126,6 +126,10 @@ class ProwlClient:
             self._stack = AsyncExitStack()
             await self._connect()
 
+    def _call_meta(self) -> dict[str, Any] | None:
+        """Request `_meta` for each call; the service adds its traceparent here."""
+        return None
+
     async def _rpc(
         self, name: str, arguments: dict[str, Any] | None = None, *, retry: bool = True
     ) -> CallToolResult:
@@ -142,9 +146,11 @@ class ProwlClient:
                     session = self._session
                 if session is None:
                     raise ProwlError("prowl reconnect produced no session")
-                return await session.call_tool(
-                    name, arguments or {}, read_timeout_seconds=_call_timeout()
-                )
+                meta = self._call_meta()
+                kwargs: dict[str, Any] = {"read_timeout_seconds": _call_timeout()}
+                if meta:
+                    kwargs["meta"] = meta
+                return await session.call_tool(name, arguments or {}, **kwargs)
             except McpError:
                 raise
             except (

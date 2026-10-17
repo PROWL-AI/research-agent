@@ -86,7 +86,7 @@ def main():
         subprocess.run(['plutil','-lint',str(plist)],check=True)
         descriptor={'protocol':'fabric-service/0.1','id':ID,'instance':'default','name':'Prowl Research','summary':'Research requests, evidence, costs and human decisions',
                     'origin':f'http://127.0.0.1:{a.port}','auth':{'tokenFile':str(data/'host.token')},'lifecycle':{'manager':'launchd','label':LABEL,'plist':str(plist)},
-                    'paths':{'data':str(data),'config':str(data),'logs':[str(logs/'service.log')]},
+                    'paths':{'data':str(data),'config':str(data),'logs':[str(logs/'events.log'),str(logs/'service.log')]},
                     'commands':{'doctor':[python,'-m','research_agent.service.cli','doctor','--port',str(a.port),'--json']},
                     'source':{'repository':'https://github.com/PROWL-AI/research-agent'},'fabricManifest':str(release/'source/fabric-agent.json'),
                     'installedAt':__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),'installedBy':'prowl-research-service'}

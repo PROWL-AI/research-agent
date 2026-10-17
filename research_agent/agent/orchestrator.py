@@ -16,7 +16,9 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 
-from research_agent.agent.writer import produce_report
+from research_agent.agent.citations import FidelityResult
+from research_agent.agent.writer import ledger_only_report, produce_report
+from research_agent.config import resolve_llm_cap, writer_reserve
 from research_agent.events import emit
 from research_agent.evidence import terminal
 from research_agent.evidence.ledger import (
@@ -48,12 +50,13 @@ from research_agent.evidence.store import (
     SKIPPED_BUDGET,
     SKIPPED_ON_ERROR,
     ArtifactStore,
+    AttemptRecord,
     Checkpoint,
     CheckpointMigrationError,
     StepRecord,
     make_step_id,
 )
-from research_agent.llm import LLMClient
+from research_agent.llm import LLMBudgetExceeded, LLMClient, LlmMeter
 from research_agent.prowl_client import ProwlClient, ProwlError
 from research_agent.runbook import Runbook, RunbookInput, get_runbook
 
@@ -332,8 +335,13 @@ class Orchestrator:
         runbook_name: str,
         inputs: dict[str, Any],
         run_id: str | None = None,
+        *,
+        max_llm_usd: float | None = None,
     ) -> RunResult:
         """Execute (or resume) one run while holding its lock.
+
+        `max_llm_usd` caps the run's own LLM spend (config.resolve_llm_cap names
+        the fallbacks); tool spend stays under the runbook's budget.
 
         This method is the only writer of the run's lifecycle state while the
         run is live: a cancellation or an exception is recorded here, inside
@@ -348,7 +356,8 @@ class Orchestrator:
             raise _lock_refused(run_id)
         try:
             try:
-                return await self._run_locked(runbook_name, inputs, run_id, runbook, store)
+                return await self._run_locked(runbook_name, inputs, run_id, runbook, store,
+                                              max_llm_usd=max_llm_usd)
             except asyncio.CancelledError:
                 self._write_terminal(
                     store, runbook_name, status="partial", partial=True,
@@ -410,6 +419,43 @@ class Orchestrator:
         run_id: str,
         runbook: Runbook,
         store: ArtifactStore,
+        *,
+        max_llm_usd: float | None = None,
+    ) -> RunResult:
+        try:
+            return await self._run_metered(runbook_name, inputs, run_id, runbook, store, max_llm_usd)
+        finally:
+            # The client outlives the run (MCP server, service): a meter bound to
+            # this run's checkpoint must not meter the next one.
+            if getattr(self.llm, "meter", None) is not None:
+                self.llm.meter = None
+
+    def _attach_meter(self, checkpoint: Checkpoint, store: ArtifactStore, runbook: Runbook,
+                      max_llm_usd: float | None) -> LlmMeter:
+        cap, source = resolve_llm_cap(max_llm_usd, checkpoint.llm_cap_usd, runbook.meta.budget.max_llm_usd)
+        checkpoint.llm_cap_usd = cap
+        counter = {"n": sum(1 for a in checkpoint.attempts if a.kind == "llm")}
+
+        def new_id() -> str:
+            counter["n"] += 1
+            return f"llm#{counter['n']}"
+
+        meter = LlmMeter(max_usd=cap, reserve_usd=writer_reserve(cap), attempts=checkpoint.attempts,
+                         persist=lambda: store.save_checkpoint(checkpoint), record_type=AttemptRecord,
+                         new_id=new_id)
+        self.llm.meter = meter
+        emit(log, "llm.budget", run_id=checkpoint.run_id, max_llm_usd=cap, source=source,
+             reserve_usd=meter.reserve_usd, spent_usd=meter.spend())
+        return meter
+
+    async def _run_metered(
+        self,
+        runbook_name: str,
+        inputs: dict[str, Any],
+        run_id: str,
+        runbook: Runbook,
+        store: ArtifactStore,
+        max_llm_usd: float | None,
     ) -> RunResult:
         ledger = Ledger.load(store.run_dir / "ledger.json")
         ledger.run_id = run_id
@@ -465,20 +511,34 @@ class Orchestrator:
             # run_id" for an id a caller was handed — and the owner's terminal
             # write needs a checkpoint to record into.
             store.save_checkpoint(checkpoint)
+        meter = self._attach_meter(checkpoint, store, runbook, max_llm_usd)
+        store.save_checkpoint(checkpoint)
         emit(log, "run.started", run_id=run_id, runbook=runbook_name, resuming=resuming)
         started_monotonic = time.monotonic()
 
         catalog = await self.prowl.list_tools()
 
+        planned = True
         if not resuming:
-            raw_plan = await self._plan(runbook, brief, catalog)
-            checkpoint.plan_raw = raw_plan
-            checkpoint.steps = build_steps(raw_plan, runbook.meta.tools, catalog)
-            store.save_checkpoint(checkpoint)
+            try:
+                raw_plan = await self._plan(runbook, brief, catalog)
+            except LLMBudgetExceeded as exc:
+                # Nothing was dispatched: the run stops before research, said why.
+                planned = False
+                checkpoint.partial = True
+                checkpoint.stop_reason = terminal.budget_stop_text(terminal.BUDGET_LLM, meter.max_usd)
+                emit(log, "budget.stop", logging.WARNING, run_id=run_id, reason=checkpoint.stop_reason,
+                     stage=exc.stage, llm_spend_usd=meter.spend())
+                store.save_checkpoint(checkpoint)
+            else:
+                checkpoint.plan_raw = raw_plan
+                checkpoint.steps = build_steps(raw_plan, runbook.meta.tools, catalog)
+                store.save_checkpoint(checkpoint)
         else:
             self._exclude_vanished_tools(checkpoint, runbook.meta.tools, catalog)
             store.save_checkpoint(checkpoint)
-        await self._execute(runbook, checkpoint, store, ledger, started_monotonic)
+        if planned:
+            await self._execute(runbook, checkpoint, store, ledger, started_monotonic)
 
         evidence_incomplete = any(
             s.state in (RAW_SAVED, OUTCOME_UNKNOWN) or (s.state == FAILED and (s.reason or "").startswith("raw_write"))
@@ -492,11 +552,22 @@ class Orchestrator:
         checkpoint.partial = checkpoint.partial or unfinished or evidence_incomplete
         disclosures = checkpoint.disclosures(final=True)
 
-        outcome, fidelity = await produce_report(
-            self.llm, runbook, ledger, brief,
-            partial=checkpoint.partial, skipped_steps=disclosures,
-            transform_notes=checkpoint.transform_notes,
-        )
+        try:
+            outcome, fidelity = await produce_report(
+                self.llm, runbook, ledger, brief,
+                partial=checkpoint.partial, skipped_steps=disclosures,
+                transform_notes=checkpoint.transform_notes,
+            )
+        except LLMBudgetExceeded as exc:
+            # Even the writer reserve is spent: the evidence still ships, as a
+            # deterministic ledger listing, and the run says why.
+            checkpoint.partial = True
+            checkpoint.stop_reason = checkpoint.stop_reason or terminal.budget_stop_text(
+                terminal.BUDGET_LLM, meter.max_usd)
+            emit(log, "budget.stop", logging.WARNING, run_id=run_id, reason=checkpoint.stop_reason,
+                 stage=exc.stage, llm_spend_usd=meter.spend())
+            outcome, fidelity = ledger_only_report(runbook, ledger, checkpoint.stop_reason), FidelityResult(
+                report_md="")
 
         report_path = store.run_dir / "report.md"
         _atomic_write_text(report_path, outcome.report_md)
@@ -524,7 +595,14 @@ class Orchestrator:
             # max_usd / max_tool_calls bound Prowl tool spend only. Planner,
             # extraction, transform, writer and fidelity LLM tokens are billed
             # by the LLM provider on top — say so wherever cost_usd is read.
-            "budget_scope": "tool calls only — LLM usage is metered separately (see llm_usage)",
+            "budget_scope": "max_usd/max_tool_calls cap tool calls; max_llm_usd caps LLM calls (see llm_budget)",
+            "llm_budget": {
+                "max_llm_usd": meter.max_usd,
+                "writer_reserve_usd": meter.reserve_usd,
+                "spend_usd": meter.spend(),
+                "cost_source": checkpoint.cost_source("llm"),
+                "attempts": sum(1 for a in checkpoint.attempts if a.kind == "llm"),
+            },
             "claims": len(ledger.claims),
             "duration_s": round(time.monotonic() - started_monotonic, 1),
             "lint_issues_before": outcome.lint_before,
@@ -604,6 +682,7 @@ class Orchestrator:
             tier="strong",
             json_mode=True,
             max_tokens=8000,
+            stage="planner",
         )
         payload = _parse_json_object(text)
         raw_plan = payload.get("plan") if isinstance(payload, dict) else None
@@ -738,6 +817,14 @@ class Orchestrator:
         log.info("transform step %s: %s", record.step_id, record.step)
         try:
             result = await self._run_transform(record, checkpoint, store)
+        except LLMBudgetExceeded as exc:
+            reason = terminal.budget_stop_text(terminal.BUDGET_LLM, self.llm.meter.max_usd)
+            record.state, record.reason = SKIPPED_BUDGET, reason
+            checkpoint.partial = True
+            checkpoint.stop_reason = checkpoint.stop_reason or reason
+            emit(log, "budget.stop", logging.WARNING, run_id=checkpoint.run_id, reason=reason, stage=exc.stage)
+            save_state(checkpoint, store)
+            return
         except Exception as exc:
             if record.on_error_skip:
                 log.warning("transform step %s failed (on_error_skip): %s", record.step_id, exc)
@@ -803,6 +890,7 @@ class Orchestrator:
             [{"role": "system", "content": system}, {"role": "user", "content": user}],
             tier="cheap",
             max_tokens=2000,
+            stage="transform",
         )
 
     def _budget_stop_reason(self, budget: Any, checkpoint: Checkpoint) -> str | None:
@@ -813,6 +901,10 @@ class Orchestrator:
         survives resume (KA-12)."""
         if budget is None:
             return None
+        meter = getattr(self.llm, "meter", None)
+        if isinstance(meter, LlmMeter) and meter.research_exhausted():
+            # Dispatching more tools buys raw nobody can afford to read.
+            return terminal.budget_stop_text(terminal.BUDGET_LLM, meter.max_usd)
         if len(checkpoint.tool_attempts()) >= budget.max_tool_calls:
             return terminal.budget_stop_text(terminal.BUDGET_TOOLS, budget.max_tool_calls)
         # Elapsed is measured from the checkpoint's creation, not from this
@@ -867,6 +959,7 @@ class Orchestrator:
             tier="cheap",
             json_mode=True,
             max_tokens=2000,
+            stage="extract",
         )
         payload = _parse_json_object(text)
         claims = payload.get("claims", []) if isinstance(payload, dict) else []

@@ -753,6 +753,18 @@
       "closable_in_one_pass": true,
       "wave": 4,
       "release": "this"
+    },
+    {
+      "id": "B-039",
+      "title": "The service cannot resume an interrupted run; a new request starts a new run that pays again",
+      "source": "wave-4 build 2026-10-17 · research_agent/service/runtime.py (run_id = job id)",
+      "status": "open",
+      "area": "service",
+      "node": "N-FAB",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 5,
+      "release": "this"
     }
   ]
 }

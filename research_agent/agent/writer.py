@@ -143,6 +143,28 @@ class RewriteError(Exception):
     pass
 
 
+def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str) -> WriterOutcome:
+    """The report when no LLM budget is left for the writer: the evidence as
+    gathered, every claim with its status and source — nothing synthesized."""
+    lines = [
+        f"# {runbook.meta.name} — PARTIAL: evidence only",
+        "",
+        f"The LLM budget ran out before the report could be written ({reason}). "
+        "Below is the evidence ledger as gathered; no synthesis, no conclusions. "
+        "Raise max_llm_usd and run `rewrite` on this run to get the full report.",
+        "",
+        "| Claim | Value | Status | Source |",
+        "|---|---|---|---|",
+    ]
+    for c in ledger.claims:
+        value = "" if c.value is None else f"{c.value}{(' ' + c.unit) if c.unit else ''}"
+        text = c.claim.replace("|", "/").replace("\n", " ")
+        lines.append(f"| {text} [{c.id}] | {value} | {c.status.value} | {c.source_tool} |")
+    if not ledger.claims:
+        lines.append("| (no evidence gathered) | | | |")
+    return WriterOutcome(report_md="\n".join(lines) + "\n", lint_before=0, lint_after=0, revised=False)
+
+
 class LintIssue(BaseModel):
     kind: str
     text: str
@@ -289,7 +311,7 @@ async def write_report(
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     try:
         return await llm.complete(
-            messages, tier="strong", max_tokens=_DRAFT_MAX_TOKENS, temperature=0.3,
+            messages, tier="strong", max_tokens=_DRAFT_MAX_TOKENS, temperature=0.3, stage="writer",
         )
     except LLMError as exc:
         if exc.retryable or exc.finish_reason != "length":
@@ -304,6 +326,7 @@ async def write_report(
     try:
         return await llm.complete(
             messages, tier="strong", max_tokens=_DRAFT_ESCALATED_MAX_TOKENS, temperature=0.3,
+            stage="writer",
         )
     except LLMError as exc:
         truncated = (exc.content or "").strip()
@@ -334,6 +357,7 @@ async def repair_report(
         tier="strong",
         max_tokens=8000,
         temperature=0.2,
+        stage="repair",
     )
 
 
