@@ -142,15 +142,21 @@ async def test_a_delegated_caller_sees_only_its_own_jobs(tmp_path, estate):
     app = create_app(tmp_path, "host", "agent", delegation=_policy(estate))
     _, mine = await _result(app, {"Authorization": "Bearer " + estate.token()})
     job_id = mine["result"]["structuredContent"]["job"]["id"]
-    other = estate.token(actor="another-agent.default")
-    _, body = await _result(app, {"Authorization": "Bearer " + other}, call=("fabric.job.get", {"id": job_id}))
-    assert body["result"]["isError"] is True and "scope-not-granted" in json.dumps(body)
+    for call in (("fabric.job.get", {"id": job_id}), ("fabric.job.cancel", {"id": job_id}),
+                 ("research.artifact.get", {"id": job_id, "name": "report.md"})):
+        _, body = await _result(app, {"Authorization": "Bearer " + estate.token(
+            actor="another-agent.default", scope="fabric.job.get fabric.job.cancel research.artifact.get")}, call=call)
+        assert body["result"]["isError"] is True, call
+        assert body["result"]["structuredContent"]["error"]["code"] == "scope-not-granted", call
     _, body = await _result(app, {"Authorization": "Bearer " + estate.token()}, call=("fabric.job.get", {"id": job_id}))
     assert body["result"]["isError"] is False
 
 
 def test_the_well_known_document_declares_delegation_when_configured(tmp_path, estate):
-    configured = create_app(tmp_path / "a", "host", "agent", delegation=_policy(estate))
+    jwks = tmp_path / "jwks.json"
+    jwks.write_text(json.dumps(estate.jwks))
+    policy = DelegationPolicy(issuer=ISSUER, jwks=str(jwks), audience=AUDIENCE, effects=EFFECTS)
+    configured = create_app(tmp_path / "a", "host", "agent", delegation=policy)
     plain = create_app(tmp_path / "b", "host", "agent",
                        delegation=DelegationPolicy(issuer=None, jwks=None, audience=AUDIENCE, effects=EFFECTS))
     import asyncio
@@ -160,15 +166,71 @@ def test_the_well_known_document_declares_delegation_when_configured(tmp_path, e
         async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:18764") as client:
             return (await client.get("/.well-known/fabric-service")).json()
 
-    assert asyncio.run(well_known(configured))["auth"]["delegation"]["issuer"] == ISSUER
+    declared = asyncio.run(well_known(configured))["auth"]["delegation"]
+    assert declared == {"issuer": ISSUER, "jwks": jwks.resolve().as_uri()}  # a URI a host can read
     assert "auth" not in asyncio.run(well_known(plain))
 
 
-def test_binding_beyond_loopback_needs_delegation(tmp_path):
-    from research_agent.service.cli import check_bind
+def test_the_service_binds_loopback_only():
+    import inspect
 
-    assert check_bind("127.0.0.1", {}) is None
-    assert "refusing to bind 0.0.0.0" in check_bind("0.0.0.0", {})
-    jwks = tmp_path / "jwks.json"
-    jwks.write_text(json.dumps(Estate().jwks))
-    assert check_bind("0.0.0.0", {"RESEARCH_DELEGATION_ISSUER": ISSUER, "RESEARCH_DELEGATION_JWKS": str(jwks)}) is None
+    from research_agent.service import cli
+
+    source = inspect.getsource(cli.main)
+    assert '"--host"' not in source and 'host="127.0.0.1"' in source
+
+
+def _list(rid=7):
+    return {"jsonrpc": "2.0", "id": rid, "method": "tools/list", "params": {}}
+
+
+async def test_methods_without_a_capability_still_need_an_authentic_token(tmp_path, estate):
+    app = create_app(tmp_path, "host", "agent", delegation=_policy(estate))
+    good = await _post(app, _list(), {"Authorization": "Bearer " + estate.token()})
+    assert good.status_code == 200 and good.json()["result"]["tools"]
+    for bad in (estate.token(aud="someone-else.default"), estate.token(key=Ed25519PrivateKey.generate()),
+                estate.token(iat=int(time.time()) - 2000, ttl=300), "not-a-token"):
+        response = await _post(app, _list(), {"Authorization": "Bearer " + bad})
+        assert response.status_code == 401, bad
+        assert response.headers["www-authenticate"].startswith("Bearer")
+        assert response.json()["error"]["code"] == "unauthenticated"
+    own = await _post(app, _list(), {"Authorization": "Bearer agent"})
+    assert own.status_code == 200  # the service's own token needs no delegation for metadata
+
+
+async def test_with_no_trusted_issuer_metadata_with_a_token_is_unavailable(tmp_path, estate):
+    app = create_app(tmp_path, "host", "agent", delegation=DelegationPolicy(issuer=None, jwks=None,
+                                                                           audience=AUDIENCE, effects=EFFECTS))
+    response = await _post(app, _list(), {"Authorization": "Bearer " + estate.token()})
+    assert response.status_code == 503 and response.json()["error"]["code"] == "issuer-unavailable"
+
+
+async def test_no_credential_is_a_contract_shaped_401(tmp_path, estate):
+    app = create_app(tmp_path, "host", "agent", delegation=_policy(estate))
+    response = await _post(app, _list(), {})
+    assert response.status_code == 401 and response.json()["error"]["code"] == "unauthenticated"
+
+
+def test_the_published_schemas_are_the_ones_the_service_lists():
+    """fabric/schemas is generated from protocol.SCHEMAS; a hand edit or a stale
+    build would make a host validate against a contract the service does not keep."""
+    from pathlib import Path
+
+    from research_agent.service.protocol import CAPABILITIES, SCHEMAS, tools_list
+
+    folder = Path(__file__).resolve().parent.parent / "fabric" / "schemas"
+    listed = {tool["name"]: tool["inputSchema"] for tool in tools_list()}
+    for name in CAPABILITIES:
+        published = json.loads((folder / f"{name}.input.json").read_text())
+        assert published == SCHEMAS[name] == listed[name], name  # $id included
+    assert listed["research.run"]["properties"]["max_llm_usd"]["maximum"] == 1000
+    stdio = json.loads((folder / "capability-input.schema.json").read_text())
+    assert stdio["properties"]["max_llm_usd"]["maximum"] == 1000
+
+
+def test_the_envelope_vouches_for_a_verified_caller_but_not_for_admission():
+    from research_agent.service.runtime import attribution_gap
+
+    assert attribution_gap({"delegation": None})["claim"] == "Fabric admission and chain attribution"
+    gap = attribution_gap({"delegation": {"principal": "urn:person:operator", "caller": "caller-agent.default"}})
+    assert gap["claim"] == "Fabric admission" and "verified" in gap["reason"]

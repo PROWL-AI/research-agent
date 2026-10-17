@@ -9,7 +9,9 @@ const origin='http://127.0.0.1:18765';
 const env={...process.env};for(const key of ['PROWL_API_KEY','RESEARCH_LLM_API_KEY','OPENROUTER_API_KEY'])delete env[key];
 const child=spawn('.venv/bin/python',['-m','research_agent.service.cli','serve','--root',root,'--port','18765'],{env,stdio:['ignore','ignore','pipe']});
 let error='';child.stderr.on('data',d=>error+=d.toString());
-const evidence='docs/evidence/fabric-dashboard/raw';await mkdir(evidence,{recursive:true});
+// Screenshots go to a fresh temporary folder unless DASHBOARD_EVIDENCE_DIR names one on purpose:
+// a routine run must never overwrite committed evidence.
+const evidence=process.env.DASHBOARD_EVIDENCE_DIR||await mkdtemp(join(tmpdir(),'prowl-ui-shots-'));await mkdir(evidence,{recursive:true});
 let browser;
 try{
  for(let i=0;i<80;i++){try{if((await fetch(origin+'/.well-known/fabric-service')).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
@@ -21,9 +23,14 @@ try{
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto(origin+login.url);await page.getByRole('heading',{name:'Исследования, на виду.'}).waitFor();
  await page.screenshot({path:evidence+'/overview-desktop.png',fullPage:true});
+ // No provider keys in this run: the header chip says so, in Russian, as do the kit's pickers.
+ await page.locator('#service-chip',{hasText:'Работает с ограничениями'}).waitFor();
+ assert.equal(await page.locator('#fd-theme option:checked').textContent(),'Графит');
+ assert.equal(await page.locator('#fd-scheme option[value=auto]').textContent(),'Как в системе');
  await page.getByRole('button',{name:'Открыть учебный пример',exact:true}).click();
  await page.getByRole('heading',{name:'Разрешить этот запрос?'}).waitFor();
  await page.screenshot({path:evidence+'/approval-desktop.png',fullPage:true});
+ await page.getByText('Инициатор: Оператор (панель)',{exact:true}).waitFor();  // created in the panel, not a declared name
  await page.getByRole('button',{name:'Разрешить запуск',exact:true}).click();
  await page.locator('.badge.completed').waitFor({timeout:15000});
  await page.getByRole('tab',{name:'Данные',exact:true}).click();
@@ -48,6 +55,13 @@ try{
  await page.locator('#search').fill('not-a-request');
  await page.getByRole('heading',{name:'Ничего не найдено'}).waitFor();
  await page.locator('#search').fill('');
+ await page.setViewportSize({width:360,height:740});
+ await page.waitForTimeout(200);
+ // the kit prepared the wide box: it is marked exactly when it overflows (ED-4)
+ assert(await page.evaluate(()=>{const b=document.querySelector('#request-table .fd-scroll');return b.hasAttribute('data-fd-overflow')===(b.scrollWidth>b.clientWidth+1)&&b.hasAttribute('data-fd-overflow');}),'scroll box not prepared');
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'requests 360 overflow');
+ await page.screenshot({path:evidence+'/requests-360.png',fullPage:true});
+ await page.setViewportSize({width:1440,height:1000});
  await page.locator('[data-nav="learn"]').click();
  await page.getByRole('heading',{name:'От запроса к данным.'}).waitFor();
  await page.setViewportSize({width:390,height:844});
@@ -63,7 +77,7 @@ try{
  await page.getByText('Нет свежих данных',{exact:true}).waitFor();
  assert(await page.getByRole('heading',{name:'Исследования, на виду.'}).isVisible());
  assert.deepEqual(errors,[]);
- console.log(JSON.stringify({browser:'Playwright WebKit',viewports:['1440x1000','390x844'],checks:['empty','approval','tutorial','steps','table','report','fixture-spend-exclusion','chains','dirty-settings','settings-diff','search-empty','mobile-no-overflow','offline-keeps-snapshot'],pageErrors:errors,status:'PASS'}));
+ console.log(JSON.stringify({browser:'Playwright WebKit',viewports:['1440x1000','390x844','360x740'],evidence,checks:['empty','status-chip','russian-kit-labels','verified-initiator','scroll-box-prepared','requests-360-no-overflow','approval','tutorial','steps','table','report','fixture-spend-exclusion','chains','dirty-settings','settings-diff','search-empty','mobile-no-overflow','offline-keeps-snapshot'],pageErrors:errors,status:'PASS'}));
 }catch(e){console.error(e);throw e;}finally{
  if(browser)await browser.close();
  child.kill('SIGTERM');

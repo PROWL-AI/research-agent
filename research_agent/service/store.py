@@ -86,8 +86,13 @@ class Store:
     def jobs(self):
         return [json.loads(r[0]) for r in self.db.execute("SELECT body FROM jobs ORDER BY rowid DESC LIMIT 5000")]
 
-    def create(self, request: dict, request_key: str, trace: str | None = None, delegation: dict | None = None):
+    def create(self, request: dict, request_key: str, trace: str | None = None, delegation: dict | None = None,
+               run_dir: str | None = None, via: str = "mcp"):
         request_hash = digest(request)
+        if delegation:
+            # Idempotency keys are a caller's own namespace: another principal
+            # replaying a key gets its own job, never someone else's handle.
+            request_key = "delegated:" + digest({"p": delegation.get("principal"), "c": delegation.get("caller")})[:16] + ":" + request_key
         with self.db:
             row = self.db.execute("SELECT request_hash,body FROM jobs WHERE request_key=?", (request_key,)).fetchone()
             if row:
@@ -101,7 +106,12 @@ class Store:
                        request=request, config=self.config(), traceparent=trace, result=None, error=None,
                        # Who acts for whom (a verified delegation, DEC-0039); None for the
                        # service's own agent token or the operator's dashboard.
-                       delegation=delegation)
+                       delegation=delegation,
+                       # The run directory this job writes (a resume's root run, B-039).
+                       runDir=run_dir,
+                       # Which door the request came through: "dashboard" (the operator's
+                       # signed-in panel) or "mcp" (an agent with a token).
+                       via=via)
             job["proposal"] = {"digest": digest({"id": job_id, "request": request, "config": job["config"]}),
                                "expiresAt": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat().replace("+00:00", "Z")}
             self.db.execute("INSERT INTO jobs VALUES(?,?,?,?)", (job_id, request_key, request_hash, json.dumps(job)))

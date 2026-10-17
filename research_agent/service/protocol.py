@@ -2,9 +2,8 @@
 from __future__ import annotations
 import base64
 import json
-from pathlib import Path
 from jsonschema import Draft202012Validator
-from .delegation import recorded, refusal_tool_result
+from .delegation import Refused, recorded, refusal_tool_result, require_owner
 from .runtime import child_trace, run_dir_name, runbooks
 from .store import Conflict
 
@@ -161,7 +160,7 @@ class Protocol:
                     return self.error(rid, -32602, "Unknown tool"), 400
                 verdict = authorize(name) if authorize is not None else {"ok": True}
                 if not verdict.get("ok"):
-                    result = refusal_tool_result(verdict)
+                    result = refusal_tool_result(verdict, child_trace(meta.get("traceparent")))
                     if modern:
                         result["resultType"] = "complete"
                     return {"jsonrpc": "2.0", "id": rid, "result": result}, 200
@@ -170,6 +169,8 @@ class Protocol:
                     data, stored_trace = self.call(name, args, meta.get("traceparent"), recorded(verdict))
                     trace = stored_trace or trace
                     result = {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False)}], "structuredContent": data, "isError": False}
+                except Refused as exc:
+                    result = refusal_tool_result(exc.verdict, trace)
                 except (ValueError, KeyError, Conflict) as exc:
                     code = exc.args[0] if isinstance(exc, KeyError) else "request-rejected"
                     result = {"content": [{"type": "text", "text": str(code)}], "structuredContent": {"error": {"code": str(code), "message": str(exc)[:300]}}, "isError": True}
@@ -202,17 +203,15 @@ class Protocol:
         if name.startswith("fabric.job."):
             if args.get("inputResponses"):
                 raise ValueError("Decisions require the operator session in Fabric Dashboards; MCP caller credentials cannot approve their own jobs")
-            started_by = (rt.store.job(args["id"]).get("delegation") or {})
-            if delegation and (started_by.get("principal"), started_by.get("caller")) != (
-                    delegation["principal"], delegation["caller"]):
-                # A delegated caller reads and cancels only the jobs it started for
-                # its principal (the kit's rule for job tools).
-                raise ValueError("scope-not-granted: this job was started by another principal or caller")
+            # A delegated caller reads and cancels only the jobs it started for its
+            # principal (the kit's rule for job tools); refused with the DL-19 code.
+            require_owner(rt.store.job(args["id"]), delegation)
             job = rt.cancel(args["id"]) if name.endswith("cancel") else rt.store.job(args["id"])
             return job_view(job, getattr(rt, "origin", "http://127.0.0.1:18764")), job.get("traceparent")
         if name == "research.list_runbooks":
             output = {"runbooks": runbooks()}
         else:
+            require_owner(rt.store.job(args["id"]), delegation)
             output = artifact(rt.store, args["id"], args["name"])
         fake_job = {"id": "read-" + __import__('secrets').token_hex(8), "request": {}, "traceparent": child_trace(trace)}
         return rt.envelope(fake_job, output, 0), fake_job["traceparent"]

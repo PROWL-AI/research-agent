@@ -45,6 +45,7 @@
     "max_llm_usd": {
       "type": "number",
       "exclusiveMinimum": 0,
+      "maximum": 1000,
       "description": "Cap on this run's own LLM spend in USD, checked before every LLM call (retries included). Unset: RESEARCH_MAX_LLM_USD, the cap a resumed run recorded, the runbook's budget.max_llm_usd, else 5."
     }
   },

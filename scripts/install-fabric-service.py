@@ -2,10 +2,13 @@
 """Install a clean committed snapshot; no provider keys or agent config edits.
 
 With --vault-project NAME the service is launched through Project Observatory's
-vault-only consumer: `use_secret.py run --vault-only --env prod NAME
-PROWL_API_KEY,RESEARCH_LLM_API_KEY -- <serve>`. The keys live in the vault,
-reach the process environment only, and never touch the plist, argv, a file or
-a log. Without it the service starts degraded (no provider keys) and says so.
+vault-only service consumer: `use_secret.py serve --env prod --consumer
+chat.prowl.research NAME PROWL_API_KEY,RESEARCH_LLM_API_KEY -- <serve>`, run by
+Observatory's own interpreter. The keys live in the vault, reach the process
+environment only, and never touch the plist, argv, a file or a log. Without it
+the service starts degraded (no provider keys) and says so. Delegation settings
+(RESEARCH_DELEGATION_ISSUER/_JWKS/_AUDIENCE) present in the installer's
+environment are passed to the service; they are public configuration, not keys.
 --dry-run prints the launch argv and the slots it needs, installs nothing.
 """
 import argparse
@@ -40,17 +43,32 @@ def atomic(path, body):
     os.replace(temp,path)
 
 
+def observatory_python(engine):
+    """The interpreter of the virtualenv Observatory's engine is installed in."""
+    for parent in engine.parents:
+        if (parent/'pyvenv.cfg').is_file() and (parent/'bin/python').exists():
+            return str(parent/'bin/python')
+    return sys.executable
+
+
 def missing_slots(project):
-    """Slots the vault folder lacks (names only — a value is never read here)."""
+    """Slots the vault folder lacks (names only — a value is never read here).
+    A listing line is `  <folder>/<env>/<NAME>  (<size>…)`: matched exactly."""
     engine=Path(command('project-observatory','full-path'))
-    listing=command(sys.executable,str(engine/'tools/vault.py'),'list',project,'prod')
-    return [s for s in SLOTS if f'{project}/prod/{s}' not in listing]
+    listing=command(observatory_python(engine),str(engine/'tools/vault.py'),'list',project,'prod')
+    held={line.split()[0] for line in listing.splitlines() if line.strip() and '/' in line.split()[0]}
+    return [s for s in SLOTS if f'{project}/prod/{s}' not in held]
 
 
 def vault_consumer(project):
-    """The Observatory vault-only consumer's argv prefix."""
+    """The Observatory vault-only service consumer's argv prefix."""
     engine=Path(command('project-observatory','full-path'))
-    return [sys.executable,str(engine/'tools/use_secret.py'),'run','--vault-only','--env','prod',project,','.join(SLOTS),'--']
+    return [observatory_python(engine),str(engine/'tools/use_secret.py'),'serve','--env','prod','--consumer',LABEL,
+            project,','.join(SLOTS),'--']
+
+
+#: Public delegation configuration passed through to the service (never a key).
+DELEGATION_ENV=('RESEARCH_DELEGATION_ISSUER','RESEARCH_DELEGATION_JWKS','RESEARCH_DELEGATION_AUDIENCE')
 
 
 def launch_argv(python,data,port,build,logs,vault_project):
@@ -68,13 +86,16 @@ def main():
         base=Path.home()/'.local/share'/ID
         argv=launch_argv(str(base/'releases/<commit>/venv/bin/python'),Path.home()/'Library/Application Support'/ID,a.port,
                          base/'releases/<commit>/build.json',Path.home()/'Library/Logs'/ID,a.vault_project)
+        try:missing=missing_slots(a.vault_project) if a.vault_project else []
+        except subprocess.CalledProcessError as exc:missing=f'vault check failed (exit {exc.returncode}); resolve it before installing'
         print(json.dumps({'argv':argv,'slots':list(SLOTS) if a.vault_project else [],
-                          'missing':missing_slots(a.vault_project) if a.vault_project else [],
+                          'missing':missing,
                           'keys':'vault-only consumer' if a.vault_project else 'none: the service starts degraded'},indent=2))
         return
-    if a.vault_project and missing_slots(a.vault_project):
-        p.error(f"vault {a.vault_project}/prod lacks {', '.join(missing_slots(a.vault_project))}: "
-                "issue them through Observatory's doors first")
+    if a.vault_project:
+        try:missing=missing_slots(a.vault_project)
+        except subprocess.CalledProcessError as exc:p.error(f'vault {a.vault_project}: the slot check failed (exit {exc.returncode}); resolve the folder in Observatory first')
+        if missing:p.error(f"vault {a.vault_project}/prod lacks {', '.join(missing)}: issue them through Observatory's doors first")
     if command('git','status','--porcelain',cwd=ROOT): p.error('Commit task changes before immutable installation.')
     sha=command('git','rev-parse','HEAD',cwd=ROOT)
     base=Path.home()/'.local/share'/ID
@@ -112,7 +133,8 @@ def main():
         python=str(release/'venv/bin/python')
         argv=launch_argv(python,data,a.port,release/'build.json',logs,a.vault_project)
         payload={'Label':LABEL,'ProgramArguments':argv,'RunAtLoad':True,'KeepAlive':True,'ThrottleInterval':10,'ExitTimeOut':15,'ProcessType':'Standard',
-                 'EnvironmentVariables':{'PATH':'/usr/bin:/bin:/usr/local/bin','FABRIC_SERVICE_SUPERVISOR':'launchd'},
+                 'EnvironmentVariables':{'PATH':'/usr/bin:/bin:/usr/local/bin','FABRIC_SERVICE_SUPERVISOR':'launchd',
+                                         **{k:os.environ[k] for k in DELEGATION_ENV if os.environ.get(k)}},
                  'StandardOutPath':str(logs/'service.log'),'StandardErrorPath':str(logs/'service.log')}
         domain=f'gui/{os.getuid()}'
         overrides=command('launchctl','print-disabled',domain)

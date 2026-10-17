@@ -18,8 +18,12 @@ The verifier is the adapter kit's (vendor/fabric_delegation.py, unchanged).
 
 from __future__ import annotations
 
+import base64
 import ipaddress
+import json
 import os
+import time
+from pathlib import Path
 from typing import Any, Mapping
 
 from .vendor import fabric_delegation as fd
@@ -42,6 +46,7 @@ class DelegationPolicy:
     def __init__(self, *, issuer: str | None, jwks: Any, audience: str, effects: Mapping[str, str]) -> None:
         self.issuer = issuer or None
         self.jwks_source = jwks if isinstance(jwks, str) else None
+        self._keys = None
         self.audience = audience
         self.effects = dict(effects)
         self._gate = None
@@ -49,6 +54,7 @@ class DelegationPolicy:
             if jwks is None:
                 raise ValueError("RESEARCH_DELEGATION_ISSUER is set without RESEARCH_DELEGATION_JWKS")
             keys = fd.JwksCache(jwks) if isinstance(jwks, str) else jwks
+            self._keys = keys
             self._gate = fd.delegation_gate(audience=audience, jwks=keys, issuer=self.issuer, effects=self.effects)
 
     @classmethod
@@ -64,14 +70,37 @@ class DelegationPolicy:
         return self._gate is not None
 
     def declaration(self) -> dict[str, str] | None:
-        """`auth.delegation` for the well-known document (DL-16), when configured."""
-        if not self.configured:
+        """`auth.delegation` for the well-known document (DL-16), when configured
+        from a source a host can read: an https/http URL, or a file as a file: URI."""
+        if not self.configured or not self.jwks_source:
             return None
-        return {"issuer": self.issuer, "jwks": self.jwks_source or "inline"}
+        source = self.jwks_source
+        if "://" not in source:
+            source = Path(source).expanduser().resolve().as_uri()
+        return {"issuer": self.issuer, "jwks": source}
 
     @staticmethod
     def carries_token(headers: Any) -> bool:
         return fd.read_delegation_token(headers) is not None
+
+    def authenticate(self, headers: Any) -> bool:
+        """For methods that name no capability (initialize, tools/list, ping):
+        the presented token must be authentic, current and for this service.
+        Its own first capability stands in for row 10, at effect `none`."""
+        carried = fd.read_delegation_token(headers)
+        if carried is None or self._gate is None:
+            return False
+        token = carried["token"]
+        try:
+            payload = token.split(".")[1]
+            claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+            capability = str(claims.get("scope", "")).split(" ")[0]
+        except (IndexError, ValueError, AttributeError):
+            return False
+        keys = self._keys.get(fd._kid_of(token)) if isinstance(self._keys, fd.JwksCache) else self._keys
+        verdict = fd.verify_delegation(token, audience=self.audience, jwks=keys, now=time.time(),
+                                       capability=capability, effect="none", issuer=self.issuer)
+        return bool(verdict.get("ok"))
 
     def check(self, tool: str, headers: Any, *, own_token: bool, loopback: bool) -> dict[str, Any]:
         """The verdict for one tools/call: `{ok: True, tier, principal, caller, chain, ...}` or a DL-19
@@ -86,8 +115,34 @@ class DelegationPolicy:
         return self._gate(tool, headers, tier=tier)
 
 
-def refusal_tool_result(verdict: dict[str, Any]) -> dict[str, Any]:
-    return fd.refusal_tool_result(verdict)
+def refusal_tool_result(verdict: dict[str, Any], traceparent: str | None = None) -> dict[str, Any]:
+    return fd.refusal_tool_result(verdict, traceparent)
+
+
+def refusal_http(verdict: dict[str, Any]):
+    return fd.refusal_http(verdict)
+
+
+class Refused(Exception):
+    """A DL-19 refusal raised inside a tool call (ownership, scope)."""
+
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(f"{code}: {detail}")
+        self.verdict = {"ok": False, "code": code, "detail": detail}
+
+
+def owned_by(job: dict[str, Any], delegation: dict[str, Any] | None) -> bool:
+    """A delegated caller acts only on jobs started for the same principal by the
+    same caller; the service's own token (no delegation) is the operator's floor."""
+    if not delegation:
+        return True
+    started_by = job.get("delegation") or {}
+    return (started_by.get("principal"), started_by.get("caller")) == (delegation["principal"], delegation["caller"])
+
+
+def require_owner(job: dict[str, Any], delegation: dict[str, Any] | None) -> None:
+    if not owned_by(job, delegation):
+        raise Refused("scope-not-granted", "job-of-another-principal")
 
 
 def recorded(verdict: dict[str, Any]) -> dict[str, Any] | None:

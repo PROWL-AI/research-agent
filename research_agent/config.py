@@ -23,6 +23,8 @@ DEFAULT_MAX_LLM_USD = 5.0
 #: passes, so a run that spends its research allowance still writes a report.
 WRITER_RESERVE_SHARE = 0.25
 WRITER_RESERVE_MAX_USD = 1.0
+#: The largest per-run LLM cap a caller may ask for (every surface shares it).
+MAX_LLM_USD_LIMIT = 1000.0
 
 
 class ConfigError(Exception):
@@ -49,7 +51,10 @@ def resolve_llm_cap(
         return number
 
     if explicit is not None:
-        return valid(explicit, "max_llm_usd"), "caller"
+        value = valid(explicit, "max_llm_usd")
+        if value > MAX_LLM_USD_LIMIT:
+            raise ConfigError(f"max_llm_usd above {MAX_LLM_USD_LIMIT} is refused (got {explicit!r})")
+        return value, "caller"
     raw = env.get("RESEARCH_MAX_LLM_USD", "").strip()
     if raw:
         return valid(raw, "RESEARCH_MAX_LLM_USD"), "env"

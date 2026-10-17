@@ -53,21 +53,6 @@ def configure_logging(log_dir):
     return log_dir / "events.log"
 
 
-def check_bind(host, environ=None):
-    """A bind beyond loopback reaches callers off this machine (T2, DL-25): they
-    must present delegation tokens, so the service refuses to start without a
-    trusted issuer and key set. Loopback needs nothing."""
-    from .delegation import DelegationPolicy, is_loopback
-    from .protocol import EFFECTS
-
-    if is_loopback(host):
-        return None
-    if DelegationPolicy.from_env(EFFECTS, environ).configured:
-        return None
-    return (f"refusing to bind {host}: callers beyond loopback are T2 and need delegation tokens — "
-            "set RESEARCH_DELEGATION_ISSUER and RESEARCH_DELEGATION_JWKS, or bind 127.0.0.1")
-
-
 def lock(root):
     if root.is_symlink():
         raise ValueError("Data directory must not be a symlink")
@@ -105,15 +90,9 @@ def main():
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--build", type=Path)
     parser.add_argument("--log-dir", type=Path, default=default_log_dir())
-    parser.add_argument("--host", default="127.0.0.1",
-                        help="bind address; anything beyond loopback requires delegation (RESEARCH_DELEGATION_ISSUER/_JWKS)")
     args = parser.parse_args()
     if not 1024 <= args.port <= 65535:
         parser.error("port must be between 1024 and 65535")
-    if args.command == "serve":
-        bind_problem = check_bind(args.host)
-        if bind_problem:
-            parser.error(bind_problem)
     if args.command == "doctor":
         import httpx
         try:
@@ -136,7 +115,8 @@ def main():
         build = json.loads(args.build.read_text()) if args.build else None
         app = create_app(args.root, token(args.root, "host.token"), token(args.root, "agent.token"), args.port, build)
         # Never log request URLs: the host's one-use login code is in its URL.
-        uvicorn.run(app, host=args.host, port=args.port, access_log=False, log_level="warning", timeout_graceful_shutdown=8)
+        # Loopback only: the dashboard login and the own-token tier (T0) assume it.
+        uvicorn.run(app, host="127.0.0.1", port=args.port, access_log=False, log_level="warning", timeout_graceful_shutdown=8)
     finally:
         os.close(fd)
 
