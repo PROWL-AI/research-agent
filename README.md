@@ -167,8 +167,14 @@ with a source log and confidence ladder.
 ```bash
 pytest                                  # unit tests + runbook validation (offline)
 python scripts/validate_runbooks.py --online  # frontmatter + tool names vs live Prowl catalog (needs PROWL_API_KEY)
-python evals/judge.py --run runs/<id>   # 5-dimension quality rubric for a finished run
+python evals/judge.py --run runs/<id>   # 5-dimension quality rubric for a finished run (exit 0 pass, 1 fail, 2 judge error)
+python evals/calibrate.py               # the judge against planted-defect fixtures (offline; --live spends)
 ```
+
+The judge's verdict is vetoed by defects the code proves — an invented citation or quotation, a
+figure its cited claim does not carry, a conflict shown as settled, a partial run that does not say
+so — so a lenient model cannot pass them. Its own LLM calls stop at `--max-usd` (default 0.50) and
+are recorded in `<run>/judge-ledger.json`, never in the run's checkpoint.
 
 Authoring a new runbook: `docs/runbook-authoring.md`.
 Architecture decisions and inherited traps: `docs/knowledge-pack.md`.

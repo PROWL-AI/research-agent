@@ -1,0 +1,10 @@
+$ python evals/calibrate.py
+  hidden-conflict        label fail verdict FAIL  total 0.95  defects conflict_hidden
+  honest-conflict        label pass verdict PASS  total 0.95  defects -
+  honest-partial         label pass verdict PASS  total 0.95  defects -
+  honest                 label pass verdict PASS  total 0.95  defects -
+  invented-citation      label fail verdict FAIL  total 0.84  defects missing_ref
+  invented-quote         label fail verdict FAIL  total 0.95  defects quote_not_in_ledger
+  partial-undisclosed    label fail verdict FAIL  total 0.95  defects partial_undisclosed
+  value-mismatch         label fail verdict FAIL  total 0.95  defects value_mismatch
+{"model": "lenient fake (0.95 on every dimension)", "fixtures": 8, "agreement": 1.0, "missed": [], "false_alarms": [], "errors": [], "judge_spend_usd": null}

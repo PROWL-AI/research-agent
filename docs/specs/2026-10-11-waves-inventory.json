@@ -521,7 +521,7 @@
         "KA-09"
       ],
       "closable_in_one_pass": false,
-      "notes": "Offline harness + planted-bad fixtures in wave 3/4 scope; the live calibration pass spends money.",
+      "notes": "Offline harness + planted-bad fixtures in wave 3/4 scope; the live calibration pass spends money. W6-T1 offline half done 2026-10-17: planted fixtures + code vetoes + harness (docs/evidence/judge-calibration); live half waits on B-042.",
       "wave": 6,
       "release": "this"
     },
@@ -540,7 +540,8 @@
       "closable_in_one_pass": false,
       "needs_operator": "spend cites the 2026-10-09 approval (~$2-3 per run) plus one durable budget row B-027",
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "notes": "W6-T1 offline half done 2026-10-17: planted fixtures + code vetoes + harness (docs/evidence/judge-calibration); live half waits on B-042."
     },
     {
       "id": "B-027",
@@ -797,13 +798,14 @@
       "id": "B-041",
       "title": "The eval judge's own LLM calls are unmetered (evals/judge.py runs without a meter): its spend is in no attempt ledger",
       "source": "wave-4 unit certification 2026-10-17 · evals/judge.py",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed — W6-T1 (judge ledger beside the run, --max-usd)"
     },
     {
       "id": "B-042",

@@ -364,7 +364,7 @@
 - **Expected result:** судья проваливает каждую planted-bad фикстуру; на размеченном наборе записано число согласия с человеком; код выхода прогона и код выхода судьи разделены.
 - **Failure outcome:** фикстура, которую судья пропустил, блокирует приёмку; судья без калибровки не используется как доказательство качества.
 - **Wave:** 6 (N-ACC, B-017)
-- **Coverage:** —
+- **Coverage:** offline half — `tests/test_judge_calibration.py`, `evals/calibrate.py` ([evidence](../evidence/judge-calibration/README.md)): a maximally lenient model still fails every planted fixture (code-proven defects veto the pass), honest fixtures pass, the judge's own spend is metered, exit codes 0/1/2. The live half (the configured judge model's agreement, a labelled set of real runs) waits for an LLM key (B-042); the status stays UNVERIFIED until it runs.
 
 ### CORE-14: Повторная отправка тем же ключом не оплачивается дважды на сервере
 - **Status:** UNVERIFIED
