@@ -358,13 +358,13 @@
 - **Status:** UNVERIFIED
 - **Actor:** оператор (P-01) при приёмке
 - **Trigger:** запуск судьи (`evals/judge.py`) на заранее испорченных фикстурах
-- **Preconditions:** набор planted-bad фикстур: выдуманная цитата, неподтверждённая цифра, скрытый конфликт, отсутствующее раскрытие.
+- **Preconditions:** набор planted-bad фикстур: выдуманная ссылка, выдуманная цитата, цифра, которой нет в процитированном утверждении, скрытый конфликт, нераскрытый неполный прогон. Цифра без ссылки снижает оценку цитирования и не является вето.
 - **Steps:**
   1. Прогнать судью на каждой фикстуре; затем на размеченном наборе.
 - **Expected result:** судья проваливает каждую planted-bad фикстуру; на размеченном наборе записано число согласия с человеком; код выхода прогона и код выхода судьи разделены.
 - **Failure outcome:** фикстура, которую судья пропустил, блокирует приёмку; судья без калибровки не используется как доказательство качества.
 - **Wave:** 6 (N-ACC, B-017)
-- **Coverage:** offline half — `tests/test_judge_calibration.py`, `evals/calibrate.py` ([evidence](../evidence/judge-calibration/README.md)): a maximally lenient model still fails every planted fixture (code-proven defects veto the pass), honest fixtures pass, the judge's own spend is metered, exit codes 0/1/2. The live half (the configured judge model's agreement, a labelled set of real runs) waits for an LLM key (B-042); the status stays UNVERIFIED until it runs.
+- **Coverage:** офлайн-половина — `tests/test_judge_calibration.py`, `evals/calibrate.py`, `scripts/mutation_check.py` ([доказательства](../evidence/judge-calibration/README.md)): модель, ставящая 0.95 всем, всё равно проваливает каждую заложенную фикстуру (фикстуры написаны вместе с проверками), честные проходят; расход судьи проверяется оценкой до вызова; код выхода 0/1/2, сбой модели — 2. Живая половина (согласие настроенной модели судьи, размеченные реальные прогоны) не выполнена: ключ модели есть, флаг `--live` — ручной шлюз оператора; статус остаётся UNVERIFIED.
 
 ### CORE-14: Повторная отправка тем же ключом не оплачивается дважды на сервере
 - **Status:** UNVERIFIED

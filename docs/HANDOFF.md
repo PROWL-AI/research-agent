@@ -8,7 +8,7 @@ Objective: close every open item of this agent in its final form, in waves
 - Plan: [`specs/2026-10-11-waves-canvas.md`](specs/2026-10-11-waves-canvas.md) — target state, seams,
   waves with exit criteria, §7a wave status, operator questions (§8).
 - Inventory: [`specs/2026-10-11-waves-inventory.json`](specs/2026-10-11-waves-inventory.json)
-  (`python3 scripts/plan/assign_waves.py --check`; 19 of 61 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
+  (`python3 scripts/plan/assign_waves.py --check`; 19 of 62 open). Board: [`evidence/backlog.md`](evidence/backlog.md).
 - **Wave 1 closed** (merged to `main` by PR #1): run-lock ownership (KA-06, B-009, B-010),
   terminal_code, structured events, honest docs, CORE scenarios, nightly CI.
 - **Wave 2 closed** on branch `wip/wave2-checkpoint-v2` (PR #2): checkpoint schema 2 — immutable
@@ -42,12 +42,19 @@ Objective: close every open item of this agent in its final form, in waves
 - **Wave 5 merged** (PR #5, `12ad137`) and installed from the merge: release `12ad13770223`, adapter probe
   29 PASS / 8 NOT_RUN / 1 FAIL — `well-known.fast` under machine load average 175–250 (B-044);
   every NOT_RUN named in VERIFICATION § Wave 5. B-037 closed (the pre-wave-3 build no longer runs).
-- **Exact next task:** wave 6, branch `feat/wave6-acceptance`. Offline first: meter the judge's LLM
-  calls through the attempt ledger (B-041), planted-bad judge fixtures and a labelled agreement check
-  (KA-G02, B-017, CORE-13); re-probe `well-known.fast` when the machine is quiet (B-044). Live
-  acceptance (KA-G03 host chain, FD-13 keys, FD-14 host update, CORE-14 server dedupe, B-040 heavy
-  runbook cap) waits on: the Fabric issuer publishing JWKS, B-042 (registry), B-043 (`prowl_` key
-  door), the operator's host update; the USD 15 wave-6 budget (Q4) is spent only after keys exist.
+- **W6-T1 offline half** (branch `feat/wave6-acceptance`): code-proven defects veto the judge, the judge's
+  spend is metered into `<run>/judge-ledger.json`, `evals/calibrate.py` + planted fixtures, `scripts/mutation_check.py`
+  (26/26). Fix round after the seam and product certifications also fixed two wave-5 seam findings (a replayed
+  resume returns its job; an operator resume keeps the chain's delegation). Evidence:
+  `evidence/judge-calibration/README.md`. The LLM key is issued into vault `prowl-research-agent` (B-042).
+- **Exact next task:** PR wave 6's offline half to `main`, merge, reinstall from the merge with
+  `python3 scripts/install-fabric-service.py --vault-project prowl-research-agent` (LLM key only; the service stays
+  degraded for Prowl), re-run `check_service.py` (B-044 under normal load). Then B-045 (status-tag check).
+- **Human gate (one line):** the live judge calibration — the operator runs
+  `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
+  in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or exports
+  `SHELEG_DEV_LIVE_AUTHORISED=live-flag` before starting the agent session so the agent may run it.
+- Live acceptance still waits on: a `prowl_` key (B-043), the hub's JWKS (KA-G03), the operator's host update (FD-14).
 - Operator decisions (canvas §8) answered 2026-10-12: Q1 PR-per-wave merges, Q2 kit in wave 5,
   Q4 USD 15, Q5 host update at wave 6, Q6 no history rewrite. Q3 closed from sources.
 - Cross-agent: B-001 (model profiles, waits on Fabric T1–T3), B-020 (the contract owner adds

@@ -202,3 +202,75 @@ async def test_completeness_and_source_quality_are_capped_by_code(tmp_path):
     run_dir = calibrate.build_run(fixture, tmp_path)
     result = await judge.judge_run(run_dir, LenientJudge(), runbooks_dir=calibrate.RUNBOOKS)
     assert result.scores["completeness"] == 0.5 and result.scores["source_quality"] == 0.5
+
+
+# ── fix round: the writer's own conventions are not defects ────────────────────
+
+PK = [dict(claim="paid keywords 300", subject="example.com paid keywords", value=300, source_tool="spyfu_get_domain_stats"),
+      dict(claim="paid keywords 900", subject="example.com paid keywords", value=900, source_tool="dataforseo_bl_summary")]
+
+
+@pytest.mark.parametrize("body", [
+    "Paid keywords: 300 [C1] vs. 900 [C2] [CONFLICT].",                       # an abbreviation is no sentence end
+    "### [CONFLICT] register\n\n- 300 paid keywords [C1]\n- 900 paid keywords [C2]",   # the runbooks' register
+    "### Conflict register\n\n- 300 [C1]\n- 900 [C2]",
+    "Two sources disagree [CONFLICT]:\n\n- 300 paid keywords [C1]\n- 900 paid keywords [C2]",  # register lead-in
+    "## Source log\n\n- 300 paid keywords — spyfu [C1], retrieved 2026-10-07.",  # provenance rows
+])
+def test_the_conflict_conventions_the_runbooks_require_are_disclosure(tmp_path, body):
+    assert _kinds("# R\n\n" + body + "\n", _ledger(tmp_path, *PK)) == []
+
+
+def test_a_conflict_hidden_behind_a_composite_unverified_block_is_still_seen(tmp_path):
+    ledger = _ledger(tmp_path, TRAFFIC, *PK)
+    assert _kinds("# R\n\nThe rival bids on 300 paid keywords [UNVERIFIED, C2].\n", ledger) == ["conflict_hidden"]
+
+
+def test_a_quoted_search_phrase_is_not_a_quotation(tmp_path):
+    ledger = _ledger(tmp_path, TRAFFIC)
+    assert _kinds('# R\n\nCapture "how to use rival" search traffic, 150,000 visits [C1].\n', ledger) == []
+
+
+def test_a_wrong_figure_beside_two_citations_is_still_a_mismatch(tmp_path):
+    links = dict(claim="1,200 referring domains", subject="example.com referring domains", value=1200,
+                 source_tool="dataforseo_bl_summary")
+    ledger = _ledger(tmp_path, TRAFFIC, links)
+    assert _kinds("# R\n\nexample.com draws 420,000 visitors [C1][C2].\n", ledger) == ["value_mismatch"]
+    assert _kinds("# R\n\nexample.com draws 150,000 visitors and 1,200 domains [C1][C2].\n", ledger) == []
+
+
+def test_the_judge_needs_no_prowl_key_and_a_model_failure_is_exit_2(tmp_path, monkeypatch, capsys):
+    fixture = json.loads((FIXTURES / "honest.json").read_text())
+    run_dir = calibrate.build_run(fixture, tmp_path)
+    monkeypatch.setattr("research_agent.runbook.RUNBOOKS_DIR", calibrate.RUNBOOKS)
+    monkeypatch.delenv("PROWL_API_KEY", raising=False)
+    monkeypatch.setenv("RESEARCH_LLM_API_KEY", "test-not-a-key")
+    monkeypatch.setenv("RESEARCH_LLM_BASE_URL", "http://127.0.0.1:9/v1")  # nothing listens
+
+    async def no_sleep(_):
+        return None
+
+    monkeypatch.setattr("research_agent.llm.asyncio.sleep", no_sleep)
+    assert judge.main(["--run", str(run_dir)]) == judge.EXIT_ERROR
+    err = capsys.readouterr().err
+    assert "judge model call failed" in err and "PROWL_API_KEY" not in err
+
+
+def test_a_run_that_turns_partial_after_the_writer_says_so():
+    from research_agent.agent.writer import disclose_partial, partial_disclosed
+
+    report = "# Teardown\n\n## Summary\n\nTraffic 150,000 [C1].\n"
+    disclosed = disclose_partial(report, "max_llm_usd=1.0 reached")
+    assert partial_disclosed(disclosed) and disclosed.startswith("# Teardown\n\n**PARTIAL RUN:** max_llm_usd=1.0")
+    assert disclose_partial(disclosed, "x") == disclosed  # idempotent
+    assert disclosed.endswith("[C1].\n")
+
+
+@pytest.mark.parametrize("sentence,expected", [
+    ("Average interest 150000 [C1] vs. last year's 60% rise.", []),  # a bare number carries the value
+    ("Engagement is 3.4% (derived: visits [C1] over followers).", []),  # the writer's derived rule
+    ("Traffic is 150,000 visits vs. 420,000 a year ago [C1].", []),  # "vs." does not end the sentence
+    ("Traffic fell 40% to a new low [C1].", ["value_mismatch"]),
+])
+def test_bare_numbers_carry_values_and_derived_figures_are_exempt(tmp_path, sentence, expected):
+    assert _kinds("# R\n\n" + sentence + "\n", _ledger(tmp_path, TRAFFIC)) == expected

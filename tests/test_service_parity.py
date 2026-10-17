@@ -406,3 +406,30 @@ def test_a_resume_respects_the_principal_and_the_operators_rejection(tmp_path, m
             rt.create(dict(request, resumeJobId=job["id"]), "again", delegation=alice)
     finally:
         store.db.close()
+
+
+def test_a_resume_replayed_with_the_same_key_returns_the_same_job(tmp_path, monkeypatch, patched_runbooks):
+    """W6 seam finding: an agent retrying research.run+resumeJobId after a lost
+    answer gets its job back, not 'already being continued'."""
+    from research_agent.service.runtime import Runtime, run_dir_name
+
+    monkeypatch.setenv("PROWL_API_KEY", "test-not-a-key")
+    monkeypatch.setenv("RESEARCH_LLM_API_KEY", "test-not-a-key")
+    store = Store(tmp_path)
+    rt = Runtime(store)
+    alice = {"principal": "urn:person:a", "caller": "caller-a.default", "chain": [], "kid": "k1", "tier": "T2"}
+    request = {"kind": "research", "runbook": "mini-teardown", "inputs": {"competitors": ["example.com"]}}
+    try:
+        first = rt.create(request, "first", delegation=alice)
+        store.transition(first["id"], "failed", "failed", error={"code": "execution-failed", "message": "x"})
+        resume = rt.create(dict(request, resumeJobId=first["id"]), "resume-key", delegation=alice)
+        again = rt.create(dict(request, resumeJobId=first["id"]), "resume-key", delegation=alice)
+        assert again["id"] == resume["id"]
+        # an operator resume of alice's job stays alice's
+        store.transition(resume["id"], "failed", "failed", error={"code": "execution-failed", "message": "x"})
+        operator = rt.create(dict(request, resumeJobId=resume["id"]), "op-key")
+        assert operator["delegation"]["caller"] == "caller-a.default"
+        # a pre-runDir resume body still maps to the run it continues
+        assert run_dir_name({"id": "pr-b", "request": {"resumeJobId": "pr-a"}}) == "pr-a"
+    finally:
+        store.db.close()

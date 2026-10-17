@@ -129,4 +129,4 @@ python -m pytest -q                              # engine + fixture suite
 ```
 
 Then one real run on a small input and `python evals/judge.py --run runs/<id>`
->= 0.7. A runbook that has never been run is a draft.
+exits 0 (PASS: weighted total >= 0.7 and no code-proven defect). A runbook that has never been run is a draft.

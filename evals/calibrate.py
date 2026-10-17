@@ -105,7 +105,7 @@ async def _amain(args: argparse.Namespace) -> int:
             from research_agent.llm import LLMClient
 
             try:
-                config = Config.from_env()
+                config = Config.from_env(require_prowl=False)  # the judge is LLM-only
             except ConfigError as exc:
                 print(f"error: {exc}", file=sys.stderr)
                 return judge.EXIT_ERROR

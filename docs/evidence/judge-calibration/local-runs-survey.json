@@ -10,8 +10,8 @@
   "claims": 455,
   "partial": true,
   "defects": {
-   "value_mismatch": 1,
-   "conflict_hidden": 13
+   "quote_not_in_ledger": 1,
+   "value_mismatch": 1
   }
  },
  {
@@ -19,24 +19,21 @@
   "claims": 222,
   "partial": false,
   "defects": {
-   "quote_not_in_ledger": 7,
-   "conflict_hidden": 2
+   "quote_not_in_ledger": 7
   }
  },
  {
   "run": "local-4",
   "claims": 149,
   "partial": false,
-  "defects": {
-   "conflict_hidden": 2
-  }
+  "defects": {}
  },
  {
   "run": "local-5",
   "claims": 185,
   "partial": false,
   "defects": {
-   "conflict_hidden": 2,
+   "conflict_hidden": 1,
    "quote_not_in_ledger": 1
   }
  },

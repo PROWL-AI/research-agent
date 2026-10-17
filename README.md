@@ -171,10 +171,13 @@ python evals/judge.py --run runs/<id>   # 5-dimension quality rubric for a finis
 python evals/calibrate.py               # the judge against planted-defect fixtures (offline; --live spends)
 ```
 
-The judge's verdict is vetoed by defects the code proves — an invented citation or quotation, a
-figure its cited claim does not carry, a conflict shown as settled, a partial run that does not say
-so — so a lenient model cannot pass them. Its own LLM calls stop at `--max-usd` (default 0.50) and
-are recorded in `<run>/judge-ledger.json`, never in the run's checkpoint.
+The judge's verdict is vetoed by defects the code proves — a citation of no claim; a quotation no
+cited claim backs; a sentence whose metric figure none of its cited claims carries (figures marked
+"derived" excepted); a conflicting claim cited where neither the line, its heading nor its register
+lead-in says CONFLICT; a partial run that does not say "partial" before its first section — so a
+lenient model cannot pass them. An uncited figure lowers the citation score instead. Each judge LLM
+call is checked by estimate against `--max-usd` (default 0.50) before it is sent and recorded in
+`<run>/judge-ledger.json`, never in the run's checkpoint. The judge needs only an LLM key.
 
 Authoring a new runbook: `docs/runbook-authoring.md`.
 Architecture decisions and inherited traps: `docs/knowledge-pack.md`.

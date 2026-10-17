@@ -32,12 +32,14 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from research_agent.agent.writer import _CITATION_BLOCK_RE, _CITATION_ID_RE, _NUMBER_RE, lint_report  # noqa: E402
+from research_agent.agent.writer import (  # noqa: E402
+    _CITATION_BLOCK_RE, _CITATION_ID_RE, _NUMBER_RE, lint_report, partial_disclosed,
+)
 from research_agent.evidence.ledger import Ledger  # noqa: E402
 from research_agent.evidence.source import is_llm_answer, is_transform  # noqa: E402
 from research_agent.evidence.store import ArtifactStore, Checkpoint  # noqa: E402
 from research_agent.evidence.store import AttemptRecord  # noqa: E402
-from research_agent.llm import LLMBudgetExceeded, LLMClient, LlmMeter  # noqa: E402
+from research_agent.llm import LLMBudgetExceeded, LLMClient, LLMError, LlmMeter  # noqa: E402
 from research_agent.runbook import Runbook, get_runbook  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -170,19 +172,80 @@ _LETTER_SCALE = {"k": 1e3, "m": 1e6, "b": 1e9}
 _SCALE = {"k": 1e3, "K": 1e3, "thousand": 1e3, "M": 1e6, "million": 1e6, "B": 1e9, "bn": 1e9, "billion": 1e9}
 
 
+_ABBREVIATION_RE = re.compile(r"\b(?:vs|e\.g|i\.e|approx|etc|cf|ca|incl|est)\.$", re.IGNORECASE)
+#: A quoted search phrase is a keyword, not a quotation of a source.
+_KEYWORD_CONTEXT_RE = re.compile(r"\b(?:keywords?|search(?:es)?|quer(?:y|ies)|terms?|phrases?|SERP)\b", re.IGNORECASE)
+
+
+def _split_line(line: str) -> list[str]:
+    parts: list[str] = []
+    for chunk in _SENTENCE_RE.split(line):
+        if parts and _ABBREVIATION_RE.search(parts[-1]):
+            parts[-1] += " " + chunk  # "300 vs. 900": one sentence
+        else:
+            parts.append(chunk)
+    return [p for p in parts if p.strip()]
+
+
 def _sentences(report_md: str) -> list[str]:
     out: list[str] = []
     for line in report_md.splitlines():
-        out.extend(s for s in _SENTENCE_RE.split(line) if s.strip())
+        out.extend(_split_line(line))
     return out
 
 
 def _cited(sentence: str) -> list[str]:
+    """Claim ids a sentence cites. An `[UNVERIFIED: …]` tombstone cites nothing;
+    the fidelity pass's composite `[UNVERIFIED, C2]` still cites C2."""
     ids: list[str] = []
     for block in _CITATION_BLOCK_RE.findall(sentence):
-        if not block.startswith("[UNVERIFIED"):
+        if not block.startswith("[UNVERIFIED:"):
             ids.extend(f"C{n}" for n in _CITATION_ID_RE.findall(block))
     return list(dict.fromkeys(ids))
+
+
+def _quotations(sentence: str) -> list[str]:
+    """Quoted text of three words or more that reads as a quotation of a source —
+    not a search phrase ("how to use Notion" search traffic)."""
+    found = []
+    for match in _QUOTE_RE.finditer(sentence):
+        quoted = match.group(1)
+        if len(quoted.split()) < 3:
+            continue
+        around = sentence[max(0, match.start() - 25):match.start()] + " " + sentence[match.end():match.end() + 25]
+        if _KEYWORD_CONTEXT_RE.search(around):
+            continue
+        found.append(quoted)
+    return found
+
+
+def _numeric(claim: Any) -> float | None:
+    try:
+        return float(str(claim.value).replace(",", "")) if claim.value is not None else None
+    except ValueError:
+        return None
+
+
+def _conflict_scopes(report_md: str) -> list[tuple[str, bool]]:
+    """Each line with whether CONFLICT is disclosed for it: on the line itself,
+    in its section heading, or in the lead-in of the list it belongs to (the
+    `[CONFLICT] register` the runbooks require). Source-log rows are a register
+    of provenance, not findings: a conflict is disclosed where it is reported."""
+    out: list[tuple[str, bool]] = []
+    heading, lead_in = "", ""
+    for line in report_md.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            heading, lead_in = stripped, ""
+            out.append((line, True))
+            continue
+        bullet = bool(re.match(r"^([-*+]|\d+[.)]|\|)\s", stripped))
+        if stripped and not bullet:
+            lead_in = stripped
+        disclosed = ("CONFLICT" in stripped.upper() or "CONFLICT" in heading.upper()
+                     or (bullet and "CONFLICT" in lead_in.upper()) or "source log" in heading.lower())
+        out.append((line, disclosed))  # a blank line keeps the lead-in: "Register:\n\n- C1 …"
+    return out
 
 
 def _figures(sentence: str) -> list[tuple[float, bool]]:
@@ -209,6 +272,12 @@ def _figures(sentence: str) -> list[tuple[float, bool]]:
             scale = _SCALE[re.search(r"(thousand|million|billion|bn)$", token.lower()).group(1)]
         figures.append((number * scale, token.endswith("%")))
     return figures
+
+
+def _numbers(sentence: str) -> list[tuple[float, bool]]:
+    """Every bare number in a sentence (outside citations and dates)."""
+    text = _DATE_RE.sub(" ", _CITATION_BLOCK_RE.sub(" ", sentence))
+    return [(float(m.group(0).replace(",", "")), False) for m in _LEADING_NUMBER_RE.finditer(text)]
 
 
 def _matches(figure: tuple[float, bool], value: float) -> bool:
@@ -252,14 +321,18 @@ def code_defects(report_md: str, ledger: Ledger, checkpoint: Checkpoint) -> list
     never a judgement call. Each one vetoes the judge's pass (W6-T1):
 
     - missing_ref — a citation names no ledger claim;
-    - quote_not_in_ledger — a sentence citing exactly one claim quotes text
-      (three words or more) and none of its quotations is backed by that
-      claim's quote or text (`_backed`);
-    - value_mismatch — a sentence citing exactly one numeric claim states
-      figures, none of which is the claim's value (1 % tolerance);
-    - conflict_hidden — a claim in status conflict is cited without CONFLICT;
-    - partial_undisclosed — a partial run that does not say so before its first
-      section (title or preamble).
+    - quote_not_in_ledger — a sentence quotes a source (three words or more, not
+      a search phrase) and none of its quotations is backed by any claim it
+      cites (`_backed`);
+    - value_mismatch — a sentence citing only numeric claims states a metric
+      figure, and no number in it is any cited claim's value (1 % tolerance);
+      a figure marked "derived" (the writer's rule) is exempt;
+    - conflict_hidden — a claim in status conflict is cited on a line whose
+      line, section heading or register lead-in does not say CONFLICT
+      (`_conflict_scopes`; Source-log rows excepted);
+    - partial_undisclosed — a partial run that does not say "partial" before its
+      first section (`writer.partial_disclosed`, the rule the orchestrator
+      enforces on report.md).
     """
     claims = {c.id: c for c in ledger.claims}
     defects: list[dict[str, str]] = []
@@ -272,32 +345,30 @@ def code_defects(report_md: str, ledger: Ledger, checkpoint: Checkpoint) -> list
 
     for ref in lint_report(report_md, ledger).missing_refs:
         add("missing_ref", ref, f"[{ref}] is not in the ledger")
-    for sentence in _sentences(report_md):
-        cited = [ref for ref in _cited(sentence) if ref in claims]
-        for ref in cited:
-            if claims[ref].status.value == "conflict" and "CONFLICT" not in sentence.upper():
-                add("conflict_hidden", ref, sentence)
-        if len(_cited(sentence)) != 1 or not cited:
+    for line, disclosed in _conflict_scopes(report_md):
+        if disclosed:
             continue
-        claim = claims[cited[0]]
-        quotations = [q for q in _QUOTE_RE.findall(sentence) if len(q.split()) >= 3]
-        if quotations and not any(_backed(q, claim) for q in quotations):
-            add("quote_not_in_ledger", claim.id, sentence)
-        try:
-            value = float(str(claim.value).replace(",", "")) if claim.value is not None else None
-        except ValueError:
-            value = None
+        for ref in _cited(line):
+            if ref in claims and claims[ref].status.value == "conflict":
+                add("conflict_hidden", ref, line)
+    for sentence in _sentences(report_md):
+        cited = [claims[ref] for ref in _cited(sentence) if ref in claims]
+        if not cited or len(cited) != len(_cited(sentence)):
+            continue  # an unknown citation is missing_ref's
+        quotations = _quotations(sentence)
+        if quotations and not any(_backed(q, c) for q in quotations for c in cited):
+            add("quote_not_in_ledger", cited[0].id, sentence)
+        values = [_numeric(c) for c in cited]
         figures = _figures(sentence)
-        if value is not None and figures and not any(_matches(f, value) for f in figures):
-            add("value_mismatch", claim.id, sentence)
-    if checkpoint.partial:
-        # The disclosure belongs before the first section: in the title or the
-        # preamble a reader meets before any finding.
-        lines = report_md.splitlines()
-        cut = next((i for i, line in enumerate(lines[1:], 1) if line.startswith("## ")), len(lines))
-        head = "\n".join(lines[:cut])
-        if "partial" not in head.lower():
-            add("partial_undisclosed", "", next((line for line in lines if line.strip()), "(empty report head)"))
+        # A metric figure (the writer lint's definition) none of the cited values
+        # matches — any number in the sentence may carry the value ("interest
+        # 36 [C18]"), and a figure marked "derived" is the writer's computed one.
+        if (figures and None not in values and "derived" not in sentence.lower()
+                and not any(_matches(f, v) for f in figures + _numbers(sentence) for v in values)):
+            add("value_mismatch", cited[0].id, sentence)
+    if checkpoint.partial and not partial_disclosed(report_md):
+        add("partial_undisclosed", "", next((line for line in report_md.splitlines() if line.strip()),
+                                            "(empty report head)"))
     return defects
 
 
@@ -432,6 +503,9 @@ async def judge_run(
         return await _judge(llm, report_md, ledger, signals, threshold, meter)
     except LLMBudgetExceeded as exc:
         raise JudgeError(f"judge budget: {exc}") from exc
+    except LLMError as exc:
+        # The model did not answer: a judge failure (exit 2), never a FAIL.
+        raise JudgeError(f"judge model call failed: {exc}") from exc
     finally:
         if meter is not None:
             llm.meter = previous
@@ -498,7 +572,7 @@ async def _amain(args: argparse.Namespace) -> int:
     from research_agent.config import Config, ConfigError
 
     try:
-        config = Config.from_env()
+        config = Config.from_env(require_prowl=False)  # the judge is LLM-only
     except ConfigError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_ERROR

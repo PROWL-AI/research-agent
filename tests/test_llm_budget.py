@@ -244,6 +244,26 @@ async def test_a_refused_repair_or_citation_pass_ends_the_run_partial(patched_ru
         "mini-teardown", BRIEF, run_id="quiet", max_llm_usd=1.0)
     assert (result.status, result.terminal_code) == ("partial", "budget_llm")
     assert result.stats["llm_budget"]["refused_stages"]
+    from research_agent.agent.writer import partial_disclosed
+
+    assert partial_disclosed((tmp_path / "runs" / "quiet" / "report.md").read_text())
+
+
+async def test_a_draft_written_as_complete_says_partial_when_its_repair_is_refused(patched_runbooks, tmp_path):
+    """W6 seam fix: the writer is told only what was partial before it wrote; a
+    repair the cap refuses afterwards still leaves report.md saying partial."""
+    from research_agent.agent.writer import partial_disclosed
+
+    provider = Provider(costs=[0.30, 0.30, 0.395], cost=0.30, plan_steps=1,
+                        report="# Report\n\n## Summary\n\nVisits are 42 [C1]. Revenue is $999 a month.\n")
+    llm = _client(provider, model_cheap="deepseek/deepseek-v4.1-flash", model_strong="xiaomi/mimo-v2.6-pro")
+    result = await Orchestrator(FakeProwl(), llm, runs_root=tmp_path / "runs").run(
+        "mini-teardown", BRIEF, run_id="quiet2", max_llm_usd=1.0)
+    assert (result.status, result.terminal_code) == ("partial", "budget_llm")
+    assert "writer" not in result.stats["llm_budget"]["refused_stages"]  # the draft was written
+    report = (tmp_path / "runs" / "quiet2" / "report.md").read_text()
+    assert report.startswith("# Report\n\n**PARTIAL RUN:** max_llm_usd") and partial_disclosed(report)
+    assert "Visits are 42 [C1]" in report
 
 
 async def test_a_replanned_run_keeps_its_cap_and_spend(patched_runbooks, tmp_path):

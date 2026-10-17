@@ -144,6 +144,32 @@ class RewriteError(Exception):
     pass
 
 
+def report_head(report_md: str) -> str:
+    """The part of a report a reader meets before any finding: the title and
+    the preamble up to the first `## ` section."""
+    lines = report_md.splitlines()
+    cut = next((i for i, line in enumerate(lines[1:], 1) if line.startswith("## ")), len(lines))
+    return "\n".join(lines[:cut])
+
+
+def partial_disclosed(report_md: str) -> bool:
+    """A partial run's report says so before its first section — the rule the
+    judge vetoes on (evals/judge.py) and the orchestrator enforces."""
+    return "partial" in report_head(report_md).lower()
+
+
+def disclose_partial(report_md: str, reason: str | None) -> str:
+    """Make a partial run's report say so: the writer is told only when the run
+    was partial before it wrote; a run that turns partial afterwards (a refused
+    repair or citation pass, a kept report) gets this deterministic line."""
+    if partial_disclosed(report_md):
+        return report_md
+    lines = report_md.splitlines()
+    title, rest = (lines[0], lines[1:]) if lines and lines[0].startswith("# ") else ("", lines)
+    note = f"**PARTIAL RUN:** {reason or 'the run stopped before completing every planned step'}."
+    return "\n".join(([title, ""] if title else []) + [note, ""] + rest) + ("\n" if report_md.endswith("\n") else "")
+
+
 def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str) -> WriterOutcome:
     """The report when no LLM budget is left for the writer: the evidence as
     gathered, every claim with its status and source — nothing synthesized."""

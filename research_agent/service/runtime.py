@@ -200,7 +200,18 @@ class Runtime:
         if not isinstance(key, str) or not 1 <= len(key) <= 128:
             raise ValueError("idempotencyKey must contain 1–128 characters")
         request = validate_request(request)
-        run_dir = self._check_resumable(request, delegation) if request.get("resumeJobId") else None
+        # A replay answers the job it created before any rule is checked again:
+        # a resume's own job would otherwise count as "already continuing" it.
+        existing = self.store.replay(request, key, delegation)
+        if existing is not None:
+            return existing
+        run_dir = None
+        if request.get("resumeJobId"):
+            run_dir = self._check_resumable(request, delegation)
+            if delegation is None:
+                # An operator's resume of a delegated job stays visible to the
+                # agent that owns the chain.
+                delegation = self.store.job(request["resumeJobId"]).get("delegation")
         if request["kind"] != "tutorial":
             try:
                 Config.from_env(require_llm=request["kind"] == "research")
@@ -383,8 +394,9 @@ def attribution_gap(job):
 
 def run_dir_name(job):
     """The run directory a job writes: its own id, or — for a resume (B-039) —
-    the root run of the chain it continues, fixed when the resume was created."""
-    return job.get("runDir") or job["id"]
+    the root run of the chain it continues, fixed when the resume was created.
+    A resume stored before `runDir` existed falls back to the job it names."""
+    return job.get("runDir") or (job.get("request") or {}).get("resumeJobId") or job["id"]
 
 
 def outcome_for(output):
