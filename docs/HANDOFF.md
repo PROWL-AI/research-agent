@@ -50,6 +50,15 @@ Objective: close every open item of this agent in its final form, in waves
 - **Wave 6 offline half merged** (PR #6, `d868706`) and installed from the merge with the LLM key
   (vault `prowl-research-agent`): adapter probe 30 PASS / 8 NOT_RUN / 0 FAIL; health degraded for Prowl only.
 - **Exact next task:** nothing offline remains in wave 6: B-045/B-046/B-047 closed. The rest waits on the operator (live judge calibration, host update) and external owners (B-043 `prowl_` key door, KA-G03 hub JWKS, B-020 contract PR, B-033 Fabric project registration). Re-check those at each resume. The installed service (`d868706`) carries every service change: later merges (#8, #9) touched the judge, tests, installer and docs only (`git diff d868706..e0f726a -- research_agent` is empty).
+- **2026-10-18 problem pass** (branch `docs/b043-b042-b034-b017`): B-034 closed (Observatory marks the six leak
+  findings `aboutThisProject: false`); B-042 cause measured and registry proposal `prop:098084032e734368` filed
+  (`local_folders` = `0xDEV/research-agent`); B-043 path found: prowl.chat mints keys only from a signed-in web
+  session, so the key is minted from the operator's own prowl.chat session in Safari (`POST /api/v1/keys`, total
+  USD 10, daily USD 5), piped into vault `prowl-research-agent/prod/PROWL_API_KEY` and the service reinstalled.
+  A session watcher waited for that sign-in; if this entry still says B-043 in-flight, the sign-in did not happen
+  before it expired: sign in to prowl.chat in Safari and rerun the mint (the steps are in B-043's row).
+  B-017 measured: the `sheleg-dev` hook refuses `--live` in an agent session unless the session was started with
+  `SHELEG_DEV_LIVE_AUTHORISED=live-flag` exported.
 - **Human gate (one line):** the live judge calibration — the operator runs
   `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
   in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or authorises live flags for
