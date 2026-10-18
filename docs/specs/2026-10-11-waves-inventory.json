@@ -884,6 +884,19 @@
       "wave": 6,
       "release": "this",
       "evidence": "closed — feat/b046-b047 (2026-10-18)"
+    },
+    {
+      "id": "B-048",
+      "title": "A plan that overruns the planner's 8k output budget kills the run before any tool is called",
+      "source": "live run accept-finance-20261018, 2026-10-18",
+      "status": "closed",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this",
+      "evidence": "closed: planner retries once at 24k on truncation; two tests (fix/b048-planner-truncation, 2026-10-18)"
     }
   ]
 }

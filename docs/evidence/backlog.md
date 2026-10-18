@@ -22,6 +22,8 @@
 
 ## Closed
 
+- **B-048 · A plan that overruns the planner's 8k output budget kills the run before any tool is called** · closed · measured live 2026-10-18 (run `accept-finance-20261018`, `xiaomi/mimo-v2.6-pro`: 12,575 tokens in, 8,000 out, `finish_reason=length`, 37 reasoning tokens in a probe, so not reasoning overhead). The planner now retries once at 24k on truncation and fails with a named reason at the ceiling (`test_a_truncated_plan_is_retried_once_with_a_larger_output_budget`, `test_a_plan_truncated_at_the_ceiling_fails_the_run_with_a_named_reason`); the first call stays 8k so the LLM cap arithmetic is unchanged, branch `fix/b048-planner-truncation`, 2026-10-18
+
 - **B-043 · No Observatory door issues `prowl_` keys** · closed for this agent · key `prowl_93cc8a…` (name `prowl-research-agent`, total USD 10, daily USD 5) minted 2026-10-18 21:04 UTC from the operator's signed-in prowl.chat session (`POST /api/v1/keys`), value piped into vault `prowl-research-agent/prod/PROWL_API_KEY` and never printed; vault value matches the minted prefix; service reinstalled from `8e6f36a` reports `ready`, `degraded: []`; `validate --online` with the key: all 14 runbooks valid, exit 0. Resource recorded with Observatory (`prop:732cfb9264524c1f`). A reusable door stays Observatory's: prowl.chat mints only from a signed-in web session, so a door needs that session or a new prowl.chat route, 2026-10-18
 
 - **B-034 · Observatory attributes 3 critical leaked-unrotated keys of slot `0xDEV/local` to this project** · closed · not this project's: `observatory_project project:prowl-research` marks all six findings `aboutThisProject: false` (2026-10-18); they belong to the `0xDEV/local` slot owner, and the attribution itself follows from B-042, 2026-10-18
