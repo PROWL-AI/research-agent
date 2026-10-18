@@ -476,3 +476,53 @@ async def test_a_billed_planner_failure_is_still_counted_after_a_replan(patched_
     cp = ArtifactStore(runs / "billed").load_checkpoint()
     assert cp.llm_cap_usd == 2.0
     assert cp.spend_usd("llm") >= 0.4  # the first planner call is still on the books
+
+
+class TruncatingPlanner(Provider):
+    """Cuts the planner's answer at `cut_below` max_tokens, like a model whose
+    plan for a 50-call runbook does not fit the first output budget (B-048)."""
+
+    def __init__(self, cut_below: int, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.cut_below = cut_below
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        if "response_format" in body and "plan" in body["messages"][-1]["content"].lower() \
+                and (body.get("max_tokens") or 0) < self.cut_below:
+            self.requests.append(body)
+            return httpx.Response(200, json={"choices": [{"message": {"content": '{"plan": [{"step": "a'},
+                                                          "finish_reason": "length"}],
+                                             "usage": {"prompt_tokens": 10, "completion_tokens": 10, "cost": 0.01}})
+        return super().__call__(request)
+
+
+def _planner_budgets(provider: Provider) -> list[int]:
+    return [b.get("max_tokens") for b in provider.requests
+            if "response_format" in b and "plan" in b["messages"][-1]["content"].lower()]
+
+
+async def test_a_truncated_plan_is_retried_once_with_a_larger_output_budget(patched_runbooks, tmp_path):
+    from research_agent.agent.orchestrator import _PLAN_ESCALATED_MAX_TOKENS, _PLAN_MAX_TOKENS
+
+    provider = TruncatingPlanner(cut_below=_PLAN_ESCALATED_MAX_TOKENS, cost=0.01, plan_steps=1)
+    result = await Orchestrator(FakeProwl(), _client(provider), runs_root=tmp_path / "runs").run(
+        "mini-teardown", BRIEF, run_id="plan-retry", max_llm_usd=5.0)
+    assert _planner_budgets(provider) == [_PLAN_MAX_TOKENS, _PLAN_ESCALATED_MAX_TOKENS]
+    assert result.terminal_code != "error"
+    planner = [a for a in ArtifactStore(tmp_path / "runs" / "plan-retry").load_checkpoint().attempts
+               if a.step_id == "planner"]
+    assert [a.outcome for a in planner][0] == "truncated" and len(planner) == 2  # both paid, both recorded
+
+
+async def test_a_plan_truncated_at_the_ceiling_fails_the_run_with_a_named_reason(patched_runbooks, tmp_path):
+    from research_agent.agent.orchestrator import OrchestratorError
+
+    provider = TruncatingPlanner(cut_below=10**9, cost=0.01, plan_steps=1)
+    with pytest.raises(OrchestratorError, match="planner output truncated"):
+        await Orchestrator(FakeProwl(), _client(provider), runs_root=tmp_path / "runs").run(
+            "mini-teardown", BRIEF, run_id="plan-ceiling", max_llm_usd=5.0)
+    assert len(_planner_budgets(provider)) == 2  # one retry, never a loop
+    checkpoint = ArtifactStore(tmp_path / "runs" / "plan-ceiling").load_checkpoint()
+    assert checkpoint.status == "failed" and checkpoint.terminal_code == "error"
+    assert "planner" in checkpoint.stop_reason and "max_tokens=24000" in checkpoint.stop_reason

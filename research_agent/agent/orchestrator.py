@@ -56,7 +56,7 @@ from research_agent.evidence.store import (
     StepRecord,
     make_step_id,
 )
-from research_agent.llm import LLMBudgetExceeded, LLMClient, LlmMeter
+from research_agent.llm import LLMBudgetExceeded, LLMClient, LLMError, LlmMeter
 from research_agent.prowl_client import ProwlClient, ProwlError
 from research_agent.runbook import Runbook, RunbookInput, get_runbook
 
@@ -280,6 +280,13 @@ def _validate_indexed(
         valid[index] = item
     return valid, dropped
 
+
+# A plan for a 50-90 call runbook carries every step's arguments: a verbose
+# strong model overruns 8k tokens (B-048, measured live 2026-10-18 with
+# xiaomi/mimo-v2.6-pro: 8000 completion tokens, finish_reason=length). A
+# truncated JSON plan is unusable, so a truncation retries once, larger.
+_PLAN_MAX_TOKENS = 8_000
+_PLAN_ESCALATED_MAX_TOKENS = 24_000
 
 _PLAN_INSTRUCTIONS = """\
 You are the planner for a research run. Produce an ordered execution plan as JSON:
@@ -695,16 +702,31 @@ class Orchestrator:
             f"## Allowlisted tool schemas (live catalog)\n{json.dumps(schemas, indent=2, default=str)}\n\n"
             "Output the plan JSON now."
         )
-        text = await self.llm.complete(
-            [
-                {"role": "system", "content": runbook.body + "\n\n" + _PLAN_INSTRUCTIONS},
-                {"role": "user", "content": user},
-            ],
-            tier="strong",
-            json_mode=True,
-            max_tokens=8000,
-            stage="planner",
-        )
+        messages = [
+            {"role": "system", "content": runbook.body + "\n\n" + _PLAN_INSTRUCTIONS},
+            {"role": "user", "content": user},
+        ]
+        try:
+            text = await self.llm.complete(
+                messages, tier="strong", json_mode=True, max_tokens=_PLAN_MAX_TOKENS, stage="planner",
+            )
+        except LLMError as exc:
+            if exc.retryable or exc.finish_reason != "length":
+                raise
+            log.warning("planner output truncated at max_tokens=%d; retrying with max_tokens=%d",
+                        _PLAN_MAX_TOKENS, _PLAN_ESCALATED_MAX_TOKENS)
+            try:
+                text = await self.llm.complete(
+                    messages, tier="strong", json_mode=True, max_tokens=_PLAN_ESCALATED_MAX_TOKENS,
+                    stage="planner",
+                )
+            except LLMError as again:
+                if again.retryable or again.finish_reason != "length":
+                    raise
+                raise OrchestratorError(
+                    f"planner output truncated at max_tokens={_PLAN_ESCALATED_MAX_TOKENS} after one retry "
+                    f"(first at {_PLAN_MAX_TOKENS}); the plan does not fit the model's output budget"
+                ) from again
         payload = _parse_json_object(text)
         raw_plan = payload.get("plan") if isinstance(payload, dict) else None
         if not isinstance(raw_plan, list):
