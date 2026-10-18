@@ -63,7 +63,7 @@ Objective: close every open item of this agent in its final form, in waves
   `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
   in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or authorises live flags for
   the agent's session (an operator setting on this machine) so the agent may run it.
-- Live acceptance still waits on: a `prowl_` key (B-043), the hub's JWKS (KA-G03), the operator's host update (FD-14).
+- Live acceptance: the `prowl_` key is in place (B-043 closed 2026-10-18, service `ready`); still waits on the hub's JWKS (KA-G03); FD-14 host is 0.7.12 and the native panel rendered the service, a dashboard-tab capture is still owed (take it only when the host shows this service; never commit a capture of another service).
 - Operator decisions (canvas §8) answered 2026-10-12: Q1 PR-per-wave merges, Q2 kit in wave 5,
   Q4 USD 15, Q5 host update at wave 6, Q6 no history rewrite. Q3 closed from sources.
 - Cross-agent: B-001 (model profiles, waits on Fabric T1–T3), B-020 (the contract owner adds

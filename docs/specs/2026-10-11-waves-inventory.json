@@ -567,7 +567,8 @@
       "closable_in_one_pass": false,
       "needs_operator": "host update 0.6.7→0.7.1 is operator administration; a visible native-panel look",
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "partial 2026-10-18: host is 0.7.12 (>= 0.7.1, the update is done); the service page rendered in the native panel (state tab, 23:05 CEST); a dashboard-tab capture is pending a moment when the operator is not using the host"
     },
     {
       "id": "KA-G03",
@@ -823,13 +824,14 @@
       "id": "B-043",
       "title": "No Observatory door issues prowl_ keys (prowl.chat POST /api/v1/keys with an account JWT)",
       "source": "wave-5 build 2026-10-17 · prowl.chat /api/v1/keys",
-      "status": "open — external",
+      "status": "closed",
       "area": "service",
       "node": "N-EXT",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": null,
-      "release": "external"
+      "release": "external",
+      "evidence": "closed: key minted from the operator's prowl.chat session into vault prowl-research-agent/prod; validate --online 14/14 (2026-10-18)"
     },
     {
       "id": "B-044",
