@@ -707,14 +707,15 @@
       "id": "B-034",
       "title": "Observatory attributes 3 critical leaked-unrotated keys (CIVITAI_API_TOKEN, HF_TOKEN, REPLICATE_API_TOKEN, slot 0xDEV/local, seen 2026-09-14) to this project; none is used by research-agent",
       "source": "observatory_findings project:prowl-research 2026-10-16",
-      "status": "open — external",
+      "status": "closed",
       "area": "external",
       "node": "N-EXT",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "notes": "Owner: the 0xDEV/local slot (not this repo). Rotate through Observatory doors and settle with vault.py settle; or re-scope the finding away from prowl-research.",
       "wave": null,
-      "release": "external"
+      "release": "external",
+      "evidence": "closed: Observatory marks the six findings aboutThisProject false; owner is the 0xDEV/local slot (2026-10-18)"
     },
     {
       "id": "B-035",
