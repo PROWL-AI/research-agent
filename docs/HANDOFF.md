@@ -59,6 +59,11 @@ Objective: close every open item of this agent in its final form, in waves
   before it expired: sign in to prowl.chat in Safari and rerun the mint (the steps are in B-043's row).
   B-017 measured: the `sheleg-dev` hook refuses `--live` in an agent session unless the session was started with
   `SHELEG_DEV_LIVE_AUTHORISED=live-flag` exported.
+- **2026-10-18 live runs:** with the `prowl_` key in place, `accept-finance-20261018` died at the planner (8k plan
+  truncated, B-048, fixed in PR #13); `accept-finance-20261018b` on the fix planned and dispatched, then stopped after
+  3 of 44 steps when one required tool returned no results (B-049), and cheap-tier citation checks returned null
+  content (B-050). LLM spend USD 0.03, tool spend USD 0.021. Service reinstalled from `616ddc4`: `ready`, `degraded: []`.
+  **Exact next task: B-049** (decide and implement the step-failure policy, then rerun finance acceptance), then B-050.
 - **Human gate (one line):** the live judge calibration — the operator runs
   `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
   in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or authorises live flags for
