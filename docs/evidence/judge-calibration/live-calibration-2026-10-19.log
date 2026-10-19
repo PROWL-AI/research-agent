@@ -1,0 +1,13 @@
+# evals/calibrate.py --live, run by the operator on 2026-10-19 in this checkout (main b70cb4d),
+# key from vault prowl-research-agent/prod/RESEARCH_LLM_API_KEY; judge threshold 0.7.
+  hidden-conflict        label fail verdict FAIL  total 0.74  defects conflict_hidden
+  honest-conflict        label pass verdict PASS  total 0.92  defects -
+  honest-partial         label pass verdict PASS  total 0.81  defects -
+  honest-verified        label pass verdict PASS  total 0.88  defects -
+  honest                 label pass verdict PASS  total 0.87  defects -
+  invented-citation      label fail verdict FAIL  total 0.51  defects missing_ref
+  invented-quote         label fail verdict FAIL  total 0.57  defects quote_not_in_ledger
+  partial-undisclosed    label fail verdict FAIL  total 0.62  defects partial_undisclosed
+  value-mismatch         label fail verdict FAIL  total 0.45  defects value_mismatch
+  verified-mislabel      label fail verdict FAIL  total 0.76  defects status_mislabel
+{"model": "anthropic/claude-haiku-5.5", "fixtures": 10, "agreement": 1.0, "missed": [], "false_alarms": [], "errors": [], "judge_spend_usd": 0.007708}

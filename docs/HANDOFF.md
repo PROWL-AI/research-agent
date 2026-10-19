@@ -64,6 +64,7 @@ Objective: close every open item of this agent in its final form, in waves
   3 of 44 steps when one required tool returned no results (B-049), and cheap-tier citation checks returned null
   content (B-050). LLM spend USD 0.03, tool spend USD 0.021. Service reinstalled from `616ddc4`: `ready`, `degraded: []`.
   **Exact next task: B-049** (decide and implement the step-failure policy, then rerun finance acceptance), then B-050.
+- **2026-10-19 judge calibration (fixture half):** run by the operator, `anthropic/claude-haiku-5.5` agreed with all 10 fixture labels, no false alarms, USD 0.0077; two planted fixtures fail only through the code veto (evidence in `evidence/judge-calibration/`). The gate line below is done for the fixtures; agreement with a person on real runs waits on B-049.
 - **Human gate (one line):** the live judge calibration — the operator runs
   `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
   in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or authorises live flags for
