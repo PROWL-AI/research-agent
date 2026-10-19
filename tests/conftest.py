@@ -65,6 +65,9 @@ class FakeProwl:
         self.list_tools_calls = 0
         self.cost_per_call: float | None = None
         self.fail_on: set[str] = set()
+        # fail_on refusals that every later call would get too (an empty wallet,
+        # a forbidden key): they stop the run instead of one step (B-049).
+        self.fail_stops_run = False
         # tool name -> refusal envelope: simulates what ProwlClient._invoke
         # raises when the server answers {success: false, error_class: ...}
         # with MCP isError=false.
@@ -102,14 +105,21 @@ class FakeProwl:
         if name in self.error_envelopes:
             from research_agent.prowl_client import ToolCallError
 
+            from research_agent.prowl_client import STOPPING_ERROR_CLASSES
+
             envelope = self.error_envelopes[name]
             error_class = envelope.get("error_class", "unknown_error")
             detail = envelope.get("error", "")
-            raise ToolCallError(f"prowl_call_tool: {error_class}: {detail}")
+            refused = ToolCallError(f"prowl_call_tool: {error_class}: {detail}")
+            refused.error_class = error_class  # as ProwlClient._invoke sets them
+            refused.stops_run = error_class in STOPPING_ERROR_CLASSES
+            raise refused
         if name in self.fail_on:
             from research_agent.prowl_client import ToolCallError
 
-            raise ToolCallError(f"{name}: simulated failure")
+            refused = ToolCallError(f"{name}: simulated failure")
+            refused.stops_run = self.fail_stops_run
+            raise refused
         if self.cost_per_call is not None:
             self.cost_usd = (self.cost_usd or 0.0) + self.cost_per_call
         return {"tool": name, "rows": [{"value": 42}]}

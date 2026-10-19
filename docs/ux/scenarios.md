@@ -206,6 +206,7 @@
 | CORE-14 | Повторная отправка тем же ключом не оплачивается дважды на сервере | 6 | UNVERIFIED |
 | CORE-15 | Вызов с токеном делегирования: проверка, отказ, запись цепочки | 5 | PASS@198a227 |
 | CORE-16 | Продолжение завершившегося задания сервиса без повторной оплаты | 5 | PASS@d77deeb |
+| CORE-17 | Отказ инструмента по одному шагу не останавливает прогон | 6 | UNVERIFIED |
 
 ### CORE-01: Запуск до терминального состояния (CLI, stdio MCP)
 - **Status:** PASS@583f1d1
@@ -402,4 +403,16 @@
 - **Failure outcome:** отказ при создании, с причиной: неизвестный id; чужой runbook или другие входные данные; задание, которое ждёт решения или работает; прогон, который уже закончен; задание, отклонённое оператором; прогон, который уже продолжает другое задание; задание другого принципала — `scope-not-granted`.
 - **Wave:** 5 (N-FAB, B-039)
 - **Coverage:** `tests/test_service_parity.py::test_a_failed_service_job_is_resumed_without_paying_again`, `::test_a_resume_respects_the_principal_and_the_operators_rejection`, `::test_a_resume_replayed_with_the_same_key_returns_the_same_job`
+
+### CORE-17: Отказ инструмента по одному шагу не останавливает прогон
+- **Status:** UNVERIFIED
+- **Actor:** оператор (P-01); вызывающий агент
+- **Trigger:** сервер Prowl отвечает определённым отказом на один шаг: «нет результатов», `not_found`, `provider_error`, `validation`
+- **Preconditions:** нет
+- **Steps:**
+  1. Запустить прогон, в плане которого один обязательный шаг получит такой отказ.
+- **Expected result:** шаг становится `failed` с причиной сервера (необязательный: `skipped_on_error`); воркер берёт следующий шаг, следующие сегменты выполняются. Прогон заканчивается `partial` с `terminal_code=step_failed`, а `stop_reason` перечисляет шаги, которые ничего не нашли, ещё до того, как writer начинает писать, поэтому отчёт говорит об этом. Продолжение повторяет только упавшие обязательные шаги и не платит за выполненные.
+- **Failure outcome:** прогон останавливается, как раньше: пустой кошелёк Prowl (`insufficient_funds`), ключ, который сервер не пускает (`forbidden`), локальный отказ сервиса (лимит вызовов, журнал недоступен), неизвестный исход отправки (`outcome_unknown`), пять отказов подряд в одном воркере, любой бюджет. Неначатые шаги остаются `pending`.
+- **Wave:** 6 (N-ACC, B-049)
+- **Coverage:** `tests/test_step_failure_policy.py` (9 тестов), `tests/test_orchestrator.py::test_a_refused_step_does_not_stop_the_run_and_reaches_the_writer`
 

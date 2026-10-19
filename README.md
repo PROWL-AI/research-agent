@@ -196,6 +196,12 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   evidence ledger and runs citation repair/verification, but this is not a
   guarantee that every fact is true or has two independent sources. Inspect
   the report's verification disclosures and source evidence before relying on it.
+- **One refused step does not end the run.** A tool that answers "no results", "not found" or a
+  provider error marks that step `failed` (or `skipped_on_error` when the plan marked it optional) with the
+  server's reason, and the run goes on; it ends `partial` / `step_failed`, and the report names the steps that
+  found nothing. What still stops the run: an empty Prowl wallet (`insufficient_funds`), a key the server does
+  not let in (`forbidden`), the service's own call limit or an unavailable call journal, a call whose outcome is
+  unknown, five refusals in a row in one worker, and every budget. A resume re-runs only the failed required steps.
 - Runbooks declare their **tool allowlist** and **budget**
   (`max_tool_calls` / `max_usd` / `max_minutes`). On budget exhaustion the agent
   emits a partial report that marks what is missing — it never fails silently.

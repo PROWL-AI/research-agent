@@ -541,6 +541,17 @@ class Orchestrator:
             store.save_checkpoint(checkpoint)
         if planned:
             await self._execute(runbook, checkpoint, store, ledger, started_monotonic)
+            refused = [s for s in checkpoint.steps
+                       if s.state == FAILED and not s.on_error_skip and not (s.reason or "").startswith("raw_write")]
+            if refused and checkpoint.stop_reason is None:
+                # The workers went on past these refusals (B-049); the run still
+                # ends partial/step_failed, and the writer is told which steps
+                # found nothing before it writes.
+                named = "; ".join(f"'{s.step}': {(s.reason or '')[:160]}" for s in refused[:5])
+                more = f" (+{len(refused) - 5} more)" if len(refused) > 5 else ""
+                checkpoint.stop_reason = f"{len(refused)} required step(s) failed and the run went on: {named}{more}"
+                checkpoint.partial = True
+                store.save_checkpoint(checkpoint)
 
         evidence_incomplete = any(
             s.state in (RAW_SAVED, OUTCOME_UNKNOWN) or (s.state == FAILED and (s.reason or "").startswith("raw_write"))

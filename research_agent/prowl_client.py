@@ -46,8 +46,20 @@ class ProwlError(Exception):
     cost_usd: float | None = None
 
 
+#: Server error classes that will refuse every later call the same way: an empty
+#: wallet, a key the server does not let in (prowl-app `mcp_server/tool_errors.py`).
+#: Any other refusal is about one request and is evidence of absence (B-049).
+STOPPING_ERROR_CLASSES = frozenset({"insufficient_funds", "forbidden"})
+
+
 class ToolCallError(ProwlError):
     """A definite refusal: the call was answered (or never left the process)."""
+
+    #: The server's error class, when the refusal carried one.
+    error_class: str | None = None
+    #: True when every later call would be refused the same way, so the run
+    #: stops instead of walking the rest of its plan (B-049).
+    stops_run: bool = False
 
 
 class DispatchOutcomeUnknown(ProwlError):
@@ -233,6 +245,8 @@ class ProwlClient:
                 log.warning("prowl refused %s: %s", prowl_tool, record.error)
             error = ToolCallError(f"{prowl_tool}: {record.error[:300]}")
             error.cost_usd = record.cost_usd
+            error.error_class = error_class
+            error.stops_run = error_class in STOPPING_ERROR_CLASSES
             raise error
 
         if result.isError:
