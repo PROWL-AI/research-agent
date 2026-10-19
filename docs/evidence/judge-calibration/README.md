@@ -3,8 +3,7 @@
 Packet: [W6-T1](../../specs/waves/W6-T1-judge-calibration.md). Scenario: CORE-13 in
 [`docs/ux/scenarios.md`](../../ux/scenarios.md). This page proves that the judge's **code checks** reject
 planted defects. It is not a calibration of a judge model: the fixtures were written with the checks
-(in-sample), and the model in the offline run is a constant fake. Calibration — the configured judge
-model's agreement with labels, then with a person on real runs — is the live half, still NOT_RUN.
+(in-sample), and the model in the offline run is a constant fake. The configured judge model's agreement with the fixture labels was measured live on 2026-10-19 (table below); its agreement with a person on real runs is still NOT_RUN.
 
 | Gate | Result | Evidence |
 |---|---|---|
@@ -13,8 +12,8 @@ model's agreement with labels, then with a person on real runs — is the live h
 | The judge's own spend is checked by estimate before each call and recorded beside the run | PASS (offline, mocked provider) | `test_the_judge_spend_is_recorded_beside_the_run_not_in_it`, `test_the_judge_refuses_to_spend_above_its_ceiling` |
 | A model that does not answer is a judge error (exit 2), and the judge needs no Prowl key | PASS (offline, unreachable provider) | `test_the_judge_needs_no_prowl_key_and_a_model_failure_is_exit_2` |
 | The checks on real reports | surveyed, see below | [survey](local-runs-survey.json); `python evals/survey_runs.py` |
-| The configured judge model on the fixtures (`evals/calibrate.py --live`) | NOT_RUN — the LLM key exists (vault `prowl-research-agent/prod/RESEARCH_LLM_API_KEY`, USD 15 monthly ceiling), but a `--live` flag is a manual gate on the operator's machine | the operator runs it, or authorises live flags for the agent's session; command in [HANDOFF](../../HANDOFF.md) |
-| Labelled agreement with a person on real runs | NOT_RUN — needs live runs, which need a `prowl_` key (B-043) | KA-G02 live half |
+| The configured judge model on the fixtures (`evals/calibrate.py --live`) | PASS, 2026-10-19: `anthropic/claude-haiku-5.5`, agreement 1.0 on 10 fixtures (6 planted fail, 4 honest pass), no false alarms, judge spend USD 0.0077. The model's own totals: honest 0.81 to 0.92 (all above the 0.7 threshold, so the model raises no false alarm); planted 0.45 to 0.76, so the model alone rejects 4 of 6, and `hidden-conflict` (0.74) and `verified-mislabel` (0.76) fail only through the code checks' veto. Fixtures are in-sample (written with the checks) | [live run](live-calibration-2026-10-19.log), run by the operator |
+| Labelled agreement with a person on real runs | NOT_RUN: the `prowl_` key exists since 2026-10-18 (B-043 closed), but a live run stops after 3 of 44 steps (B-049), so there is no complete real report to label yet | KA-G02 live half |
 
 The judge's ceiling (`--max-usd`, default 0.50) is a check of each call's **estimate** before it is
 sent, not a hard ceiling: an unlisted `RESEARCH_JUDGE_MODEL` is estimated at the top price

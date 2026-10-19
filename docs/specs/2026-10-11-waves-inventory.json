@@ -515,6 +515,7 @@
       "area": "evals",
       "node": "N-ACC",
       "blocked_by": [
+        "B-049",
         "KA-07",
         "KA-08",
         "KA-09"
@@ -522,7 +523,8 @@
       "closable_in_one_pass": false,
       "notes": "Offline harness + planted-bad fixtures in wave 3/4 scope; the live calibration pass spends money. W6-T1 offline half done 2026-10-17: planted fixtures + code vetoes + harness (docs/evidence/judge-calibration); live half waits on B-042.",
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "fixture half PASS 2026-10-19 (agreement 1.0, 10 fixtures, USD 0.0077); person agreement waits on B-049"
     },
     {
       "id": "KA-G02",
