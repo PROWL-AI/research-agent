@@ -974,6 +974,7 @@ class Orchestrator:
             tier="cheap",
             max_tokens=2000,
             stage="transform",
+            reasoning=False,  # B-050: the cheap tier's reasoning can spend the whole budget
         )
 
     def _budget_stop_reason(self, budget: Any, checkpoint: Checkpoint) -> str | None:

@@ -2,8 +2,9 @@
 
 Live run accept-finance-20261018b executed 3 of 44 steps: its first required step
 was answered «no results» and the worker, and every later segment, stopped. A
-refusal that will repeat for every call (an empty wallet, a forbidden key, the
-service's own limit) or an unknown outcome still stops; one empty answer does not.
+refusal that will repeat for every call (an empty wallet, the service's own limit),
+five refused required steps in a row, or an unknown outcome still stops; one empty
+answer does not, and neither does `forbidden` (the server sends it per tool too).
 """
 
 from __future__ import annotations
@@ -281,3 +282,31 @@ async def test_an_llm_budget_stop_after_a_refusal_still_names_the_llm_budget(loo
     await Orchestrator(prowl, llm, runs_root=runs).run("policy-lookup", BRIEF, run_id="llmcap")
     report = (runs / "llmcap" / "report.md").read_text()
     assert "max_llm_usd=" in report and "s0-empty.com" in report
+
+
+async def test_the_writer_does_not_call_a_lost_raw_or_a_transform_a_refusal(patched_runbooks, tmp_path):
+    from research_agent.agent.writer import write_report
+
+    captured = {}
+
+    class Capture(FakeLLM):
+        async def complete(self, messages, tier="cheap", json_mode=False, **kwargs):
+            captured.setdefault("system", messages[0]["content"])
+            return "# Report (partial)\n\nNothing [C1].\n"
+
+    from research_agent.evidence.ledger import Ledger
+    from research_agent.runbook import get_runbook
+
+    steps = [
+        {"step": "quote", "tool": TOOL, "state": "failed", "reason": "step 'quote' failed: not_found: no data"},
+        {"step": "page", "tool": TOOL, "state": "failed", "reason": "raw_write: disk full"},
+        {"step": "synthesis", "tool": "transform", "state": "failed", "reason": "transform failed: boom"},
+        {"step": "later", "tool": TOOL, "state": "skipped_budget", "reason": "max_tool_calls=2"},
+    ]
+    runbook = get_runbook("mini-teardown")
+    await write_report(Capture(), runbook, Ledger(tmp_path / "ledger.json"), BRIEF, partial=True, skipped_steps=steps)
+    note = captured["system"].split("## PARTIAL RUN", 1)[1]
+    refused_line = next(line for line in note.splitlines() if "refused by the data source" in line)
+    assert "quote" in refused_line and "page" not in refused_line and "synthesis" not in refused_line
+    assert "did not run" in note and "later" in note
+    assert "did not complete" in note and "raw_write" in note and "synthesis (failed)" in note

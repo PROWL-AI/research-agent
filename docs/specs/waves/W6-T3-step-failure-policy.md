@@ -21,7 +21,7 @@ segment (`dataforseo_serp_google_finance_quote`) had returned the quote. One emp
 | `research_agent/prowl_client.py:43-56,217-238` | `ToolCallError` (definite), `DispatchOutcomeUnknown` (maybe executed); a refusal envelope carries `error_class` |
 | prowl-app `mcp_server/tool_errors.py:21-48`, `mcp_server/tools.py:1472,1520,1614,1621` (`4328ad09`) | the server's error classes; only `insufficient_funds` repeats for every later call: `forbidden` is also sent for one provider's credentials, a denylisted tool or one tool outside the key's scope |
 | `research_agent/service/runtime.py:67,73` | local refusals before dispatch: the service call limit, an unavailable call journal |
-| `research_agent/evidence/terminal.py` | closed terminal codes; `step_failed` already means "a step failed hard" |
+| `research_agent/evidence/terminal.py` | closed terminal codes; `step_failed` meant "a step failed hard"; restated by this change |
 | `docs/ux/scenarios.md` CORE-01…16 | no scenario covers a refused step; CORE-11 covers lost evidence |
 | retro, verification ledger, code graph | none found in this repository |
 
@@ -65,11 +65,11 @@ added three; the fix round implements them with tests in `tests/test_step_failur
 |---|---|---|
 | REQ-1 | A definite refusal of a required data step marks it `failed` with the reason; the worker continues and later segments run | `test_a_refused_required_step_does_not_stop_the_run` |
 | REQ-2 | An optional step's refusal stays `skipped_on_error`; a run whose only failures are optional ends `complete` | existing `test_on_error_skip_inside_worker` |
-| REQ-3 | `insufficient_funds`, `forbidden` and the service's local refusals stop the worker and the later segments | `test_a_refusal_that_repeats_for_every_call_still_stops_the_run` |
+| REQ-3 | `insufficient_funds` and the service's local refusals stop the worker and the later segments (`forbidden` fails one step, D2') | `test_a_refusal_that_repeats_for_every_call_still_stops_the_run` |
 | REQ-4 | An unknown dispatch outcome still stops the worker (unchanged) | existing outcome-unknown tests (`test_ka_contracts.py`) |
-| REQ-5 | Five refusals in a row stop the worker | `test_five_refusals_in_a_row_stop_the_worker` |
+| REQ-5 | Five refusals of required steps in a row, across the run, stop it (D3') | `test_five_refusals_in_a_row_stop_the_worker` |
 | REQ-6 | A failed required step makes the run `partial`/`step_failed`, with the failed steps named in `stop_reason` before the writer runs | `test_a_refused_required_step_does_not_stop_the_run` |
-| REQ-7 | Resume re-runs only the failed required steps, never a completed one | `test_resume_after_a_refused_step_runs_only_that_step` |
+| REQ-7 | Resume asks every failed step again (D5'), never a completed one | `test_resume_after_a_refused_step_runs_only_that_step` |
 | REQ-8 | Docs: CORE-17 scenario, README "How it works", board B-049 and the inventory | `docs/ux/lint.py` where present; review |
 | REQ-9 | Live: the finance acceptance run on the fix executes past its first refused step | live run receipt in the board |
 | REQ-10 | D2' to D8 | `test_forbidden_fails_one_step_and_the_run_goes_on`, `test_optional_refusals_neither_count_nor_stop`, `test_the_refusal_cap_is_shared_by_every_worker`, `test_a_budget_stop_after_a_refusal_keeps_its_code_and_names_the_refusal`, `test_a_failed_optional_step_after_a_stopping_refusal_runs_again_on_resume`, `test_the_writer_is_told_which_steps_were_refused_and_why`, `test_a_transform_is_told_which_steps_before_it_were_refused`, `test_an_llm_budget_stop_after_a_refusal_still_names_the_llm_budget` |
@@ -77,8 +77,8 @@ added three; the fix round implements them with tests in `tests/test_step_failur
 ## Plan
 
 1. Tests for REQ-1, 3, 5, 6, 7 (watched failing on `eb31bd3`).
-2. `ToolCallError.stops_run` (class default False); the client sets it for `insufficient_funds` and
-   `forbidden`, the service runtime for its local refusals. `error_class` kept on the error.
+2. `ToolCallError.stops_run` (class default False); the client sets it for `insufficient_funds`
+   (D2'), the service runtime for its local refusals. `error_class` kept on the error.
 3. Worker: a definite refusal that does not stop the run records the step and continues; a stopping one,
    or the fifth in a row, keeps today's stop.
 4. Orchestrator: after execution, a run with failed required steps and no stop reason records
