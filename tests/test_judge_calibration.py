@@ -459,3 +459,26 @@ def test_only_a_currency_letter_or_scale_word_scales_a_unit(tmp_path, unit, sent
 def test_a_status_legend_with_tags_is_not_a_register(tmp_path, legend):
     body = legend + "\n\n- 300 paid keywords [C1]\n- 900 paid keywords [C2]"
     assert _kinds("# R\n\n" + body + "\n", _ledger(tmp_path, *PK)) == ["conflict_hidden", "conflict_hidden"]
+
+
+async def test_a_judge_answer_cut_at_max_tokens_is_asked_once_more_larger(tmp_path):
+    # B-056: the judge's own call was cut at 2000 tokens on a real report (exit 2).
+    from research_agent.llm import LLMError
+
+    class CutOnce(LenientJudge):
+        def __init__(self) -> None:
+            super().__init__()
+            self.budgets = []
+
+        async def complete(self, messages, tier="cheap", json_mode=False, **kwargs):
+            self.budgets.append(kwargs.get("max_tokens"))
+            if len(self.budgets) == 1:
+                raise LLMError("LLM output truncated at max_tokens (finish_reason='length')",
+                               retryable=False, finish_reason="length")
+            return await super().complete(messages, tier, json_mode, **kwargs)
+
+    fixture = json.loads((FIXTURES / "honest.json").read_text())
+    run_dir = calibrate.build_run(fixture, tmp_path)
+    llm = CutOnce()
+    result = await judge.judge_run(run_dir, llm, runbooks_dir=calibrate.RUNBOOKS)
+    assert result.passed and llm.budgets == [2000, 6000]

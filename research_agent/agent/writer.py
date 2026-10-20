@@ -37,7 +37,12 @@ _ASSUMPTION_MARKER = "(target, assumption — not data)"
 _UNVERIFIED_MARKER = "[UNVERIFIED"
 _MAX_REPAIR_PASSES = 3
 _DRAFT_MAX_TOKENS = 8000
-_DRAFT_ESCALATED_MAX_TOKENS = 12_000
+#: B-052: a 44-step finance report on xiaomi/mimo-v2.6-pro (16,258 tokens in) was cut
+#: at both 8000 and 12000; the second budget matches the planner's escalation.
+_DRAFT_ESCALATED_MAX_TOKENS = 24_000
+#: A repair pass rewrites the whole report, so it gets the draft's ceiling, not
+#: the first budget (it was cut at 8000 on the same run and kept the draft).
+_REPAIR_MAX_TOKENS = _DRAFT_ESCALATED_MAX_TOKENS
 
 WRITER_SYSTEM_TEMPLATE = """\
 You are the writer for a research run. Write the final markdown report.
@@ -410,7 +415,7 @@ async def repair_report(
     return await llm.complete(
         [{"role": "system", "content": system}, {"role": "user", "content": user}],
         tier="strong",
-        max_tokens=8000,
+        max_tokens=_REPAIR_MAX_TOKENS,
         temperature=0.2,
         stage="repair",
     )

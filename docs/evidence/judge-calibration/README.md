@@ -7,7 +7,7 @@ planted defects. It is not a calibration of a judge model: the fixtures were wri
 
 | Gate | Result | Evidence |
 |---|---|---|
-| A lenient model (0.95 on every dimension) fails every planted-defect fixture (in-sample, author-written) | PASS — 6 / 6 planted fail, 4 / 4 honest pass | [offline run](offline-calibration.log); `tests/test_judge_calibration.py` |
+| A lenient model (0.95 on every dimension) fails every planted-defect fixture (in-sample, author-written) | PASS: 6 / 6 planted fail, 5 / 5 honest pass (the fifth, `honest-real-shapes`, holds the four honest shapes a real report was falsely flagged for, B-055) | [offline run](offline-calibration.log); `tests/test_judge_calibration.py` |
 | Each defence is load-bearing | 46 / 46 planted mutations killed | [mutations](mutations.log); `python scripts/mutation_check.py` |
 | The judge's own spend is checked by estimate before each call and recorded beside the run | PASS (offline, mocked provider) | `test_the_judge_spend_is_recorded_beside_the_run_not_in_it`, `test_the_judge_refuses_to_spend_above_its_ceiling` |
 | A model that does not answer is a judge error (exit 2), and the judge needs no Prowl key | PASS (offline, unreachable provider) | `test_the_judge_needs_no_prowl_key_and_a_model_failure_is_exit_2` |
@@ -19,6 +19,17 @@ The judge's ceiling (`--max-usd`, default 0.50) is a check of each call's **esti
 sent, not a hard ceiling: an unlisted `RESEARCH_JUDGE_MODEL` is estimated at the top price
 (`research_agent/pricing.py`), which can refuse a large report at the default. With the default judge
 model a judging of the largest local report estimates at about USD 0.004.
+
+## False positives found on a real report (B-055, 2026-10-20)
+
+On the first complete live report (`accept-finance-20261020b`) the checks raised 19 defects; 15 were false. Fixed and
+pinned by the `honest-real-shapes` fixture: a signed figure (`-1.06%`, `DKK -14.7 bn`: the number patterns drop the minus,
+so the sign is not compared); a figure stated in a numeric claim's text (`+21%` beside a stored absolute value); a table
+figure in its column's unit (12,000 in a `DKK m` column for a 12-billion claim, allowed only for figures of 1,000 or more,
+so a lost scale letter like `$4` for `$4B` still fails); a conflict table whose header row carries `[CONFLICT]`. Thirteen
+of the 19 came from claims about the search request itself (timestamps, detected locations), which extraction no
+longer sees (B-054). The 4 left are real: a conflict cited in another section without its tag, and two quoted headlines
+the cited claims do not hold.
 
 ## What the checks do not catch (named, not vetoed)
 

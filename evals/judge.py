@@ -40,6 +40,7 @@ from research_agent.evidence.source import is_llm_answer, is_transform  # noqa: 
 from research_agent.evidence.store import ArtifactStore, Checkpoint  # noqa: E402
 from research_agent.evidence.store import AttemptRecord, CheckpointWriteError  # noqa: E402
 from research_agent.llm import LLMBudgetExceeded, LLMClient, LLMError, LlmMeter  # noqa: E402
+from research_agent.agent.orchestrator import _complete_escalating  # noqa: E402
 from research_agent.runbook import Runbook, get_runbook  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -226,9 +227,9 @@ _UNIT_SCALE_RE = re.compile(r"\b(thousand|million|billion|bn)\b|(?:\b(?:USD|EUR|
 
 
 def _claim_values(claims: list[Any]) -> list[float]:
-    """What the cited claims carry: a numeric value (also scaled by its unit —
-    value 12, unit "million USD" is 12,000,000), else the numbers in the claim's
-    own text (a non-numeric claim can still state a figure)."""
+    """What the cited claims carry: a numeric value (also scaled by its unit:
+    value 12, unit "million USD" is 12,000,000), and the numbers in the claim's
+    own text (any claim can state a figure in its words)."""
     values: list[float] = []
     for claim in claims:
         value = _numeric(claim)
@@ -238,8 +239,9 @@ def _claim_values(claims: list[Any]) -> list[float]:
             if unit:
                 word = next(g for g in unit.groups() if g).lower()
                 values.append(value * (_SCALE.get(word) or _LETTER_SCALE[word]))
-        else:
-            values.extend(n for n, _ in _figures(claim.claim) + _numbers(claim.claim))
+        # The claim's own text carries figures too ("increased by 21% to DKK 100,988
+        # million": value 100988, text 21) (B-055).
+        values.extend(n for n, _ in _figures(claim.claim) + _numbers(claim.claim))
     return values
 
 
@@ -302,6 +304,10 @@ def _conflict_scopes(report_md: str) -> list[tuple[str, bool]]:
         bullet = bool(re.match(r"^([-*+]|\d+[.)])\s", stripped)) or stripped.startswith("|")
         if stripped and not bullet:
             lead_in = stripped
+        elif stripped.startswith("|") and not re.fullmatch(r"[|\s:-]+", stripped) and _register(stripped) \
+                and not _cited(stripped):
+            # a table header row "| # | [CONFLICT] | Sources |" is the register's lead-in (B-055)
+            lead_in = stripped
         disclosed = (_CONFLICT_TAG_RE.search(stripped) is not None or _register(heading)
                      or (bullet and _register(lead_in))
                      or _SOURCE_LOG_HEADING_RE.match(heading) is not None)
@@ -345,8 +351,17 @@ def _numbers(sentence: str) -> list[tuple[float, bool]]:
 
 
 def _matches(figure: tuple[float, bool], value: float) -> bool:
-    number, percent = figure
+    """1 % tolerance. The sign is not compared: the number patterns drop a leading
+    minus ("-1.06%", "DKK -14.7 bn") and prose states a fall as "declined 1.06%"
+    (B-055). A bare figure of 1,000 or more may be in its table column's unit:
+    12,000 in a "DKK m" column is the claim's 12 billion."""
+    number, percent = abs(figure[0]), figure[1]
+    value = abs(value)
     candidates = [value, value * 100] if percent else [value]
+    if not percent and number >= 1000:
+        # only a figure in the thousands or more: "$4" for a $4B claim is a lost
+        # scale letter, the defect value_mismatch exists for
+        candidates += [value / scale for scale in (1e3, 1e6, 1e9)]
     return any(abs(number - v) <= max(abs(v) * 0.01, 1e-9) for v in candidates)
 
 
@@ -592,11 +607,14 @@ async def _judge(llm, report_md, ledger, signals, threshold, meter) -> JudgeResu
         + "\n\n## report_markdown\n"
         + report_md[:_REPORT_SNIPPET_CHARS]
     )
-    text = await llm.complete(
+    # A cut answer is asked once more with a larger budget, never looped (B-056:
+    # the judge's own call was cut at 2000 tokens on a real 44-step report).
+    text = await _complete_escalating(
+        llm,
         [{"role": "system", "content": _JUDGE_SYSTEM}, {"role": "user", "content": user}],
+        2000, 6000,
         tier="strong",
         json_mode=True,
-        max_tokens=2000,
         temperature=0.0,
         stage="judge",
     )

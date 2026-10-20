@@ -310,3 +310,29 @@ async def test_the_writer_does_not_call_a_lost_raw_or_a_transform_a_refusal(patc
     assert "quote" in refused_line and "page" not in refused_line and "synthesis" not in refused_line
     assert "did not run" in note and "later" in note
     assert "did not complete" in note and "raw_write" in note and "synthesis (failed)" in note
+
+
+async def test_request_metadata_never_reaches_the_claim_extractor(lookup_runbook, tmp_path):
+    # B-054: Google News timestamps and detected locations became conflicting claims.
+    class NewsProwl(FakeProwl):
+        async def call_tool(self, name, arguments, idempotency_key=None):
+            await super().call_tool(name, arguments, idempotency_key)
+            return {"data": {
+                "search_metadata": {"created_at": "2026-10-20T04:17:21Z", "request_time_taken": 1.9},
+                "search_parameters": {"engine": "google_news", "q": "novo nordisk"},
+                "search_information": {"total_results": 6620, "detected_location": "San Francisco",
+                                       "time_taken_displayed": 0.31},
+                "organic_results": [{"title": "Novo Nordisk cuts guidance", "date": "2026-10-19"}],
+            }, "billing": {"cost_usd": 0.01}}
+
+    llm = FakeLLM()
+    llm.plan_payload = _plan("a.com")
+    await Orchestrator(NewsProwl(), llm, runs_root=tmp_path / "runs").run("policy-lookup", BRIEF, run_id="meta")
+    extract = [m["content"] for c in llm.calls for m in c["messages"] if m["content"].startswith("Tool: ")]
+    assert extract, "no extraction call"
+    sent = extract[-1]
+    for leaked in ("2026-10-20T04:17:21Z", "request_time_taken", "San Francisco", "time_taken_displayed", "google_news\""):
+        assert leaked not in sent
+    assert "6620" in sent and "Novo Nordisk cuts guidance" in sent
+    stored = next((tmp_path / "runs" / "meta" / "raw").glob("*.json")).read_text()
+    assert "San Francisco" in stored  # the stored raw keeps everything

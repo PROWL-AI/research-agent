@@ -88,10 +88,37 @@ _UNTRUSTED_INSTRUCTION = (
 _ENVELOPE_META_KEYS = ("billing", "execution_time_ms", "billing_warning")
 
 
+#: Request bookkeeping a search provider returns beside the results: when and
+#: how fast it ran, the request's URLs and parameters, where it thought the
+#: caller was. Extracted as claims they conflict with each other on every rerun
+#: (B-054: Google News timestamps and detected locations became six conflicting
+#: claims in accept-finance-20261020b). `total_results` stays: it is a finding.
+_REQUEST_META_KEYS = ("search_metadata", "search_parameters")
+_REQUEST_META_INFO_KEYS = ("time_taken_displayed", "detected_location", "query_displayed")
+
+
+def _strip_request_meta(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_strip_request_meta(v) for v in value]
+    if not isinstance(value, dict):
+        return value
+    out = {}
+    for key, item in value.items():
+        if key in _REQUEST_META_KEYS:
+            continue
+        if key == "search_information" and isinstance(item, dict):
+            item = {k: v for k, v in item.items() if k not in _REQUEST_META_INFO_KEYS}
+        out[key] = _strip_request_meta(item)
+    return out
+
+
 def _strip_envelope_meta(payload: Any) -> Any:
+    """What the claim extractor sees: the payload without the server envelope's
+    bookkeeping and without the provider's request metadata (B-054). The stored
+    raw keeps everything."""
     if not isinstance(payload, dict):
-        return payload
-    return {k: v for k, v in payload.items() if k not in _ENVELOPE_META_KEYS}
+        return _strip_request_meta(payload)
+    return _strip_request_meta({k: v for k, v in payload.items() if k not in _ENVELOPE_META_KEYS})
 
 
 class OrchestratorError(Exception):
@@ -1053,7 +1080,9 @@ class Orchestrator:
             "must appear inside its quote. "
             "'subject' is a short stable key grouping claims about the same metric "
             "(e.g. 'example.com monthly organic traffic'). Return at most 8 claims; "
-            "prefer numbers and quotable findings. If nothing is extractable, return "
+            "prefer numbers and quotable findings. Never extract facts about the request "
+            "itself (when or how fast the search ran, its parameters or URLs, where the "
+            "caller was detected): they are not findings. If nothing is extractable, return "
             '{"claims": []}. '
             + _UNTRUSTED_INSTRUCTION
         )

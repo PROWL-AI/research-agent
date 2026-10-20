@@ -1,0 +1,59 @@
+{
+ "name": "honest-real-shapes",
+ "label": "pass",
+ "defects": [],
+ "why": "B-055: shapes a real report used honestly that the checks once flagged: a signed figure, a percent stated in a numeric claim's text, a table figure in millions against a claim in billions, and a conflict table whose header carries the [CONFLICT] tag.",
+ "runbook": "calibration-teardown",
+ "partial": false,
+ "claims": [
+  {
+   "claim": "NVO:NYSE percentage delta was -1.055894",
+   "subject": "NVO daily change",
+   "value": -1.055894,
+   "unit": "%",
+   "source_tool": "dataforseo_serp_google_finance_ticker_search",
+   "quote": "delta -1.055894"
+  },
+  {
+   "claim": "Net profit increased by 21% to DKK 100,988 million in 2024",
+   "subject": "net profit 2024",
+   "value": 100988,
+   "unit": "DKK million",
+   "source_tool": "google_search",
+   "quote": "Net profit increased by 21% to DKK 100,988 million"
+  },
+  {
+   "claim": "Free cash flow in 2024 was DKK -14.7 billion",
+   "subject": "free cash flow 2024",
+   "value": -14.7,
+   "unit": "DKK billion",
+   "source_tool": "google_search",
+   "quote": "free cash flow in 2024 was realised at DKK -14.7 billion"
+  },
+  {
+   "claim": "CapEx was roughly DKK 12 billion in 2022",
+   "subject": "capex 2022",
+   "value": 12,
+   "unit": "DKK billion",
+   "source_tool": "exa_keyword_search",
+   "quote": "roughly DKK 12 billion in 2022"
+  },
+  {
+   "claim": "US GLP-1 volume share is 44.8%",
+   "subject": "US GLP-1 volume share",
+   "value": 44.8,
+   "unit": "%",
+   "source_tool": "exa_keyword_search",
+   "quote": "US volume share 44.8%"
+  },
+  {
+   "claim": "US GLP-1 volume share is 39%",
+   "subject": "US GLP-1 volume share",
+   "value": 39,
+   "unit": "%",
+   "source_tool": "google_search",
+   "quote": "US volume share 39%"
+  }
+ ],
+ "report": "# Calibration Teardown\n\n## Executive summary\n\nThe stock moved -1.06% on the day [C1]. Net profit grew +21% [C2]. Free cash flow was DKK -14.7 bn in 2024 [C3].\n\n## Capex\n\n| Year | Capex (DKK m) |\n|---|---|\n| 2022 | ~12,000 [C4] |\n\n## Contradictions\n\n| # | [CONFLICT] | Sources |\n|---|---|---|\n| 1 | US GLP-1 volume share 44.8% [C5] vs 39% [C6] | two searches |\n\n## Source log\n\n- daily change, dataforseo [C1], retrieved 2026-10-20.\n"
+}
