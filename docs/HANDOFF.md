@@ -63,8 +63,15 @@ Objective: close every open item of this agent in its final form, in waves
   truncated, B-048, fixed in PR #13); `accept-finance-20261018b` on the fix planned and dispatched, then stopped after
   3 of 44 steps when one required tool returned no results (B-049), and cheap-tier citation checks returned null
   content (B-050). LLM spend USD 0.03, tool spend USD 0.021. Service reinstalled from `616ddc4`: `ready`, `degraded: []`.
-  **Exact next task: B-049** (decide and implement the step-failure policy, then rerun finance acceptance), then B-050.
+  B-049 and B-050 were closed on 2026-10-20 (entry below).
 - **2026-10-19 judge calibration (fixture half):** run by the operator, `anthropic/claude-haiku-5.5` agreed with all 10 fixture labels, no false alarms, USD 0.0077; two planted fixtures fail only through the code veto (evidence in `evidence/judge-calibration/`). The gate line below is done for the fixtures; agreement with a person on real runs waits on B-049.
+- **2026-10-20 B-049, B-050, B-051 closed** (one PR, service reinstalled from the merge): a single refused step no longer
+  stops a run (W6-T3 D1 to D8, CORE-17, three blind readings plus a second round); cheap JSON stages run with reasoning
+  off and a length-cut null answer is not retried; a cut transform or extraction is asked once more, larger. Live
+  receipts on `accept-finance-20261020` (local `runs/`): refused step went on (18 data calls vs 3), extraction cuts 35/43
+  to 2/15, claims 51 to 157, no tool call paid twice; wave-6 spend so far about USD 0.46 of 15.
+  **Exact next task: B-053** (one fresh complete finance run: measures B-040, gives B-017's person half its report),
+  then **B-052** (writer cut at 12000 tokens).
 - **Human gate (one line):** the live judge calibration — the operator runs
   `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
   in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or authorises live flags for

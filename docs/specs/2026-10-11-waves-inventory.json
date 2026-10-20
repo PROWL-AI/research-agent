@@ -925,6 +925,43 @@
       "wave": 6,
       "release": "this",
       "evidence": "closed: reasoning off for cheap JSON stages on OpenRouter; length-null not retried; 3 tests (2026-10-20)"
+    },
+    {
+      "id": "B-051",
+      "title": "A cut transform or claim extraction stopped the run",
+      "source": "live run accept-finance-20261020, 2026-10-20",
+      "status": "closed",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this",
+      "evidence": "closed: one escalation for transform and extraction (cf1244b); live resume completed the transform"
+    },
+    {
+      "id": "B-052",
+      "title": "Writer draft cut at 8000 and 12000 tokens on the finance runbook",
+      "source": "live run accept-finance-20261020, 2026-10-20",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-053",
+      "title": "One complete live run on the B-049/B-050/B-051 code (time, LLM budget, person half of B-017)",
+      "source": "live run accept-finance-20261020, 2026-10-20",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
     }
   ]
 }
