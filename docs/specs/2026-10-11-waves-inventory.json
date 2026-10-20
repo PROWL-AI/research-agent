@@ -1021,13 +1021,14 @@
       "id": "B-058",
       "title": "Claim extraction cut at 4000 tokens on large raw results",
       "source": "accept-finance-20261020c, 2026-10-20",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed: shorter quotes; complete claims kept from a cut answer (2026-10-20)"
     }
   ]
 }

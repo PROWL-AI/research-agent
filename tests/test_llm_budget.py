@@ -622,3 +622,33 @@ async def test_complete_escalating_asks_once_and_then_fails():
     with pytest.raises(LLMError):
         await _complete_escalating(_client(provider), MSG, 2000, 6000, tier="cheap", stage="transform")
     assert [r["max_tokens"] for r in provider.requests] == [2000, 6000]
+
+
+def test_complete_claims_keeps_whole_objects_before_the_cut():
+    from research_agent.agent.orchestrator import _complete_claims
+
+    cut = '{"claims": [{"claim": "A is 1", "value": 1}, {"claim": "B is 2", "value": 2}, {"claim": "C is'
+    assert [c["claim"] for c in _complete_claims(cut)] == ["A is 1", "B is 2"]
+    assert _complete_claims('{"claims": [{"cla') == []
+    assert _complete_claims("not json") == []
+
+
+async def test_an_extraction_cut_at_both_budgets_keeps_its_complete_claims(patched_runbooks, tmp_path):
+    # B-058: two extractions cut at 4000 left their steps raw_saved and the run evidence_incomplete.
+    class CutWithClaims(Provider):
+        def __call__(self, request):
+            body = json.loads(request.content)
+            if "evidence-ledger claims" in body["messages"][0]["content"]:
+                self.requests.append(body)
+                content = ('{"claims": [{"claim": "Visits 42", "subject": "example.com visits", "value": 42, '
+                           '"unit": "visits", "quote": "visits 42"}, {"claim": "Vis')
+                return httpx.Response(200, json={"choices": [{"message": {"content": content}, "finish_reason": "length"}],
+                                                 "usage": {"prompt_tokens": 10, "completion_tokens": 10, "cost": 0.01}})
+            return super().__call__(request)
+
+    provider = CutWithClaims(cost=0.01, plan_steps=1)
+    result = await Orchestrator(FakeProwl(), _client(provider), runs_root=tmp_path / "runs").run(
+        "mini-teardown", BRIEF, run_id="salvage", max_llm_usd=5.0)
+    checkpoint = ArtifactStore(tmp_path / "runs" / "salvage").load_checkpoint()
+    assert [s.state for s in checkpoint.steps] == ["completed"]
+    assert result.terminal_code == "completed" and result.stats["claims"] == 1
