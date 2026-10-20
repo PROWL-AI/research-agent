@@ -271,3 +271,11 @@ async def test_conflict_reaches_the_writer_with_both_sides_and_the_rule(tmp_path
     rows = [r for r in _json.loads(ledger.as_prompt_json()) if r["subject"] == "a.com visits"]
     assert {r["status"] for r in rows} == {"conflict"} and ledger.as_prompt_json() in system
     assert "[CONFLICT]" in system and "never chart it" in system
+
+
+def test_draft_and_repair_budgets_fit_a_long_report():
+    # B-052: a 44-step finance report was cut at 8000 and 12000; repair at 8000.
+    from research_agent.agent import writer
+
+    assert writer._DRAFT_ESCALATED_MAX_TOKENS >= 24_000
+    assert writer._REPAIR_MAX_TOKENS >= writer._DRAFT_ESCALATED_MAX_TOKENS

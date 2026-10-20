@@ -943,13 +943,14 @@
       "id": "B-052",
       "title": "Writer draft cut at 8000 and 12000 tokens on the finance runbook",
       "source": "live run accept-finance-20261020, 2026-10-20",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed: fix/b052-b056 (2026-10-20)"
     },
     {
       "id": "B-053",
@@ -968,37 +969,40 @@
       "id": "B-054",
       "title": "Claim extraction mines tool metadata as facts (junk conflicts)",
       "source": "judge on accept-finance-20261020b, 2026-10-20",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed: fix/b052-b056 (2026-10-20)"
     },
     {
       "id": "B-055",
       "title": "Judge value and conflict checks raise false positives on a real report",
       "source": "judge on accept-finance-20261020b, 2026-10-20",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed: fix/b052-b056 (2026-10-20)"
     },
     {
       "id": "B-056",
       "title": "Judge model call cut at max_tokens (judge error)",
       "source": "judge on accept-finance-20261020b, 2026-10-20",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed: fix/b052-b056 (2026-10-20)"
     }
   ]
 }
