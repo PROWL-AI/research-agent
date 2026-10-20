@@ -81,7 +81,12 @@ Follow the flagship (`saas-competitor-teardown/SKILL.md`):
 3. `## Sequence` — numbered steps. Each step: **Bold name** — tools in
    backticks with literal parameters where they matter;
    `Parallel:` / `Fan-out` / `Transform:` markers; `(on_error=skip)` on
-   anything non-fatal. Steps are imperative and specific ("Extract top 5 by
+   steps the report can do without. No single refused step stops a run
+   (B-049): a required step that is refused leaves the report `partial` and is
+   asked again on resume; an optional one (`on_error=skip`) lets the run end
+   `complete` and is not asked again. Only an empty wallet, the service's own
+   limit, an unknown outcome, five required refusals in a row or a budget stop
+   the run. Steps are imperative and specific ("Extract top 5 by
    organic traffic"), never vague ("analyze competitors"). Prefer one batched
    call over per-item fan-out for bulk-capable tools. Transform steps are
    first-class: they run as LLM passes over prior artifacts and cost no tool

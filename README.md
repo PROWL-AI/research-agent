@@ -54,6 +54,9 @@ Other environment knobs (all optional):
   comparable. Prices for the cost estimate are in `research_agent/pricing.py`
   (OpenRouter catalog, read 2026-10-17; `scripts/check_prices.py` re-reads it).
 - `RESEARCH_MAX_LLM_USD` — the run's LLM spend ceiling (see "How it works").
+  Claim extraction and citation checks send `reasoning: {enabled: false}` to OpenRouter: on the cheap
+  tier reasoning could spend the whole 2000-token output budget before any JSON, and an answer cut that
+  way is not retried, because the same request is cut the same way (B-050, measured 2026-10-18/20).
 - `RESEARCH_RUNS_DIR` — where runs are written, for the stdio MCP server and
   every CLI command alike (`run`, `status`, `report`, `rewrite`, `export`,
   `prune`). Default `./runs` relative to the process; set it explicitly in MCP
@@ -130,7 +133,7 @@ the run stopped (`null` while it is live). The set is closed:
 | `completed` | `complete` (or `partial` when a disclosed omission remains, e.g. a step excluded because its tool left the catalog) | every runnable step ran and its evidence was saved |
 | `budget_tools` / `budget_usd` / `budget_minutes` | `partial` | a runbook budget ran out; the report marks what is missing |
 | `budget_llm` | `partial` | the next LLM call would cross `max_llm_usd` (minus the writer reserve for research stages), or a report-stage call (writer, repair, citation check) was refused; the report is written from what was gathered, or is the evidence ledger listed |
-| `step_failed` | `partial` | a step failed hard or a worker crashed |
+| `step_failed` | `partial` | a required step failed: refused while the run went on to the writer (B-049), or a refusal that stopped the run (empty wallet, the service's own limit, five refusals of required steps in a row), or a worker crashed; `stop_reason` says which and names the steps |
 | `evidence_incomplete` | `partial` | evidence is missing with no other stop: a claim extraction failed (the resume finishes it from the saved raw, no new paid call), or a required step's raw could not be written (the resume fetches it again — a new, paid call; an optional step is `skipped_on_error` instead) |
 | `cancelled` | `partial` | any cancellation of the owning task: a caller or service cancel, the service timeout (job error `timeout`), Ctrl-C, a client closing its session or a graceful service shutdown |
 | `error` | `failed` | an exception escaped the run; `stop_reason` carries it |
@@ -196,6 +199,14 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   evidence ledger and runs citation repair/verification, but this is not a
   guarantee that every fact is true or has two independent sources. Inspect
   the report's verification disclosures and source evidence before relying on it.
+- **One refused step does not end the run.** A tool that is refused (no results, not found, a provider, scope or
+  argument error) marks that step `failed` (or `skipped_on_error` when the plan marked it optional) with the
+  server's reason, and the run goes on; with a refused required step it ends `partial` / `step_failed`, and the
+  writer is told which steps were refused and why, so the report says what is missing. What still stops the run:
+  an empty Prowl wallet (`insufficient_funds`), the service's own call limit or an unavailable call journal, a call
+  whose outcome is unknown, five refusals of required steps in a row across the run (optional steps neither count
+  nor reset it), and every budget. A budget stop keeps its own `terminal_code`; its `stop_reason` also names the
+  refused steps. A resume asks every `failed` step again (a new attempt, which the provider may bill again).
 - Runbooks declare their **tool allowlist** and **budget**
   (`max_tool_calls` / `max_usd` / `max_minutes`). On budget exhaustion the agent
   emits a partial report that marks what is missing — it never fails silently.

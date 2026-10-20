@@ -849,6 +849,7 @@ async def test_ka04_unstarted_steps_after_failure_remain_resumable(tmp_path):
     # the failed step is `failed` (resumable), never `completed`.
     prowl = FakeProwl()
     prowl.fail_on.add("spyfu_get_domain_stats")
+    prowl.fail_stops_run = True  # a hard stop; a single-step refusal goes on (B-049)
     steps = _records("spyfu_get_domain_stats", "dataforseo_bl_summary")
     checkpoint = Checkpoint(run_id="stopped", runbook="mini-teardown", steps=steps)
     orch = type("O", (), {"prowl": prowl, "_budget_stop_reason": staticmethod(lambda *_: None)})()

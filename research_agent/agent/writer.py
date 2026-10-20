@@ -312,12 +312,31 @@ async def write_report(
 ) -> str:
     partial_note = ""
     if partial:
-        skipped = ", ".join(s.get("step", "?") for s in skipped_steps or []) or "none"
-        partial_note = (
-            "\n## PARTIAL RUN\nThis run stopped before completing every planned step. "
-            "Mark the report as partial in its first line and list the sections that are "
-            f"missing or thin. Skipped steps: {skipped}.\n"
-        )
+        steps = skipped_steps or []
+        # A refusal is a data step the source answered without data (B-049); a lost
+        # raw or a failed transform is not one, and a pending or budget-skipped step
+        # did not run. Everything else is named with its state.
+        refused = [s for s in steps if s.get("state") in ("failed", "skipped_on_error")
+                   and s.get("tool") != "transform" and not str(s.get("reason") or "").startswith("raw_write")]
+        not_run = [s for s in steps if s.get("state") in ("pending", "skipped_budget")]
+        other = [s for s in steps if s not in refused and s not in not_run]
+        lines = ["\n## PARTIAL RUN",
+                 "Mark the report as partial in its first line and list the sections that are missing or thin."]
+        if refused:
+            # B-049: the run went on past these; their answer was a refusal, not data.
+            lines.append("These steps were refused by the data source (no data from them; say so, never fill "
+                         "the gap from elsewhere): "
+                         + "; ".join(f"{s.get('step', '?')}: {str(s.get('reason') or '')[:200]}" for s in refused) + ".")
+        if not_run:
+            lines.append("These steps did not run (the run stopped before them): "
+                         + ", ".join(s.get("step", "?") for s in not_run) + ".")
+        if other:
+            lines.append("These steps did not complete: "
+                         + "; ".join(f"{s.get('step', '?')} ({s.get('state', '?')}): "
+                                     f"{str(s.get('reason') or '')[:160]}" for s in other) + ".")
+        if not steps:
+            lines.append("Skipped steps: none.")
+        partial_note = "\n".join(lines) + "\n"
 
     system = WRITER_SYSTEM_TEMPLATE.format(
         output_instructions=runbook.output_instructions or "(no output instructions)",

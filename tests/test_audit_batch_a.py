@@ -42,6 +42,9 @@ class TestFinishedRunIdIsNotReusable:
         # completed, so resume re-executes it instead of erroring out.
         fake_llm.plan_payload = _plan(3)
         fake_prowl.fail_on.add("spyfu_get_domain_stats")
+        # A refusal that stops the run (an empty wallet, then a top-up): since
+        # B-049 only such refusals stop it; one empty answer does not.
+        fake_prowl.fail_stops_run = True
         orch = Orchestrator(fake_prowl, fake_llm, runs_root=tmp_path / "runs")
         result = await orch.run("mini-teardown", {"competitors": ["a.com"]}, run_id="r-part")
         assert result.status == "partial"

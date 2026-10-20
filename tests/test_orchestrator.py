@@ -64,7 +64,7 @@ async def test_on_error_skip_continues(
     assert any(s["step"] == "s0" for s in result.skipped_steps)
 
 
-async def test_hard_failure_aborts_to_writer(
+async def test_a_refused_step_does_not_stop_the_run_and_reaches_the_writer(
     patched_runbooks, tmp_path: Path, fake_llm: FakeLLM, fake_prowl: FakeProwl
 ):
     fake_llm.plan_payload = {
@@ -78,8 +78,10 @@ async def test_hard_failure_aborts_to_writer(
 
     result = await orchestrator.run("mini-teardown", {"competitors": ["a.com"]}, run_id="r3")
 
+    # B-049: each refusal is recorded on its step and the run goes on to the writer.
     assert result.status == "partial"
-    assert len(fake_prowl.tool_calls) == 1
+    assert result.terminal_code == "step_failed"
+    assert len(fake_prowl.tool_calls) == 2
     assert Path(result.report_path).is_file()
 
 

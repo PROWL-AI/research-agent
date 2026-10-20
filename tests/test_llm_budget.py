@@ -526,3 +526,99 @@ async def test_a_plan_truncated_at_the_ceiling_fails_the_run_with_a_named_reason
     checkpoint = ArtifactStore(tmp_path / "runs" / "plan-ceiling").load_checkpoint()
     assert checkpoint.status == "failed" and checkpoint.terminal_code == "error"
     assert "planner" in checkpoint.stop_reason and "max_tokens=24000" in checkpoint.stop_reason
+
+
+def _length_null(cost: float = 0.01) -> dict:
+    return {"choices": [{"message": {"content": None}, "finish_reason": "length"}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 2000, "cost": cost}}
+
+
+async def test_a_null_answer_cut_at_max_tokens_is_not_retried():
+    # B-050: the same request at the same max_tokens is cut the same way; three
+    # paid attempts bought nothing in run accept-finance-20261018b.
+    from research_agent.llm import LLMError
+
+    provider = Provider(script=[(200, _length_null())] * 3)
+    llm = _client(provider)
+    with pytest.raises(LLMError) as err:
+        await llm.complete(MSG, json_mode=True, max_tokens=2000, stage="citations")
+    assert err.value.finish_reason == "length" and err.value.retryable is False
+    assert len(provider.requests) == 1
+
+
+async def test_reasoning_can_be_turned_off_on_openrouter_only():
+    provider = Provider()
+    on_openrouter = LLMClient("https://openrouter.ai/api/v1", "test", "cheap", "strong")
+    on_openrouter._client = httpx.AsyncClient(transport=httpx.MockTransport(provider))
+    await on_openrouter.complete(MSG, json_mode=True, reasoning=False, stage="citations")
+    assert provider.requests[-1]["reasoning"] == {"enabled": False}
+    await on_openrouter.complete(MSG, stage="writer")
+    assert "reasoning" not in provider.requests[-1]  # default: the provider's own behaviour
+    elsewhere = _client(provider)
+    await elsewhere.complete(MSG, reasoning=False, stage="citations")
+    assert "reasoning" not in provider.requests[-1]  # another endpoint may reject the field
+
+
+async def test_citation_checks_and_claim_extraction_send_reasoning_off(patched_runbooks, tmp_path):
+    provider = Provider(cost=0.01, plan_steps=1)
+    llm = LLMClient("https://openrouter.ai/api/v1", "test", "cheap", "strong")
+    llm._client = httpx.AsyncClient(transport=httpx.MockTransport(provider))
+    await Orchestrator(FakeProwl(), llm, runs_root=tmp_path / "runs").run(
+        "mini-teardown", BRIEF, run_id="reasoning", max_llm_usd=5.0)
+    extract = [r for r in provider.requests if "evidence-ledger claims" in r["messages"][0]["content"]]
+    assert extract and all(r.get("reasoning") == {"enabled": False} for r in extract)
+    planner = [r for r in provider.requests if r.get("max_tokens") == 8000]
+    assert planner and all("reasoning" not in r for r in planner)
+
+
+class CutCheapStages(Provider):
+    """Cuts transform and extraction answers below `cut_below` max_tokens (B-051)."""
+
+    def __init__(self, cut_below: int, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.cut_below = cut_below
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        system = body["messages"][0]["content"]
+        cheap_stage = "transform step" in system or "evidence-ledger claims" in system
+        if cheap_stage and (body.get("max_tokens") or 0) < self.cut_below:
+            self.requests.append(body)
+            return httpx.Response(200, json={"choices": [{"message": {"content": '{"claims": [{"cla'},
+                                                          "finish_reason": "length"}],
+                                             "usage": {"prompt_tokens": 10, "completion_tokens": 10, "cost": 0.01}})
+        return super().__call__(request)
+
+
+def _budgets(provider: Provider, marker: str) -> list[int]:
+    return [b.get("max_tokens") for b in provider.requests if marker in b["messages"][0]["content"]]
+
+
+async def test_a_cut_transform_and_extraction_are_asked_once_more_larger(patched_runbooks, tmp_path):
+    from research_agent.agent.orchestrator import (_EXTRACT_ESCALATED_MAX_TOKENS, _EXTRACT_MAX_TOKENS,
+                                                   _TRANSFORM_ESCALATED_MAX_TOKENS, _TRANSFORM_MAX_TOKENS)
+
+    provider = CutCheapStages(cut_below=_EXTRACT_ESCALATED_MAX_TOKENS, cost=0.01, plan_steps=1)
+    llm = _client(provider)
+    result = await Orchestrator(FakeProwl(), llm, runs_root=tmp_path / "runs").run(
+        "mini-teardown", BRIEF, run_id="cut", max_llm_usd=5.0)
+    assert _budgets(provider, "evidence-ledger claims") == [_EXTRACT_MAX_TOKENS, _EXTRACT_ESCALATED_MAX_TOKENS]
+    assert result.terminal_code == "completed"
+    assert _TRANSFORM_MAX_TOKENS < _TRANSFORM_ESCALATED_MAX_TOKENS
+    import inspect
+
+    from research_agent.agent.orchestrator import Orchestrator as O
+    # the transform goes through the same one-retry path (the mini runbook plans no transform)
+    assert "_complete_escalating" in inspect.getsource(O._run_transform)
+
+
+async def test_complete_escalating_asks_once_and_then_fails():
+    from research_agent.agent.orchestrator import _complete_escalating
+    from research_agent.llm import LLMError
+
+    cut = {"choices": [{"message": {"content": "x"}, "finish_reason": "length"}],
+           "usage": {"prompt_tokens": 1, "completion_tokens": 1, "cost": 0.0}}
+    provider = Provider(script=[(200, cut), (200, cut), (200, cut)])
+    with pytest.raises(LLMError):
+        await _complete_escalating(_client(provider), MSG, 2000, 6000, tier="cheap", stage="transform")
+    assert [r["max_tokens"] for r in provider.requests] == [2000, 6000]

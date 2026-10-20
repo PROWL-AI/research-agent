@@ -66,12 +66,14 @@ class ObservedProwl(ProwlClient):
         if len(self.store.calls(self.job["id"])) >= 256:
             refused = ToolCallError("Service call limit reached (256); nothing was sent")
             refused.cost_usd = 0.0
+            refused.stops_run = True  # every later call hits the same limit
             raise refused
         try:
             call = self.store.start_call(self.job["id"], "tool", arguments.get("tool_name", prowl_tool), scrub(arguments.get("params", {})))
         except Exception as exc:  # noqa: BLE001 — journal unavailable: do not dispatch
             refused = ToolCallError(f"Call journal unavailable ({type(exc).__name__}); nothing was sent")
             refused.cost_usd = 0.0
+            refused.stops_run = True  # nothing can be journaled, so nothing is sent
             raise refused from exc
         start = time.monotonic()
         index = len(self.call_log)

@@ -206,6 +206,7 @@
 | CORE-14 | Повторная отправка тем же ключом не оплачивается дважды на сервере | 6 | UNVERIFIED |
 | CORE-15 | Вызов с токеном делегирования: проверка, отказ, запись цепочки | 5 | PASS@198a227 |
 | CORE-16 | Продолжение завершившегося задания сервиса без повторной оплаты | 5 | PASS@d77deeb |
+| CORE-17 | Отказ инструмента по одному шагу не останавливает прогон | 6 | UNVERIFIED |
 
 ### CORE-01: Запуск до терминального состояния (CLI, stdio MCP)
 - **Status:** PASS@583f1d1
@@ -253,7 +254,7 @@
 - **Steps:**
   1. Открыть статус или запустить вход, выполняющий сверку.
   2. Продолжить прогон: `prowl-research run <runbook> --run-id <id>`.
-- **Expected result:** сверка берёт `RunLock` без ожидания, помечает прогон `interrupted` под блокировкой; продолжение выполняет шаги в состояниях `pending`, `skipped_budget` (если бюджет позволяет), `outcome_unknown` (тем же ключом), `raw_saved` (только извлечение) и `failed` без `on_error_skip`; `completed`, `skipped_on_error` и `excluded` не выполняются.
+- **Expected result:** сверка берёт `RunLock` без ожидания, помечает прогон `interrupted` под блокировкой; продолжение выполняет шаги в состояниях `pending`, `skipped_budget` (если бюджет позволяет), `outcome_unknown` (тем же ключом), `raw_saved` (только извлечение) и `failed` (обязательный шаг, а также необязательный после отказа, остановившего прогон); `completed`, `skipped_on_error` и `excluded` не выполняются.
 - **Failure outcome:** если блокировка занята — сверка ничего не пишет (событие `run.reconcile.skipped_active`), а статус показывает `active=true`; недоступный для записи каталог не мешает сверке остальных (`run.reconcile.failed`). Чтение статуса само по себе никогда не пишет, кроме этой сверки под блокировкой.
 - **Wave:** 1 (сверка в `interrupted`, N-OWN); 2 (продолжение по сохранённым состояниям шагов, N-STATE)
 - **Coverage:** волна 1 (сверка): `test_control_unlocked_orphan_is_reconciled`, `test_reconcile_orphans_reports_what_it_marked_and_skips_active`, `test_reconcile_survives_an_unwritable_run_dir`, `test_cli_status_reconciles_an_orphan_and_prints_terminal`, `test_service_recover_reconciles_its_run_dirs`; волна 2 (продолжение по состояниям шагов): `test_ka03_*`, `test_outcome_unknown_attempt_is_resent_with_the_same_key`, `tests/test_durability.py`
@@ -402,4 +403,16 @@
 - **Failure outcome:** отказ при создании, с причиной: неизвестный id; чужой runbook или другие входные данные; задание, которое ждёт решения или работает; прогон, который уже закончен; задание, отклонённое оператором; прогон, который уже продолжает другое задание; задание другого принципала — `scope-not-granted`.
 - **Wave:** 5 (N-FAB, B-039)
 - **Coverage:** `tests/test_service_parity.py::test_a_failed_service_job_is_resumed_without_paying_again`, `::test_a_resume_respects_the_principal_and_the_operators_rejection`, `::test_a_resume_replayed_with_the_same_key_returns_the_same_job`
+
+### CORE-17: Отказ инструмента по одному шагу не останавливает прогон
+- **Status:** UNVERIFIED
+- **Actor:** оператор (P-01); вызывающий агент
+- **Trigger:** сервер Prowl отвечает определённым отказом на один шаг: «нет результатов», `not_found`, `provider_error`, `validation`, `forbidden` (ключ провайдера, инструмент вне области ключа)
+- **Preconditions:** нет
+- **Steps:**
+  1. Запустить прогон, в плане которого один обязательный шаг получит такой отказ.
+- **Expected result:** шаг становится `failed` с причиной сервера (необязательный: `skipped_on_error`); воркер берёт следующий шаг, следующие сегменты выполняются, трансформация узнаёт, какие шаги перед ней получили отказ. Прогон с отказом обязательного шага заканчивается `partial` с `terminal_code=step_failed`; `stop_reason` перечисляет такие шаги с причиной сервера, а writer получает их список с причинами до того, как начинает писать, поэтому отчёт говорит, чего нет. Если прогон затем остановил бюджет, код остаётся бюджетным, а `stop_reason` дополнительно называет отказавшие шаги. Продолжение запрашивает упавшие шаги снова (новая попытка) и не платит за выполненные.
+- **Failure outcome:** прогон останавливается, как раньше: пустой кошелёк Prowl (`insufficient_funds`), локальный отказ сервиса (лимит вызовов, журнал недоступен), неизвестный исход отправки (`outcome_unknown`), пять отказов обязательных шагов подряд на весь прогон (необязательные не считаются), любой бюджет. Неначатые шаги остаются `pending`.
+- **Wave:** 6 (N-ACC, B-049)
+- **Coverage:** `tests/test_step_failure_policy.py` (16 тестов), `tests/test_orchestrator.py::test_a_refused_step_does_not_stop_the_run_and_reaches_the_writer`
 

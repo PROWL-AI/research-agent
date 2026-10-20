@@ -281,12 +281,44 @@ def _validate_indexed(
     return valid, dropped
 
 
+def _refusal_text(record: Any) -> str:
+    """`'step': server reason`, without the "step 'x' failed: " prefix the
+    worker writes into the reason (B-049)."""
+    reason = record.reason or record.state
+    prefix = f"step '{record.step}' failed: "
+    if reason.startswith(prefix):
+        reason = reason[len(prefix):]
+    return f"'{record.step}': {reason[:200]}"
+
+
 # A plan for a 50-90 call runbook carries every step's arguments: a verbose
 # strong model overruns 8k tokens (B-048, measured live 2026-10-18 with
 # xiaomi/mimo-v2.6-pro: 8000 completion tokens, finish_reason=length). A
 # truncated JSON plan is unusable, so a truncation retries once, larger.
 _PLAN_MAX_TOKENS = 8_000
 _PLAN_ESCALATED_MAX_TOKENS = 24_000
+
+# The cheap tier's structured answers have the same shape of failure (B-051,
+# live run accept-finance-20261020: a governance-scorecard transform cut at
+# 2000 with reasoning off stopped the run; two claim extractions cut at 2000).
+# A cut answer is asked once more with a larger budget, never looped.
+_TRANSFORM_MAX_TOKENS = 2_000
+_TRANSFORM_ESCALATED_MAX_TOKENS = 6_000
+_EXTRACT_MAX_TOKENS = 2_000
+_EXTRACT_ESCALATED_MAX_TOKENS = 4_000
+
+
+async def _complete_escalating(llm: Any, messages: list[dict[str, str]], first: int, escalated: int,
+                               **kwargs: Any) -> str:
+    """One call; if the answer is cut at max_tokens, one more at `escalated`."""
+    try:
+        return await llm.complete(messages, max_tokens=first, **kwargs)
+    except LLMError as exc:
+        if exc.retryable or exc.finish_reason != "length":
+            raise
+        log.warning("%s output cut at max_tokens=%d; asking once more at %d",
+                    kwargs.get("stage", "llm"), first, escalated)
+        return await llm.complete(messages, max_tokens=escalated, **kwargs)
 
 _PLAN_INSTRUCTIONS = """\
 You are the planner for a research run. Produce an ordered execution plan as JSON:
@@ -297,7 +329,8 @@ Rules:
   tool's schema exactly.
 - Follow the runbook sequence; skip steps the brief makes unnecessary (e.g. skip
   discovery when competitors are named).
-- Set on_error_skip=true for enrichment steps that may safely fail.
+- Set on_error_skip=true for steps the report can do without (enrichment, per-item fan-out). A refused
+  required step does not stop the run, but it leaves the report partial and is asked again on resume.
 - Transform steps are first-class: use {"step": "<name>", "tool": "transform",
   "instruction": "<what to synthesize, and from which prior steps>"} for the
   runbook's Transform: markers (synthesis/extraction between tool calls). They
@@ -489,7 +522,10 @@ class Orchestrator:
             for record in checkpoint.steps:
                 if record.state == DISPATCHING:
                     record.state, record.reason = OUTCOME_UNKNOWN, "process exited during dispatch"
-                elif record.state == SKIPPED_BUDGET or (record.state == FAILED and not record.on_error_skip):
+                elif record.state in (SKIPPED_BUDGET, FAILED):
+                    # A failed optional step exists only after a refusal that
+                    # stopped the run (empty wallet, refusals in a row): it is
+                    # asked again too (B-049).
                     record.state, record.reason = PENDING, None
             log.info("resuming run %s: %s", run_id, checkpoint.step_counts())
             checkpoint.stop_reason = None
@@ -541,6 +577,22 @@ class Orchestrator:
             store.save_checkpoint(checkpoint)
         if planned:
             await self._execute(runbook, checkpoint, store, ledger, started_monotonic)
+            refused = [s for s in checkpoint.steps
+                       if s.state == FAILED and not s.on_error_skip and not (s.reason or "").startswith("raw_write")]
+            if refused:
+                # The workers went on past these refusals (B-049). The writer is
+                # told which steps were refused before it writes. With no other
+                # stop the run ends step_failed; a budget stop keeps its code
+                # (its text leads) and names the refused steps after it.
+                named = "; ".join(_refusal_text(s) for s in refused[:5])
+                more = f" (+{len(refused) - 5} more)" if len(refused) > 5 else ""
+                text = f"{len(refused)} required step(s) refused and the run went on: {named}{more}"
+                if checkpoint.stop_reason is None:
+                    checkpoint.stop_reason = text
+                elif terminal.code_for_stop_reason(checkpoint.stop_reason) != terminal.STEP_FAILED:
+                    checkpoint.stop_reason = f"{checkpoint.stop_reason}; also {text}"
+                checkpoint.partial = True
+                store.save_checkpoint(checkpoint)
 
         evidence_incomplete = any(
             s.state in (RAW_SAVED, OUTCOME_UNKNOWN) or (s.state == FAILED and (s.reason or "").startswith("raw_write"))
@@ -587,8 +639,10 @@ class Orchestrator:
                 fidelity = FidelityResult(report_md="", **{k: prior.get(k, 0) for k in
                                                            ("checked", "supported", "unverified", "unchecked")})
             else:
-                outcome, fidelity = ledger_only_report(runbook, ledger, checkpoint.stop_reason), FidelityResult(
-                    report_md="")
+                llm_stop = terminal.budget_stop_text(terminal.BUDGET_LLM, meter.max_usd)
+                reason = (checkpoint.stop_reason if checkpoint.stop_reason.startswith(llm_stop)
+                          else f"{llm_stop}; {checkpoint.stop_reason}")
+                outcome, fidelity = ledger_only_report(runbook, ledger, reason), FidelityResult(report_md="")
         if meter.refusals and checkpoint.stop_reason is None:
             # A repair pass or a citation batch the cap refused was handled
             # quietly (draft kept, batch unchecked); the run still says so.
@@ -924,16 +978,26 @@ class Orchestrator:
             "their units and name the artifact each fact came from. "
             + _UNTRUSTED_INSTRUCTION
         )
+        position = next((i for i, s in enumerate(checkpoint.steps) if s.step_id == record.step_id), len(checkpoint.steps))
+        refused = [s for s in checkpoint.steps[:position]
+                   if s.kind == "data" and s.state in (FAILED, SKIPPED_ON_ERROR)]
+        refused_part = (
+            "\n\n## Steps that returned no data (do not fill their gap from elsewhere; say it is missing)\n"
+            + "\n".join(f"- {_refusal_text(s)}" for s in refused[-10:])
+        ) if refused else ""
         user = (
             f"## Instruction\n{instruction}\n\n"
             "## Recent raw artifacts\n"
             + ("\n\n".join(context_parts) if context_parts else "(no artifacts yet)")
+            + refused_part
         )
-        return await self.llm.complete(
+        return await _complete_escalating(
+            self.llm,
             [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            _TRANSFORM_MAX_TOKENS, _TRANSFORM_ESCALATED_MAX_TOKENS,
             tier="cheap",
-            max_tokens=2000,
             stage="transform",
+            reasoning=False,  # B-050: the cheap tier's reasoning can spend the whole budget
         )
 
     def _budget_stop_reason(self, budget: Any, checkpoint: Checkpoint) -> str | None:
@@ -997,12 +1061,14 @@ class Orchestrator:
             f"Tool: {item.tool}\nStep: {item.step}\nRaw result:\n"
             f"{_UNTRUSTED_OPEN}\n{raw_text}\n{_UNTRUSTED_CLOSE}"
         )
-        text = await self.llm.complete(
+        text = await _complete_escalating(
+            self.llm,
             [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            _EXTRACT_MAX_TOKENS, _EXTRACT_ESCALATED_MAX_TOKENS,
             tier="cheap",
             json_mode=True,
-            max_tokens=2000,
             stage="extract",
+            reasoning=False,
         )
         payload = _parse_json_object(text)
         claims = payload.get("claims", []) if isinstance(payload, dict) else []
