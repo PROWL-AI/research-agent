@@ -515,7 +515,8 @@
       "area": "evals",
       "node": "N-ACC",
       "blocked_by": [
-        "B-057",
+        "B-059",
+        "B-060",
         "KA-07",
         "KA-08",
         "KA-09"
@@ -1029,6 +1030,30 @@
       "wave": 6,
       "release": "this",
       "evidence": "closed: shorter quotes; complete claims kept from a cut answer (2026-10-20)"
+    },
+    {
+      "id": "B-059",
+      "title": "Repair by line or section instead of a whole-report rewrite (cut at 24000)",
+      "source": "accept-finance-20261020d, 2026-10-20",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-060",
+      "title": "Judge false positives: section refs, assumption marker, ids inside a conflict tag",
+      "source": "accept-finance-20261020d, 2026-10-20",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
     }
   ]
 }
