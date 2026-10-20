@@ -70,8 +70,11 @@ Objective: close every open item of this agent in its final form, in waves
   off and a length-cut null answer is not retried; a cut transform or extraction is asked once more, larger. Live
   receipts on `accept-finance-20261020` (local `runs/`): refused step went on (18 data calls vs 3), extraction cuts 35/43
   to 2/15, claims 51 to 157, no tool call paid twice; wave-6 spend so far about USD 0.46 of 15.
-  **Exact next task: B-053** (one fresh complete finance run: measures B-040, gives B-017's person half its report),
-  then **B-052** (writer cut at 12000 tokens).
+  B-053 closed the same day: `accept-finance-20261020b` ran the whole 44-step plan on the installed `00331bf`
+  (17.5 min, LLM USD 0.131, tools USD 0.322, 247 claims). The judge fails that report; part of it is false positives.
+  **Exact next task: B-054** (extractor mines tool metadata as claims), then **B-055** (judge false positives, add them
+  as honest fixtures first), **B-056** (judge call cut), **B-052** (writer cut at 12000). Then the operator labels the
+  report for B-017's person half (a person's act: the report is `runs/accept-finance-20261020b/report.md`, local).
 - **Human gate (one line):** the live judge calibration — the operator runs
   `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
   in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or authorises live flags for
