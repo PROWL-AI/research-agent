@@ -72,9 +72,14 @@ Objective: close every open item of this agent in its final form, in waves
   to 2/15, claims 51 to 157, no tool call paid twice; wave-6 spend so far about USD 0.46 of 15.
   B-053 closed the same day: `accept-finance-20261020b` ran the whole 44-step plan on the installed `00331bf`
   (17.5 min, LLM USD 0.131, tools USD 0.322, 247 claims). The judge fails that report; part of it is false positives.
-  **Exact next task: B-054** (extractor mines tool metadata as claims), then **B-055** (judge false positives, add them
-  as honest fixtures first), **B-056** (judge call cut), **B-052** (writer cut at 12000). Then the operator labels the
-  report for B-017's person half (a person's act: the report is `runs/accept-finance-20261020b/report.md`, local).
+  B-052, B-054, B-055, B-056 closed the same day (PR #18, installed `cf4de7e`) and confirmed live on
+  `accept-finance-20261020c`: the judge's FAIL 0.57 there names only real writing defects.
+  **Exact next task: B-057** (route the judge's code-proven defects into the writer's repair pass), then **B-058**
+  (chunk large raw results for extraction). Then the operator labels a report for B-017's person half (a person's
+  act; latest report `runs/accept-finance-20261020c/report.md`, local).
+  Machine note 2026-10-20: the disk filled (swap 27 GB with 39 sessions) and killed one run mid-way; the run resumed
+  without paying twice. Free space then 3.6 GB; Observatory's disk guard and cleanup freed little; swap shrinks only
+  when sessions close or the machine restarts.
 - **Human gate (one line):** the live judge calibration — the operator runs
   `python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent RESEARCH_LLM_API_KEY -- .venv/bin/python evals/calibrate.py --live`
   in this checkout (≤ USD 0.50 per fixture, 8 fixtures, key ceiling USD 15), or authorises live flags for

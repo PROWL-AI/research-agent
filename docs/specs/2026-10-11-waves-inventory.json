@@ -515,7 +515,7 @@
       "area": "evals",
       "node": "N-ACC",
       "blocked_by": [
-        "B-049",
+        "B-057",
         "KA-07",
         "KA-08",
         "KA-09"
@@ -1003,6 +1003,30 @@
       "wave": 6,
       "release": "this",
       "evidence": "closed: fix/b052-b056 (2026-10-20)"
+    },
+    {
+      "id": "B-057",
+      "title": "Route the judge's code-proven defects into the writer's repair pass",
+      "source": "accept-finance-20261020c, 2026-10-20",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-058",
+      "title": "Claim extraction cut at 4000 tokens on large raw results",
+      "source": "accept-finance-20261020c, 2026-10-20",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
     }
   ]
 }
