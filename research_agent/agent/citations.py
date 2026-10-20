@@ -188,6 +188,7 @@ async def verify_citations(
                 max_tokens=2000,
                 temperature=0.0,
                 stage="citations",
+                reasoning=False,
             )
         except Exception as exc:
             # A failed batch is unchecked, never "supported": silence must not

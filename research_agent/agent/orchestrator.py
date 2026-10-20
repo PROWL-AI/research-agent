@@ -1043,6 +1043,7 @@ class Orchestrator:
             json_mode=True,
             max_tokens=2000,
             stage="extract",
+            reasoning=False,
         )
         payload = _parse_json_object(text)
         claims = payload.get("claims", []) if isinstance(payload, dict) else []

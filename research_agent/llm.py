@@ -221,8 +221,12 @@ class LLMClient:
         finish = choice.get("finish_reason")
         content = (choice.get("message") or {}).get("content")
         if content is None:
+            # Cut at max_tokens before any content (reasoning spent the budget):
+            # the same request is cut the same way, so a retry only pays again
+            # (B-050). Other null answers stay retryable.
             raise LLMError(
                 f"LLM response has null content (finish_reason={finish!r})",
+                retryable=finish != "length",
                 finish_reason=finish,
             )
         # A truncated draft must not flow into lint/repair as if it were the
@@ -256,6 +260,7 @@ class LLMClient:
         temperature: float = 0.2,
         *,
         stage: str = "research",
+        reasoning: bool | None = None,
     ) -> str:
         payload: dict[str, Any] = {
             "model": self.model_for(tier),
@@ -270,6 +275,12 @@ class LLMClient:
             # OpenRouter reports the call's cost only when asked (usage
             # accounting); without it every attempt is a table estimate.
             payload["usage"] = {"include": True}
+            if reasoning is False:
+                # Reasoning tokens are billed inside the output budget and can
+                # use all of it before any JSON is written (B-050, operator's
+                # model guide: turn reasoning off for a checker). OpenRouter
+                # only: another endpoint may reject the field.
+                payload["reasoning"] = {"enabled": False}
 
         request_kwargs: dict[str, Any] = {"json": payload}
         if max_tokens is not None:

@@ -526,3 +526,46 @@ async def test_a_plan_truncated_at_the_ceiling_fails_the_run_with_a_named_reason
     checkpoint = ArtifactStore(tmp_path / "runs" / "plan-ceiling").load_checkpoint()
     assert checkpoint.status == "failed" and checkpoint.terminal_code == "error"
     assert "planner" in checkpoint.stop_reason and "max_tokens=24000" in checkpoint.stop_reason
+
+
+def _length_null(cost: float = 0.01) -> dict:
+    return {"choices": [{"message": {"content": None}, "finish_reason": "length"}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 2000, "cost": cost}}
+
+
+async def test_a_null_answer_cut_at_max_tokens_is_not_retried():
+    # B-050: the same request at the same max_tokens is cut the same way; three
+    # paid attempts bought nothing in run accept-finance-20261018b.
+    from research_agent.llm import LLMError
+
+    provider = Provider(script=[(200, _length_null())] * 3)
+    llm = _client(provider)
+    with pytest.raises(LLMError) as err:
+        await llm.complete(MSG, json_mode=True, max_tokens=2000, stage="citations")
+    assert err.value.finish_reason == "length" and err.value.retryable is False
+    assert len(provider.requests) == 1
+
+
+async def test_reasoning_can_be_turned_off_on_openrouter_only():
+    provider = Provider()
+    on_openrouter = LLMClient("https://openrouter.ai/api/v1", "test", "cheap", "strong")
+    on_openrouter._client = httpx.AsyncClient(transport=httpx.MockTransport(provider))
+    await on_openrouter.complete(MSG, json_mode=True, reasoning=False, stage="citations")
+    assert provider.requests[-1]["reasoning"] == {"enabled": False}
+    await on_openrouter.complete(MSG, stage="writer")
+    assert "reasoning" not in provider.requests[-1]  # default: the provider's own behaviour
+    elsewhere = _client(provider)
+    await elsewhere.complete(MSG, reasoning=False, stage="citations")
+    assert "reasoning" not in provider.requests[-1]  # another endpoint may reject the field
+
+
+async def test_citation_checks_and_claim_extraction_send_reasoning_off(patched_runbooks, tmp_path):
+    provider = Provider(cost=0.01, plan_steps=1)
+    llm = LLMClient("https://openrouter.ai/api/v1", "test", "cheap", "strong")
+    llm._client = httpx.AsyncClient(transport=httpx.MockTransport(provider))
+    await Orchestrator(FakeProwl(), llm, runs_root=tmp_path / "runs").run(
+        "mini-teardown", BRIEF, run_id="reasoning", max_llm_usd=5.0)
+    extract = [r for r in provider.requests if "evidence-ledger claims" in r["messages"][0]["content"]]
+    assert extract and all(r.get("reasoning") == {"enabled": False} for r in extract)
+    planner = [r for r in provider.requests if r.get("max_tokens") == 8000]
+    assert planner and all("reasoning" not in r for r in planner)

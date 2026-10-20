@@ -54,6 +54,9 @@ Other environment knobs (all optional):
   comparable. Prices for the cost estimate are in `research_agent/pricing.py`
   (OpenRouter catalog, read 2026-10-17; `scripts/check_prices.py` re-reads it).
 - `RESEARCH_MAX_LLM_USD` — the run's LLM spend ceiling (see "How it works").
+  Claim extraction and citation checks send `reasoning: {enabled: false}` to OpenRouter: on the cheap
+  tier reasoning could spend the whole 2000-token output budget before any JSON, and an answer cut that
+  way is not retried, because the same request is cut the same way (B-050, measured 2026-10-18/20).
 - `RESEARCH_RUNS_DIR` — where runs are written, for the stdio MCP server and
   every CLI command alike (`run`, `status`, `report`, `rewrite`, `export`,
   `prune`). Default `./runs` relative to the process; set it explicitly in MCP
