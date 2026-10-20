@@ -1074,10 +1074,10 @@ class Orchestrator:
             '{"claims": [{"claim": "...", "subject": "...", "value": "...", "unit": "...", '
             '"source_url": "...", "quote": "..."}]}. '
             "Include ONLY facts present in the raw text — no outside knowledge. "
-            "'quote' is the exact text of the raw result the claim rests on, copied "
-            "character for character (it is checked against the stored raw; a quote "
-            "that is not there leaves the claim unverified). A numeric claim's value "
-            "must appear inside its quote. "
+            "'quote' is the shortest exact text of the raw result the claim rests on, "
+            "at most 300 characters, copied character for character (it is checked "
+            "against the stored raw; a quote that is not there leaves the claim "
+            "unverified). A numeric claim's value must appear inside its quote. "
             "'subject' is a short stable key grouping claims about the same metric "
             "(e.g. 'example.com monthly organic traffic'). Return at most 8 claims; "
             "prefer numbers and quotable findings. Never extract facts about the request "
@@ -1090,17 +1090,27 @@ class Orchestrator:
             f"Tool: {item.tool}\nStep: {item.step}\nRaw result:\n"
             f"{_UNTRUSTED_OPEN}\n{raw_text}\n{_UNTRUSTED_CLOSE}"
         )
-        text = await _complete_escalating(
-            self.llm,
-            [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            _EXTRACT_MAX_TOKENS, _EXTRACT_ESCALATED_MAX_TOKENS,
-            tier="cheap",
-            json_mode=True,
-            stage="extract",
-            reasoning=False,
-        )
-        payload = _parse_json_object(text)
-        claims = payload.get("claims", []) if isinstance(payload, dict) else []
+        try:
+            text = await _complete_escalating(
+                self.llm,
+                [{"role": "system", "content": system}, {"role": "user", "content": user}],
+                _EXTRACT_MAX_TOKENS, _EXTRACT_ESCALATED_MAX_TOKENS,
+                tier="cheap",
+                json_mode=True,
+                stage="extract",
+                reasoning=False,
+            )
+            payload = _parse_json_object(text)
+            claims = payload.get("claims", []) if isinstance(payload, dict) else []
+        except LLMError as exc:
+            # Cut even at the larger budget (B-058): the complete claim objects
+            # before the cut were paid for and are as good as any; keep them.
+            salvaged = _complete_claims(exc.content or "") if exc.finish_reason == "length" else []
+            if not salvaged:
+                raise
+            log.warning("extract for %s cut at max_tokens=%d; kept %d complete claim(s) from the cut answer",
+                        item.step, _EXTRACT_ESCALATED_MAX_TOKENS, len(salvaged))
+            claims = salvaged
         # The whole raw, once per step, in both shapes a quote can be copied
         # from: its values (what a page says) and its JSON (what the extractor saw).
         texts = {
@@ -1173,6 +1183,25 @@ class Orchestrator:
     def _new_run_id(runbook_name: str) -> str:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         return f"{stamp}-{runbook_name}-{uuid.uuid4().hex[:6]}"
+
+
+def _complete_claims(text: str) -> list[dict[str, Any]]:
+    """The complete objects of a `{"claims": [...]}` answer cut mid-way (B-058)."""
+    start = text.find("[", text.find('"claims"'))
+    if start < 0:
+        return []
+    decoder, out, i = json.JSONDecoder(), [], start + 1
+    while True:
+        while i < len(text) and text[i] in " \t\r\n,":
+            i += 1
+        if i >= len(text) or text[i] != "{":
+            return out
+        try:
+            obj, i = decoder.raw_decode(text, i)
+        except json.JSONDecodeError:
+            return out
+        if isinstance(obj, dict):
+            out.append(obj)
 
 
 def _parse_json_object(text: str) -> Any:
