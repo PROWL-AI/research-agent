@@ -76,8 +76,10 @@ Objective: close every open item of this agent in its final form, in waves
   `accept-finance-20261020c`: the judge's FAIL 0.57 there names only real writing defects.
   B-057 closed the same day: the repair pass gets the judge's code-proven defects (`report_checks.py`).
   B-058 closed the same day (shorter quotes, complete claims kept from a cut answer).
-  **Exact next task:** one live finance run on the installed build to confirm B-057/B-058 with the judge, then the
-  remaining open rows by priority (`python3 scripts/plan/assign_waves.py --check`). Then the operator labels a report for B-017's person half (a person's
+  Live check on the installed `52844a6` (`accept-finance-20261020d`): B-058 held; B-057 did not reach the model because
+  the whole-report repair was cut at 24000 and thrown away (B-059); the judge raised three more false positives (B-060).
+  **Exact next task: B-059** (repair by line or section), then **B-060** (add the three shapes to `honest-real-shapes`
+  first). After both, a live run plus the operator's label closes B-017's person half. Then the operator labels a report for B-017's person half (a person's
   act; latest report `runs/accept-finance-20261020c/report.md`, local).
   Machine note 2026-10-20: the disk filled (swap 27 GB with 39 sessions) and killed one run mid-way; the run resumed
   without paying twice. Free space then 3.6 GB; Observatory's disk guard and cleanup freed little; swap shrinks only
