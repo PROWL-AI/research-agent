@@ -18,7 +18,8 @@ BUDGET_USD = "budget_usd"
 BUDGET_MINUTES = "budget_minutes"
 #: LLM-spend budget stop: the run's max_llm_usd left no room for the next call.
 BUDGET_LLM = "budget_llm"
-#: A step failed hard (not on_error_skip) or a worker crashed.
+#: A required step failed: refused while the run went on (B-049), a refusal that
+#: stopped the run, or a worker crashed. stop_reason says which.
 STEP_FAILED = "step_failed"
 #: Evidence could not be persisted/extracted (declared now, set from wave 2).
 EVIDENCE_INCOMPLETE = "evidence_incomplete"
@@ -57,7 +58,8 @@ def code_for_stop_reason(stop_reason: str | None) -> str:
 
     The execution engine records why it stopped as a `stop_reason` string:
     budget stops start with the budget name (`_budget_stop_reason`), every
-    other stop is a hard step failure or a worker crash. No stop reason means
+    other stop is a failed required step (refused while the run went on, or a
+    refusal that stopped it) or a worker crash. No stop reason means
     every step ran — a resumed run may still be `partial` because completed
     on_error_skip steps keep their disclosures, but nothing stopped it.
     """

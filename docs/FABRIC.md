@@ -98,7 +98,7 @@ A research job (`fabric.job.get`) and the run checkpoint it drives (`research.ar
 | What happened | Job (`fabric.job.get`) | Result envelope `outcome` | Checkpoint `status` / `terminal_code` |
 |---|---|---|---|
 | every planned step ran | `completed` | `succeeded` | `complete` / `completed` |
-| budget stop (tools, USD, minutes, LLM), evidence incomplete, a hard step failure the writer still reported | `completed` | `partial` (the `done` statement names the `terminal_code`) | `partial` / `budget_tools`, `budget_usd`, `budget_minutes`, `budget_llm`, `evidence_incomplete`, `step_failed` |
+| budget stop (tools, USD, minutes, LLM), evidence incomplete, a required step that failed (refused while the run went on, or a refusal that stopped it) | `completed` | `partial` (the `done` statement names the `terminal_code`) | `partial` / `budget_tools`, `budget_usd`, `budget_minutes`, `budget_llm`, `evidence_incomplete`, `step_failed` |
 | the caller cancelled the job | `cancelled` | — (job error) | `partial` / `cancelled` |
 | past the wall-clock timeout | `failed`, error `timeout` + `terminalCode` | — | `partial` / `cancelled` |
 | the service shut down mid-run | `interrupted` | — | `partial` / `cancelled` |

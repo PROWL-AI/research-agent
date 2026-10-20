@@ -47,9 +47,12 @@ class ProwlError(Exception):
 
 
 #: Server error classes that will refuse every later call the same way: an empty
-#: wallet, a key the server does not let in (prowl-app `mcp_server/tool_errors.py`).
-#: Any other refusal is about one request and is evidence of absence (B-049).
-STOPPING_ERROR_CLASSES = frozenset({"insufficient_funds", "forbidden"})
+#: wallet. `forbidden` is not one: the server sends it for one provider's
+#: credentials, a denylisted tool or a tool outside the key's scope too
+#: (prowl-app `mcp_server/tools.py`), so it fails one step and the
+#: refusals-in-a-row cap is the backstop. Any other refusal is about one request
+#: (B-049).
+STOPPING_ERROR_CLASSES = frozenset({"insufficient_funds"})
 
 
 class ToolCallError(ProwlError):

@@ -312,12 +312,22 @@ async def write_report(
 ) -> str:
     partial_note = ""
     if partial:
-        skipped = ", ".join(s.get("step", "?") for s in skipped_steps or []) or "none"
-        partial_note = (
-            "\n## PARTIAL RUN\nThis run stopped before completing every planned step. "
-            "Mark the report as partial in its first line and list the sections that are "
-            f"missing or thin. Skipped steps: {skipped}.\n"
-        )
+        steps = skipped_steps or []
+        refused = [s for s in steps if s.get("state") in ("failed", "skipped_on_error")]
+        not_run = [s for s in steps if s not in refused]
+        lines = ["\n## PARTIAL RUN",
+                 "Mark the report as partial in its first line and list the sections that are missing or thin."]
+        if refused:
+            # B-049: the run went on past these; their answer was a refusal, not data.
+            lines.append("These steps were refused by the data source (no data from them; say so, never fill "
+                         "the gap from elsewhere): "
+                         + "; ".join(f"{s.get('step', '?')}: {str(s.get('reason') or '')[:200]}" for s in refused) + ".")
+        if not_run:
+            lines.append("These steps did not run (the run stopped before them): "
+                         + ", ".join(s.get("step", "?") for s in not_run) + ".")
+        if not steps:
+            lines.append("Skipped steps: none.")
+        partial_note = "\n".join(lines) + "\n"
 
     system = WRITER_SYSTEM_TEMPLATE.format(
         output_instructions=runbook.output_instructions or "(no output instructions)",

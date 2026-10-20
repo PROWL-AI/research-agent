@@ -64,8 +64,9 @@ log = logging.getLogger(__name__)
 #: every worker's data call hits the same billed Prowl account.
 EFFORT_WORKERS = {"lookup": 1, "comparison": 3, "deep": 5}
 
-#: Definite refusals in a row that stop a worker: one empty answer is evidence of
-#: absence, a run of them is a provider that is down for every tool (B-049).
+#: Refusals of required steps in a row, across all workers, that stop the run:
+#: one empty answer is evidence of absence, a run of them is a provider that is
+#: down for every tool (B-049). Optional steps neither count nor reset it.
 MAX_REFUSALS_IN_ROW = 5
 
 
@@ -116,6 +117,8 @@ class WorkerContext:
     extract_claims: Callable[..., Awaitable[int]] = field(
         repr=False, default=None  # wired by the lead; None only in tests that stub it
     )
+    #: Refusals of required steps in a row, shared by every worker of the run.
+    refusals_in_row: int = 0
 
 
 # CheckpointWriteError lives in evidence.store (the LLM meter raises it too).
@@ -316,11 +319,11 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
     recorded on that step and the worker takes its next one (B-049). A hard
     failure stops this worker: a refusal every later call would get too
     (`ToolCallError.stops_run`), an unknown dispatch outcome, or
-    MAX_REFUSALS_IN_ROW refusals in a row. Its never-started steps stay `pending`
-    (a resume runs them); the run is partial and the other workers finish."""
+    MAX_REFUSALS_IN_ROW refusals of required steps in a row across the run. Its
+    never-started steps stay `pending` (a resume runs them); the run is partial
+    and the other workers finish."""
     summary = WorkerSummary(worker_id=worker_id)
     checkpoint = ctx.checkpoint
-    refusals_in_row = 0
     for position, record in enumerate(items):
         if record.state == RAW_SAVED:
             # Paid for already: finish the evidence from the saved raw, no dispatch.
@@ -370,8 +373,9 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             _finish_attempt(ctx, attempt, "refused" if definite else "transport_error",
                             _reported_cost(ctx.orch.prowl, attempt.idempotency_key, before, exc), record.tool)
             stopping = definite and getattr(exc, "stops_run", False)
-            refusals_in_row = refusals_in_row + 1 if definite else 0
-            cascade = definite and refusals_in_row >= MAX_REFUSALS_IN_ROW
+            if definite and not record.on_error_skip:
+                ctx.refusals_in_row += 1
+            cascade = definite and not record.on_error_skip and ctx.refusals_in_row >= MAX_REFUSALS_IN_ROW
             if record.on_error_skip and not stopping and not cascade:
                 log.warning("worker %d: step %s failed (on_error_skip): %s", worker_id, record.step_id, exc)
                 _set_state(checkpoint, record, SKIPPED_ON_ERROR, str(exc))
@@ -393,7 +397,7 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
                 continue
             reason = f"step '{record.step}' failed: {exc}"
             if cascade:
-                reason = f"{refusals_in_row} refusals in a row; {reason}"
+                reason = f"{ctx.refusals_in_row} refusals in a row; {reason}"
             # A refusal is a definite outcome (a resume tries again with a new
             # attempt number); a transport error may have executed server-side
             # (a resume re-sends the same key).
@@ -409,7 +413,7 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             log.error("worker %d: hard failure at step %s, worker stops: %s", worker_id, record.step_id, exc)
             return summary
 
-        refusals_in_row = 0
+        ctx.refusals_in_row = 0
         _finish_attempt(ctx, attempt, "ok",
                         _reported_cost(ctx.orch.prowl, attempt.idempotency_key, before), record.tool)
         save_state(checkpoint, ctx.store)

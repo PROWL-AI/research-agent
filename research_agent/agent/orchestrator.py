@@ -281,6 +281,16 @@ def _validate_indexed(
     return valid, dropped
 
 
+def _refusal_text(record: Any) -> str:
+    """`'step': server reason`, without the "step 'x' failed: " prefix the
+    worker writes into the reason (B-049)."""
+    reason = record.reason or record.state
+    prefix = f"step '{record.step}' failed: "
+    if reason.startswith(prefix):
+        reason = reason[len(prefix):]
+    return f"'{record.step}': {reason[:200]}"
+
+
 # A plan for a 50-90 call runbook carries every step's arguments: a verbose
 # strong model overruns 8k tokens (B-048, measured live 2026-10-18 with
 # xiaomi/mimo-v2.6-pro: 8000 completion tokens, finish_reason=length). A
@@ -297,7 +307,8 @@ Rules:
   tool's schema exactly.
 - Follow the runbook sequence; skip steps the brief makes unnecessary (e.g. skip
   discovery when competitors are named).
-- Set on_error_skip=true for enrichment steps that may safely fail.
+- Set on_error_skip=true for steps the report can do without (enrichment, per-item fan-out). A refused
+  required step does not stop the run, but it leaves the report partial and is asked again on resume.
 - Transform steps are first-class: use {"step": "<name>", "tool": "transform",
   "instruction": "<what to synthesize, and from which prior steps>"} for the
   runbook's Transform: markers (synthesis/extraction between tool calls). They
@@ -489,7 +500,10 @@ class Orchestrator:
             for record in checkpoint.steps:
                 if record.state == DISPATCHING:
                     record.state, record.reason = OUTCOME_UNKNOWN, "process exited during dispatch"
-                elif record.state == SKIPPED_BUDGET or (record.state == FAILED and not record.on_error_skip):
+                elif record.state in (SKIPPED_BUDGET, FAILED):
+                    # A failed optional step exists only after a refusal that
+                    # stopped the run (empty wallet, refusals in a row): it is
+                    # asked again too (B-049).
                     record.state, record.reason = PENDING, None
             log.info("resuming run %s: %s", run_id, checkpoint.step_counts())
             checkpoint.stop_reason = None
@@ -543,13 +557,18 @@ class Orchestrator:
             await self._execute(runbook, checkpoint, store, ledger, started_monotonic)
             refused = [s for s in checkpoint.steps
                        if s.state == FAILED and not s.on_error_skip and not (s.reason or "").startswith("raw_write")]
-            if refused and checkpoint.stop_reason is None:
-                # The workers went on past these refusals (B-049); the run still
-                # ends partial/step_failed, and the writer is told which steps
-                # found nothing before it writes.
-                named = "; ".join(f"'{s.step}': {(s.reason or '')[:160]}" for s in refused[:5])
+            if refused:
+                # The workers went on past these refusals (B-049). The writer is
+                # told which steps were refused before it writes. With no other
+                # stop the run ends step_failed; a budget stop keeps its code
+                # (its text leads) and names the refused steps after it.
+                named = "; ".join(_refusal_text(s) for s in refused[:5])
                 more = f" (+{len(refused) - 5} more)" if len(refused) > 5 else ""
-                checkpoint.stop_reason = f"{len(refused)} required step(s) failed and the run went on: {named}{more}"
+                text = f"{len(refused)} required step(s) refused and the run went on: {named}{more}"
+                if checkpoint.stop_reason is None:
+                    checkpoint.stop_reason = text
+                elif terminal.code_for_stop_reason(checkpoint.stop_reason) != terminal.STEP_FAILED:
+                    checkpoint.stop_reason = f"{checkpoint.stop_reason}; also {text}"
                 checkpoint.partial = True
                 store.save_checkpoint(checkpoint)
 
@@ -598,8 +617,10 @@ class Orchestrator:
                 fidelity = FidelityResult(report_md="", **{k: prior.get(k, 0) for k in
                                                            ("checked", "supported", "unverified", "unchecked")})
             else:
-                outcome, fidelity = ledger_only_report(runbook, ledger, checkpoint.stop_reason), FidelityResult(
-                    report_md="")
+                llm_stop = terminal.budget_stop_text(terminal.BUDGET_LLM, meter.max_usd)
+                reason = (checkpoint.stop_reason if checkpoint.stop_reason.startswith(llm_stop)
+                          else f"{llm_stop}; {checkpoint.stop_reason}")
+                outcome, fidelity = ledger_only_report(runbook, ledger, reason), FidelityResult(report_md="")
         if meter.refusals and checkpoint.stop_reason is None:
             # A repair pass or a citation batch the cap refused was handled
             # quietly (draft kept, batch unchecked); the run still says so.
@@ -935,10 +956,18 @@ class Orchestrator:
             "their units and name the artifact each fact came from. "
             + _UNTRUSTED_INSTRUCTION
         )
+        position = next((i for i, s in enumerate(checkpoint.steps) if s.step_id == record.step_id), len(checkpoint.steps))
+        refused = [s for s in checkpoint.steps[:position]
+                   if s.kind == "data" and s.state in (FAILED, SKIPPED_ON_ERROR)]
+        refused_part = (
+            "\n\n## Steps that returned no data (do not fill their gap from elsewhere; say it is missing)\n"
+            + "\n".join(f"- {_refusal_text(s)}" for s in refused[-10:])
+        ) if refused else ""
         user = (
             f"## Instruction\n{instruction}\n\n"
             "## Recent raw artifacts\n"
             + ("\n\n".join(context_parts) if context_parts else "(no artifacts yet)")
+            + refused_part
         )
         return await self.llm.complete(
             [{"role": "system", "content": system}, {"role": "user", "content": user}],
