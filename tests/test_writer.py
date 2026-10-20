@@ -279,3 +279,23 @@ def test_draft_and_repair_budgets_fit_a_long_report():
 
     assert writer._DRAFT_ESCALATED_MAX_TOKENS >= 24_000
     assert writer._REPAIR_MAX_TOKENS >= writer._DRAFT_ESCALATED_MAX_TOKENS
+
+
+async def test_the_repair_pass_is_given_the_defects_the_judge_proves(tmp_path, fake_llm):
+    # B-057: a report that passed the writer lint shipped a VERIFIED tag on an
+    # assumed claim and a conflict without its tag; the judge vetoed it later.
+    from research_agent.agent.writer import _writing_lint
+    from research_agent.evidence.ledger import Ledger
+
+    ledger = Ledger(tmp_path / "ledger.json")
+    ledger.add(claim="Share is 59.6%", subject="share", value=59.6, unit="%", source_tool="llm_query_perplexity")
+    ledger.add(claim="Price is 10 USD", subject="price", value=10, unit="USD", source_tool="spyfu_get_domain_stats")
+    ledger.add(claim="Price is 30 USD", subject="price", value=30, unit="USD", source_tool="dataforseo_bl_summary")
+    claims = {c.claim: c for c in ledger.claims}
+    share, low = claims["Share is 59.6%"].id, claims["Price is 10 USD"].id
+    report = f"# R\n\nShare is 59.6% [{share}] (VERIFIED).\n\nThe price is 10 USD [{low}].\n"
+    kinds = {i.kind for i in _writing_lint(report, ledger).issues}
+    assert {"status_mislabel", "conflict_hidden"} <= kinds
+    repaired = f"# R\n\nShare is 59.6% [{share}] (ASSUMED).\n\nThe price is 10 USD [{low}] [CONFLICT].\n"
+    left = {i.kind for i in _writing_lint(repaired, ledger).issues}
+    assert not ({"status_mislabel", "conflict_hidden"} & left)

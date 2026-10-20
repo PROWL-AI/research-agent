@@ -1008,13 +1008,14 @@
       "id": "B-057",
       "title": "Route the judge's code-proven defects into the writer's repair pass",
       "source": "accept-finance-20261020c, 2026-10-20",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed: report_checks moved into the agent; repair fixes code-proven defects (2026-10-20)"
     },
     {
       "id": "B-058",

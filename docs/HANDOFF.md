@@ -74,8 +74,8 @@ Objective: close every open item of this agent in its final form, in waves
   (17.5 min, LLM USD 0.131, tools USD 0.322, 247 claims). The judge fails that report; part of it is false positives.
   B-052, B-054, B-055, B-056 closed the same day (PR #18, installed `cf4de7e`) and confirmed live on
   `accept-finance-20261020c`: the judge's FAIL 0.57 there names only real writing defects.
-  **Exact next task: B-057** (route the judge's code-proven defects into the writer's repair pass), then **B-058**
-  (chunk large raw results for extraction). Then the operator labels a report for B-017's person half (a person's
+  B-057 closed the same day: the repair pass gets the judge's code-proven defects (`report_checks.py`).
+  **Exact next task: B-058** (chunk large raw results for extraction). Then the operator labels a report for B-017's person half (a person's
   act; latest report `runs/accept-finance-20261020c/report.md`, local).
   Machine note 2026-10-20: the disk filled (swap 27 GB with 39 sessions) and killed one run mid-way; the run resumed
   without paying twice. Free space then 3.6 GB; Observatory's disk guard and cleanup freed little; swap shrinks only

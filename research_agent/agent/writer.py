@@ -128,6 +128,9 @@ Rules:
   with the correct claim id, or handle the figure per the actions above.
 - Where two ledger claims conflict on the same subject, cite BOTH with
   [CONFLICT].
+- For status_mislabel, conflict_hidden, quote_not_in_ledger and value_mismatch,
+  do what the issue's detail says, on that line only; never add a claim id the
+  ledger does not hold.
 - Change nothing else: structure, sections, and already-correct text stay
   exactly as they are.
 
@@ -421,6 +424,29 @@ async def repair_report(
     )
 
 
+#: How the repair pass fixes each defect the judge would veto on (B-057).
+_DEFECT_FIX = {
+    "status_mislabel": "the ledger does not hold this claim as verified: drop the VERIFIED tag or say ASSUMED/UNVERIFIED as the ledger does",
+    "conflict_hidden": "the cited claim is in CONFLICT in the ledger: tag it [CONFLICT] on this line and show both readings",
+    "quote_not_in_ledger": "no cited claim holds this quotation: cite the claim that does, or paraphrase without quotation marks",
+    "value_mismatch": "no cited claim carries this figure: use the claim's value, cite the claim that has it, or mark the figure derived",
+}
+
+
+def _writing_lint(report_md: str, ledger: Ledger) -> LintResult:
+    """The writer lint plus the defects the judge proves by code (B-057), so the
+    repair pass fixes them before the report ships. missing_ref is lint's own;
+    an undisclosed partial run is handled by disclose_partial."""
+    from research_agent.agent.report_checks import code_defects  # imports this module
+
+    result = lint_report(report_md, ledger)
+    for defect in code_defects(report_md, ledger):
+        if defect["kind"] in _DEFECT_FIX:
+            result.issues.append(LintIssue(kind=defect["kind"], text=defect["text"],
+                                           detail=f"[{defect['claim']}] {_DEFECT_FIX[defect['kind']]}"))
+    return result
+
+
 async def write_and_repair(
     llm: LLMClient,
     runbook: Runbook,
@@ -435,7 +461,7 @@ async def write_and_repair(
         llm, runbook, ledger, brief,
         partial=partial, skipped_steps=skipped_steps, transform_notes=transform_notes,
     )
-    lint_current = lint_report(draft, ledger)
+    lint_current = _writing_lint(draft, ledger)
     lint_before = len(lint_current.issues)
     if not lint_current.issues:
         return WriterOutcome(
@@ -471,7 +497,7 @@ async def write_and_repair(
             )
             break
         report = repaired
-        lint_current = lint_report(report, ledger)
+        lint_current = _writing_lint(report, ledger)
         keys = _issue_keys(lint_current)
         log.info("repair pass %d: %d -> %d lint issues", pass_no, len(previous_keys), len(keys))
         if not keys:
@@ -488,7 +514,7 @@ async def write_and_repair(
     # construction — mark it instead of shipping a phantom citation.
     if lint_current.missing_refs:
         report = sweep_missing_refs(report, lint_current.missing_refs)
-        lint_current = lint_report(report, ledger)
+        lint_current = _writing_lint(report, ledger)
         log.info("missing_ref sweep: %d issue(s) remain", len(lint_current.issues))
 
     return WriterOutcome(
