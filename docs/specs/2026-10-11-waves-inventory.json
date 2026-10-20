@@ -904,13 +904,14 @@
       "id": "B-049",
       "title": "One required step's definite refusal stops its worker and every later segment (3 of 44 steps ran live)",
       "source": "live run accept-finance-20261018b, 2026-10-18",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed: W6-T3 D1 to D8 (b9674fd, 034bbf6, 71e3621); live run accept-finance-20261020 went past its refused step (2026-10-20)"
     },
     {
       "id": "B-050",

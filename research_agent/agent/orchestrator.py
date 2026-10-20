@@ -298,6 +298,28 @@ def _refusal_text(record: Any) -> str:
 _PLAN_MAX_TOKENS = 8_000
 _PLAN_ESCALATED_MAX_TOKENS = 24_000
 
+# The cheap tier's structured answers have the same shape of failure (B-051,
+# live run accept-finance-20261020: a governance-scorecard transform cut at
+# 2000 with reasoning off stopped the run; two claim extractions cut at 2000).
+# A cut answer is asked once more with a larger budget, never looped.
+_TRANSFORM_MAX_TOKENS = 2_000
+_TRANSFORM_ESCALATED_MAX_TOKENS = 6_000
+_EXTRACT_MAX_TOKENS = 2_000
+_EXTRACT_ESCALATED_MAX_TOKENS = 4_000
+
+
+async def _complete_escalating(llm: Any, messages: list[dict[str, str]], first: int, escalated: int,
+                               **kwargs: Any) -> str:
+    """One call; if the answer is cut at max_tokens, one more at `escalated`."""
+    try:
+        return await llm.complete(messages, max_tokens=first, **kwargs)
+    except LLMError as exc:
+        if exc.retryable or exc.finish_reason != "length":
+            raise
+        log.warning("%s output cut at max_tokens=%d; asking once more at %d",
+                    kwargs.get("stage", "llm"), first, escalated)
+        return await llm.complete(messages, max_tokens=escalated, **kwargs)
+
 _PLAN_INSTRUCTIONS = """\
 You are the planner for a research run. Produce an ordered execution plan as JSON:
 {"plan": [{"step": "<short name>", "tool": "<tool name>", "arguments": {...}, "on_error_skip": true|false}]}
@@ -969,10 +991,11 @@ class Orchestrator:
             + ("\n\n".join(context_parts) if context_parts else "(no artifacts yet)")
             + refused_part
         )
-        return await self.llm.complete(
+        return await _complete_escalating(
+            self.llm,
             [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            _TRANSFORM_MAX_TOKENS, _TRANSFORM_ESCALATED_MAX_TOKENS,
             tier="cheap",
-            max_tokens=2000,
             stage="transform",
             reasoning=False,  # B-050: the cheap tier's reasoning can spend the whole budget
         )
@@ -1038,11 +1061,12 @@ class Orchestrator:
             f"Tool: {item.tool}\nStep: {item.step}\nRaw result:\n"
             f"{_UNTRUSTED_OPEN}\n{raw_text}\n{_UNTRUSTED_CLOSE}"
         )
-        text = await self.llm.complete(
+        text = await _complete_escalating(
+            self.llm,
             [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            _EXTRACT_MAX_TOKENS, _EXTRACT_ESCALATED_MAX_TOKENS,
             tier="cheap",
             json_mode=True,
-            max_tokens=2000,
             stage="extract",
             reasoning=False,
         )

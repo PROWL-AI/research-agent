@@ -569,3 +569,56 @@ async def test_citation_checks_and_claim_extraction_send_reasoning_off(patched_r
     assert extract and all(r.get("reasoning") == {"enabled": False} for r in extract)
     planner = [r for r in provider.requests if r.get("max_tokens") == 8000]
     assert planner and all("reasoning" not in r for r in planner)
+
+
+class CutCheapStages(Provider):
+    """Cuts transform and extraction answers below `cut_below` max_tokens (B-051)."""
+
+    def __init__(self, cut_below: int, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.cut_below = cut_below
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        system = body["messages"][0]["content"]
+        cheap_stage = "transform step" in system or "evidence-ledger claims" in system
+        if cheap_stage and (body.get("max_tokens") or 0) < self.cut_below:
+            self.requests.append(body)
+            return httpx.Response(200, json={"choices": [{"message": {"content": '{"claims": [{"cla'},
+                                                          "finish_reason": "length"}],
+                                             "usage": {"prompt_tokens": 10, "completion_tokens": 10, "cost": 0.01}})
+        return super().__call__(request)
+
+
+def _budgets(provider: Provider, marker: str) -> list[int]:
+    return [b.get("max_tokens") for b in provider.requests if marker in b["messages"][0]["content"]]
+
+
+async def test_a_cut_transform_and_extraction_are_asked_once_more_larger(patched_runbooks, tmp_path):
+    from research_agent.agent.orchestrator import (_EXTRACT_ESCALATED_MAX_TOKENS, _EXTRACT_MAX_TOKENS,
+                                                   _TRANSFORM_ESCALATED_MAX_TOKENS, _TRANSFORM_MAX_TOKENS)
+
+    provider = CutCheapStages(cut_below=_EXTRACT_ESCALATED_MAX_TOKENS, cost=0.01, plan_steps=1)
+    llm = _client(provider)
+    result = await Orchestrator(FakeProwl(), llm, runs_root=tmp_path / "runs").run(
+        "mini-teardown", BRIEF, run_id="cut", max_llm_usd=5.0)
+    assert _budgets(provider, "evidence-ledger claims") == [_EXTRACT_MAX_TOKENS, _EXTRACT_ESCALATED_MAX_TOKENS]
+    assert result.terminal_code == "completed"
+    assert _TRANSFORM_MAX_TOKENS < _TRANSFORM_ESCALATED_MAX_TOKENS
+    import inspect
+
+    from research_agent.agent.orchestrator import Orchestrator as O
+    # the transform goes through the same one-retry path (the mini runbook plans no transform)
+    assert "_complete_escalating" in inspect.getsource(O._run_transform)
+
+
+async def test_complete_escalating_asks_once_and_then_fails():
+    from research_agent.agent.orchestrator import _complete_escalating
+    from research_agent.llm import LLMError
+
+    cut = {"choices": [{"message": {"content": "x"}, "finish_reason": "length"}],
+           "usage": {"prompt_tokens": 1, "completion_tokens": 1, "cost": 0.0}}
+    provider = Provider(script=[(200, cut), (200, cut), (200, cut)])
+    with pytest.raises(LLMError):
+        await _complete_escalating(_client(provider), MSG, 2000, 6000, tier="cheap", stage="transform")
+    assert [r["max_tokens"] for r in provider.requests] == [2000, 6000]
