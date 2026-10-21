@@ -1065,7 +1065,7 @@
       "node": "N-FAB",
       "blocked_by": [],
       "closable_in_one_pass": true,
-      "wave": 6,
+      "wave": 5,
       "release": "this"
     }
   ]
