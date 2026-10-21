@@ -202,7 +202,8 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
 - **The repair pass fixes what the judge would veto.** Besides the citation lint, the writer's repair pass gets the
   defects the eval judge proves by code (`research_agent/agent/report_checks.py`): a VERIFIED tag on a claim the ledger
   does not hold as verified, a conflict cited without its [CONFLICT] tag, a quotation no cited claim holds, a figure no
-  cited claim carries. `lint_issues_before`/`lint_issues_after` count both (B-057).
+  cited claim carries. `lint_issues_before`/`lint_issues_after` count both (B-057). The repair pass sends only the lines
+  at fault and patches the lines it gets back (`L<n>: …`), so a long report is not rewritten whole (B-059).
 - **One refused step does not end the run.** A tool that is refused (no results, not found, a provider, scope or
   argument error) marks that step `failed` (or `skipped_on_error` when the plan marked it optional) with the
   server's reason, and the run goes on; with a refused required step it ends `partial` / `step_failed`, and the

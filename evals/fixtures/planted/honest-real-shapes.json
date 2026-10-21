@@ -2,7 +2,7 @@
  "name": "honest-real-shapes",
  "label": "pass",
  "defects": [],
- "why": "B-055: shapes a real report used honestly that the checks once flagged: a signed figure, a percent stated in a numeric claim's text, a table figure in millions against a claim in billions, and a conflict table whose header carries the [CONFLICT] tag.",
+ "why": "B-055: shapes a real report used honestly that the checks once flagged: a signed figure, a percent stated in a numeric claim's text, a table figure in millions against a claim in billions, and a conflict table whose header carries the [CONFLICT] tag. B-060: a template label carrying a figure (the 50% deterioration model) in a sentence citing absence, a figure carrying the writer's assumption marker, and a table row whose only claim ids sit inside a conflict tag.",
  "runbook": "calibration-teardown",
  "partial": false,
  "claims": [
@@ -53,7 +53,39 @@
    "unit": "%",
    "source_tool": "google_search",
    "quote": "US volume share 39%"
+  },
+  {
+   "claim": "The financial statements source returned HTTP 404",
+   "subject": "financials source status",
+   "value": 404,
+   "unit": "HTTP status",
+   "source_tool": "firecrawl_scrape_page_markdown",
+   "quote": "404"
+  },
+  {
+   "claim": "Six named data sources returned no data",
+   "subject": "sources without data",
+   "value": 6,
+   "unit": "sources",
+   "source_tool": "google_search",
+   "quote": "Six named data sources returned no data"
+  },
+  {
+   "claim": "Oral Wegovy reached about 50,000 weekly prescriptions",
+   "subject": "oral wegovy weekly rx",
+   "value": 50000,
+   "unit": "prescriptions",
+   "source_tool": "exa_keyword_search",
+   "quote": "50,000 weekly prescriptions"
+  },
+  {
+   "claim": "Oral Wegovy reached about 265,000 weekly prescriptions",
+   "subject": "oral wegovy weekly rx",
+   "value": 265000,
+   "unit": "prescriptions",
+   "source_tool": "google_search",
+   "quote": "265,000 weekly prescriptions"
   }
  ],
- "report": "# Calibration Teardown\n\n## Executive summary\n\nThe stock moved -1.06% on the day [C1]. Net profit grew +21% [C2]. Free cash flow was DKK -14.7 bn in 2024 [C3].\n\n## Capex\n\n| Year | Capex (DKK m) |\n|---|---|\n| 2022 | ~12,000 [C4] |\n\n## Contradictions\n\n| # | [CONFLICT] | Sources |\n|---|---|---|\n| 1 | US GLP-1 volume share 44.8% [C5] vs 39% [C6] | two searches |\n\n## Source log\n\n- daily change, dataforseo [C1], retrieved 2026-10-20.\n"
+ "report": "# Calibration Teardown\n\n## Executive summary\n\nThe stock moved -1.06% on the day [C1]. Net profit grew +21% [C2]. Free cash flow was DKK -14.7 bn in 2024 [C3].\n\n## Capex\n\n| Year | Capex (DKK m) |\n|---|---|\n| 2022 | ~12,000 [C4] |\n\n## Contradictions\n\n| # | [CONFLICT] | Sources |\n|---|---|---|\n| 1 | US GLP-1 volume share 44.8% [C5] vs 39% [C6] | two searches |\n\n## Gaps\n\nThe quantified 50% deterioration model (§6) could not be produced because the financial source returned no data [C7].\n\nPrecedent transactions are missing [C8]; the 0–30% control-premium range is instruction-supplied (target, assumption — not data).\n\n| Claim | Value | Status |\n|---|---|---|\n| C9 | ~50,000 weekly Rx | VERIFIED (single source) [CONFLICT w/ C10] |\n\n## Source log\n\n- daily change, dataforseo [C1], retrieved 2026-10-20.\n"
 }

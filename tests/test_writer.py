@@ -278,7 +278,8 @@ def test_draft_and_repair_budgets_fit_a_long_report():
     from research_agent.agent import writer
 
     assert writer._DRAFT_ESCALATED_MAX_TOKENS >= 24_000
-    assert writer._REPAIR_MAX_TOKENS >= writer._DRAFT_ESCALATED_MAX_TOKENS
+    # B-059: repair returns only the fixed lines, so its budget is small on purpose
+    assert writer._REPAIR_MAX_TOKENS < writer._DRAFT_ESCALATED_MAX_TOKENS
 
 
 async def test_the_repair_pass_is_given_the_defects_the_judge_proves(tmp_path, fake_llm):
@@ -299,3 +300,42 @@ async def test_the_repair_pass_is_given_the_defects_the_judge_proves(tmp_path, f
     repaired = f"# R\n\nShare is 59.6% [{share}] (ASSUMED).\n\nThe price is 10 USD [{low}] [CONFLICT].\n"
     left = {i.kind for i in _writing_lint(repaired, ledger).issues}
     assert not ({"status_mislabel", "conflict_hidden"} & left)
+
+
+async def test_repair_patches_only_the_lines_with_issues(tmp_path):
+    # B-059: a whole-report repair was cut at 24000 tokens on a long report and
+    # thrown away; the repair now sends and gets back only the lines at fault.
+    from research_agent.agent.writer import LintIssue, LintResult, repair_report
+    from research_agent.evidence.ledger import Ledger
+
+    body = "\n".join(f"Paragraph {i} is fine and long enough to matter." for i in range(400))
+    draft = f"# Report\n\n{body}\n\nTraffic is 100,000 monthly visitors.\n\nThe end.\n"
+    lint = LintResult(issues=[LintIssue(kind="uncited_number", text="100,000 monthly visitors",
+                                        detail="uncited", context="Traffic is 100,000 monthly visitors.")])
+    sent = {}
+
+    class Patch:
+        async def complete(self, messages, **kwargs):
+            sent["user"], sent["max_tokens"] = messages[-1]["content"], kwargs.get("max_tokens")
+            n = draft.split("\n").index("Traffic is 100,000 monthly visitors.")
+            return f"L{n}: Traffic is 100,000 monthly visitors [C1]."
+
+    repaired = await repair_report(Patch(), draft, lint, Ledger(tmp_path / "ledger.json"))
+    assert "Paragraph 7 is fine" not in sent["user"]  # only the faulty line travels
+    assert sent["max_tokens"] <= 8000
+    assert "Traffic is 100,000 monthly visitors [C1]." in repaired
+    assert repaired.count("Paragraph") == 400 and repaired.endswith("The end.\n")
+
+
+async def test_an_empty_patch_deletes_its_line(tmp_path):
+    from research_agent.agent.writer import LintIssue, LintResult, repair_report
+    from research_agent.evidence.ledger import Ledger
+
+    draft = "# R\n\nKeep.\n\nBad 42%.\n"
+    lint = LintResult(issues=[LintIssue(kind="uncited_number", text="42%", detail="uncited", context="Bad 42%.")])
+
+    class Delete:
+        async def complete(self, messages, **kwargs):
+            return "L4: "
+
+    assert (await repair_report(Delete(), draft, lint, Ledger(tmp_path / "ledger.json"))).rstrip() == "# R\n\nKeep."
