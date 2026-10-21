@@ -25,6 +25,7 @@ RC = "research_agent/agent/report_checks.py"
 JT = ["tests/test_judge_calibration.py", "tests/test_judge.py"]
 MUTANTS = [
     ("chart-not-quote", RC, "    if _FENCED_RE.match(sentence):\n        return []\n", "", JT),
+    ("quote-gap", RC, "        if quoted != quoted.strip() or \" | \" in quoted:\n", "        if False:\n", JT),
     # B-060: honest shapes a real report used: assumption marker, template label, conflict-tag ids
     ("assumption-marker", RC, "and not _ASSUMPTION_RE.search(sentence)", "", JT),
     ("label-figure", RC, "figures = _figures(_LABEL_FIGURE_RE.sub(\" \", sentence))", "figures = _figures(sentence)", JT),
