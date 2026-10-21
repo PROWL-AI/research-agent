@@ -698,14 +698,15 @@
       "id": "B-033",
       "title": "This checkout is not a Fabric project: fabric_whoami refuses, so the project board (com.*) and work claims are unreachable",
       "source": "fabric_whoami 2026-10-16",
-      "status": "open — external",
+      "status": "closed",
       "area": "external",
       "node": "N-EXT",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "notes": "Operator step in Fabric: + Project → Open a project. Until then the board is this file.",
       "wave": null,
-      "release": "external"
+      "release": "external",
+      "evidence": "closed: Fabric project research-agent exists, board ready (2026-10-21)"
     },
     {
       "id": "B-034",
@@ -1050,6 +1051,18 @@
       "status": "open",
       "area": "acceptance",
       "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-061",
+      "title": "Re-vendor the delegation verifier to DEC-0045 (small-order key forgery)",
+      "source": "project board announcement 2026-10-21",
+      "status": "open",
+      "area": "service",
+      "node": "N-FAB",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
