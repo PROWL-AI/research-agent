@@ -234,3 +234,22 @@ def test_the_envelope_vouches_for_a_verified_caller_but_not_for_admission():
     assert attribution_gap({"delegation": None})["claim"] == "Fabric admission and chain attribution"
     gap = attribution_gap({"delegation": {"principal": "urn:person:operator", "caller": "caller-agent.default"}})
     assert gap["claim"] == "Fabric admission" and "verified" in gap["reason"]
+
+
+async def test_a_token_forged_against_a_small_order_key_is_refused(tmp_path, estate):
+    # DEC-0045 / CT-29 (B-061): with the identity point as the published key, the
+    # signature R = identity, S = 0 verifies every message on a lax verifier.
+    identity = (1).to_bytes(32, "little")
+    estate.jwks["keys"].append({"kty": "OKP", "crv": "Ed25519", "x": _b64(identity), "kid": "k-small",
+                                "use": "sig", "alg": "EdDSA"})
+    header = {"alg": "EdDSA", "typ": "fabric-delegation+jwt", "kid": "k-small"}
+    good = estate.token().split(".")
+    signing = _b64(json.dumps(header).encode()) + "." + good[1]
+    forged = signing + "." + _b64(identity + bytes(32))
+    app = create_app(tmp_path, "host", "agent", delegation=_policy(estate))
+    status, body = await _result(app, {"Authorization": "Bearer " + forged})
+    assert status == 200 and body["result"]["isError"] is True
+    # a small-order key in the published set is the issuer's fault: refused before
+    # any signature check (the vendored verifier, "small-order-key")
+    assert body["result"]["structuredContent"]["error"]["code"] == "issuer-unavailable"
+    assert app.state.runtime.store.jobs() == []

@@ -40,9 +40,10 @@ _DRAFT_MAX_TOKENS = 8000
 #: B-052: a 44-step finance report on xiaomi/mimo-v2.6-pro (16,258 tokens in) was cut
 #: at both 8000 and 12000; the second budget matches the planner's escalation.
 _DRAFT_ESCALATED_MAX_TOKENS = 24_000
-#: A repair pass rewrites the whole report, so it gets the draft's ceiling, not
-#: the first budget (it was cut at 8000 on the same run and kept the draft).
-_REPAIR_MAX_TOKENS = _DRAFT_ESCALATED_MAX_TOKENS
+#: A repair pass returns only the lines it fixes (B-059), so it needs far less
+#: than a draft; a model that rewrites the whole report anyway is cut here and
+#: the draft is kept.
+_REPAIR_MAX_TOKENS = 8_000
 
 WRITER_SYSTEM_TEMPLATE = """\
 You are the writer for a research run. Write the final markdown report.
@@ -108,8 +109,8 @@ Write the report now, in markdown."""
 
 
 REPAIR_SYSTEM_TEMPLATE = """\
-You are the citation-repair pass for a research report. The draft below failed
-citation lint; fix EVERY listed issue.
+You are the citation-repair pass for a research report. Lines of the report
+failed citation lint; fix EVERY listed issue on its line.
 
 Rules:
 - For each uncited number choose EXACTLY ONE action:
@@ -131,13 +132,12 @@ Rules:
 - For status_mislabel, conflict_hidden, quote_not_in_ledger and value_mismatch,
   do what the issue's detail says, on that line only; never add a claim id the
   ledger does not hold.
-- Change nothing else: structure, sections, and already-correct text stay
-  exactly as they are.
+- Change nothing else on the line: wording that is already correct stays.
 
 ## Evidence ledger (the ONLY source of valid claim ids)
 {ledger_json}
 
-Output the full repaired report in markdown."""
+Output only the fixed lines in the format the request gives."""
 
 
 class WriterOutcome(BaseModel):
@@ -205,6 +205,8 @@ class LintIssue(BaseModel):
     kind: str
     text: str
     detail: str
+    #: The sentence the issue sits in, so the repair pass can find its line (B-059).
+    context: str = ""
 
 
 class LintResult(BaseModel):
@@ -303,6 +305,7 @@ def lint_report(report_md: str, ledger: Ledger) -> LintResult:
                     kind="uncited_number",
                     text=match.group(0).strip(),
                     detail="numeric claim without a [C..] citation in its sentence",
+                    context=sentence,
                 )
             )
     return result
@@ -404,24 +407,62 @@ async def write_report(
         return truncated + "\n\n*(Report truncated at the model's output limit.)*"
 
 
+_REPAIR_MAX_LINES = 60
+_PATCH_RE = re.compile(r"^L(\d+):[ \t]?(.*)$", re.MULTILINE)
+
+
+def _issue_line(lines: list[str], issue: LintIssue) -> int | None:
+    """The report line an issue sits on, or None when it cannot be found."""
+    if issue.kind == "missing_ref":
+        pattern = re.compile(rf"\[[^\]]*\b{re.escape(issue.text)}\b[^\]]*\]")
+        return next((i for i, line in enumerate(lines) if pattern.search(line)), None)
+    probe = " ".join((issue.context or issue.text).split())[:60]
+    if not probe:
+        return None
+    return next((i for i, line in enumerate(lines) if probe in " ".join(line.split())), None)
+
+
 async def repair_report(
     llm: LLMClient,
     draft: str,
     lint: LintResult,
     ledger: Ledger,
 ) -> str:
-    issues = "\n".join(
-        f"- {issue.kind}: {issue.text!r} — {issue.detail}" for issue in lint.issues
+    """One repair pass, by line (B-059): the lines carrying issues go to the model
+    with their issues, and it returns only those lines, which are patched in.
+    A whole-report rewrite was cut at 24000 tokens on a long report and thrown
+    away. A model that answers with a whole report anyway is taken as before."""
+    lines = draft.split("\n")
+    by_line: dict[int, list[LintIssue]] = {}
+    for issue in lint.issues:
+        index = _issue_line(lines, issue)
+        if index is not None:
+            by_line.setdefault(index, []).append(issue)
+    if not by_line:
+        return draft
+    chosen = sorted(by_line)[:_REPAIR_MAX_LINES]
+    tasks = "\n\n".join(
+        f"L{i}: {lines[i]}\n" + "\n".join(f"  - {issue.kind}: {issue.text!r} ({issue.detail})" for issue in by_line[i])
+        for i in chosen
     )
     system = REPAIR_SYSTEM_TEMPLATE.format(ledger_json=ledger.as_prompt_json())
-    user = f"## Lint issues to fix\n{issues}\n\n## Draft report\n{draft}"
-    return await llm.complete(
+    user = (f"## Lines to fix\n{tasks}\n\n"
+            "Return ONLY the fixed lines, one per line given, each as `L<n>: <fixed line>` with the same n. "
+            "An empty fixed line deletes it. Do not return any other text.")
+    answer = await llm.complete(
         [{"role": "system", "content": system}, {"role": "user", "content": user}],
         tier="strong",
         max_tokens=_REPAIR_MAX_TOKENS,
         temperature=0.2,
         stage="repair",
     )
+    patches = {int(n): text for n, text in _PATCH_RE.findall(answer) if int(n) in by_line}
+    if not patches:
+        # No line patches: the model rewrote the whole report. Take it as before;
+        # the caller's collapse check refuses a gutted answer.
+        return answer
+    patched = [patches.get(i, line) for i, line in enumerate(lines)]
+    return "\n".join(line for i, line in enumerate(patched) if not (i in patches and not line.strip()))
 
 
 #: How the repair pass fixes each defect the judge would veto on (B-057).
@@ -443,7 +484,8 @@ def _writing_lint(report_md: str, ledger: Ledger) -> LintResult:
     for defect in code_defects(report_md, ledger):
         if defect["kind"] in _DEFECT_FIX:
             result.issues.append(LintIssue(kind=defect["kind"], text=defect["text"],
-                                           detail=f"[{defect['claim']}] {_DEFECT_FIX[defect['kind']]}"))
+                                           detail=f"[{defect['claim']}] {_DEFECT_FIX[defect['kind']]}",
+                                           context=defect["text"]))
     return result
 
 

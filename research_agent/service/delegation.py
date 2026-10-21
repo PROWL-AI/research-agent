@@ -13,7 +13,8 @@ Configuration (environment, read at start):
   RESEARCH_DELEGATION_JWKS     where the estate's key set is read: https, loopback http, or a file
   RESEARCH_DELEGATION_AUDIENCE this service's agent id (default `prowl-research.default`)
 
-The verifier is the adapter kit's (vendor/fabric_delegation.py, unchanged).
+The verifier is the adapter kit's (vendor/fabric_delegation.py, unchanged; re-vendored 2026-10-21 from
+fabric-agent-adapter 969a4ca, B-061).
 """
 
 from __future__ import annotations

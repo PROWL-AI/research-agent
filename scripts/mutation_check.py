@@ -24,6 +24,10 @@ J = "evals/judge.py"
 RC = "research_agent/agent/report_checks.py"
 JT = ["tests/test_judge_calibration.py", "tests/test_judge.py"]
 MUTANTS = [
+    # B-060: honest shapes a real report used: assumption marker, template label, conflict-tag ids
+    ("assumption-marker", RC, "and not _ASSUMPTION_RE.search(sentence)", "", JT),
+    ("label-figure", RC, "figures = _figures(_LABEL_FIGURE_RE.sub(\" \", sentence))", "figures = _figures(sentence)", JT),
+    ("conflict-tag-ids", RC, "_cited(_CONFLICT_REF_RE.sub(\" \", sentence))", "_cited(sentence)", JT),
     # W6-T1 — judge vetoes and metering
     ("veto", J, "self.passed = self.total >= threshold and not self.defects", "self.passed = self.total >= threshold", JT),
     ("missing_ref", RC, 'add("missing_ref", ref,', 'None and add("missing_ref", ref,', JT),

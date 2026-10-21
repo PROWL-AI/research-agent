@@ -31,6 +31,8 @@ of the 19 came from claims about the search request itself (timestamps, detected
 longer sees (B-054). The 4 left are real: a conflict cited in another section without its tag, and two quoted headlines
 the cited claims do not hold.
 
+Three more honest shapes from `accept-finance-20261020d` (B-060, 2026-10-21) joined `honest-real-shapes`: a figure that names a template item ("the 50% deterioration model"), a figure carrying the writer's assumption marker, and claim ids inside a conflict tag ("[CONFLICT w/ C32/C45]"), which name the rival readings rather than cite the line's figure. Each exemption has its own mutant (`assumption-marker`, `label-figure`, `conflict-tag-ids`).
+
 ## What the checks do not catch (named, not vetoed)
 
 - An uncited figure: it lowers `citation_accuracy` through the lint cap; it is not a veto.

@@ -515,8 +515,6 @@
       "area": "evals",
       "node": "N-ACC",
       "blocked_by": [
-        "B-059",
-        "B-060",
         "KA-07",
         "KA-08",
         "KA-09"
@@ -1036,37 +1034,40 @@
       "id": "B-059",
       "title": "Repair by line or section instead of a whole-report rewrite (cut at 24000)",
       "source": "accept-finance-20261020d, 2026-10-20",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed: fix/b059-b061 (2026-10-21)"
     },
     {
       "id": "B-060",
       "title": "Judge false positives: section refs, assumption marker, ids inside a conflict tag",
       "source": "accept-finance-20261020d, 2026-10-20",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed: fix/b059-b061 (2026-10-21)"
     },
     {
       "id": "B-061",
       "title": "Re-vendor the delegation verifier to DEC-0045 (small-order key forgery)",
       "source": "project board announcement 2026-10-21",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-FAB",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 5,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed: fix/b059-b061 (2026-10-21)"
     }
   ]
 }

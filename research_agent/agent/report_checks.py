@@ -123,6 +123,14 @@ def _register(text: str) -> bool:
 
 _SOURCE_LOG_HEADING_RE = re.compile(r"^#+\s*(?:\d+[.)]\s*)?(?:\*\*)?source log(?:\*\*)?\s*[:.]?\s*$", re.IGNORECASE)
 _DERIVED_RE = re.compile(r"\bderived\b(?!\s+from\b)", re.IGNORECASE)
+#: The writer's assumption marker: the figure is a stated assumption, not data (B-060).
+_ASSUMPTION_RE = re.compile(r"\(target, assumption")
+#: A figure that names a template item ("the 50% deterioration model", "a 30% stress
+#: test") is a label, not a datum (B-060).
+_LABEL_FIGURE_RE = re.compile(r"\d[\d,.]*\s?%?(?:\s+[a-z][a-z-]*){0,2}\s+(?:model|test|scenario|rule)s?\b", re.IGNORECASE)
+#: Claim ids inside a conflict tag ("[CONFLICT w/ C32/C45]") name the rival
+#: readings; they do not cite the line's figure (B-060).
+_CONFLICT_REF_RE = re.compile(r"\[CONFLICT\b[^\]]*\]")
 
 
 #: A status tag right after a citation block: "[C17] (VERIFIED)", "[C1, C2] VERIFIED (single source)".
@@ -298,14 +306,15 @@ def code_defects(report_md: str, ledger: Ledger, checkpoint: Any = None) -> list
         quotations = _quotations(sentence)
         if quotations and not any(_backed(q, c) for q in quotations for c in cited):
             add("quote_not_in_ledger", cited[0].id, sentence)
-        values = _claim_values(cited)
-        figures = _figures(sentence)
+        value_cited = [claims[ref] for ref in _cited(_CONFLICT_REF_RE.sub(" ", sentence)) if ref in claims]
+        values = _claim_values(value_cited)
+        figures = _figures(_LABEL_FIGURE_RE.sub(" ", sentence))
         # A metric figure (the writer lint's definition) none of the cited values
         # matches — a bare number may carry the value ("interest 36 [C18]"), and a
         # figure marked "derived" (not "derived from") is the writer's computed one.
-        if (figures and values and not _DERIVED_RE.search(sentence)
+        if (figures and values and not _DERIVED_RE.search(sentence) and not _ASSUMPTION_RE.search(sentence)
                 and not any(_matches(f, v) for f in figures + _numbers(sentence) for v in values)):
-            add("value_mismatch", cited[0].id, sentence)
+            add("value_mismatch", value_cited[0].id, sentence)
     if checkpoint is not None and checkpoint.partial and not partial_disclosed(report_md):
         add("partial_undisclosed", "", next((line for line in report_md.splitlines() if line.strip()),
                                             "(empty report head)"))
