@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from pydantic import BaseModel, Field
 
+from research_agent.agent.bindings import substitute
 from research_agent.agent.orchestrator import PlanItem
 from research_agent.events import emit
 from research_agent.evidence.store import CheckpointWriteError  # noqa: F401 — re-exported
@@ -189,7 +190,8 @@ def _set_state(checkpoint: Checkpoint, record: StepRecord, state: str, reason: s
 
 
 def plan_item(record: StepRecord) -> PlanItem:
-    return PlanItem(step=record.step, tool=record.tool, arguments=record.arguments,
+    return PlanItem(step=record.step, tool=record.tool,
+                    arguments=record.bound_arguments or record.arguments,
                     instruction=record.instruction, on_error_skip=record.on_error_skip)
 
 
@@ -348,6 +350,28 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             save_state(checkpoint, ctx.store)
             return summary
 
+        arguments, missing = substitute(record.arguments, checkpoint.bindings)
+        if missing:
+            # Never sent: the provider would refuse the literal placeholder and
+            # bill the call (B-065). Not a refusal, so the cap neither counts
+            # nor resets.
+            names = ", ".join("{{" + n + "}}" for n in sorted(missing))
+            reason = f"not sent: no earlier step resolved {names}"
+            emit(log, "step.unbound", logging.WARNING, run_id=checkpoint.run_id,
+                 step_id=record.step_id, tool=record.tool, missing=sorted(missing))
+            if record.on_error_skip:
+                _set_state(checkpoint, record, SKIPPED_ON_ERROR, reason)
+                status = "skipped"
+            else:
+                _set_state(checkpoint, record, FAILED, f"step '{record.step}' failed: {reason}")
+                checkpoint.partial = True
+                status = "failed"
+            save_state(checkpoint, ctx.store)
+            summary.outcomes.append(StepOutcome(step_id=record.step_id, step=record.step,
+                                                tool=record.tool, status=status, note=reason[:120]))
+            continue
+        record.bound_arguments = arguments if arguments != record.arguments else None
+
         attempt = _new_attempt(ctx, record)
         _set_state(checkpoint, record, DISPATCHING)
         save_state(checkpoint, ctx.store)
@@ -356,7 +380,7 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
         before = getattr(ctx.orch.prowl, "cost_usd", None)
         try:
             result = await ctx.orch.prowl.call_tool(
-                record.tool, record.arguments, idempotency_key=attempt.idempotency_key,
+                record.tool, arguments, idempotency_key=attempt.idempotency_key,
             )
         except asyncio.CancelledError as exc:
             # The call may have reached the server: the next attempt re-sends the
