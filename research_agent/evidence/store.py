@@ -94,6 +94,9 @@ class StepRecord(BaseModel):
         default_factory=lambda: {"status": "pending", "error": None, "claim_ids": []}
     )
     attempt_ids: list[str] = Field(default_factory=list)
+    #: The arguments as sent, when the plan's carried placeholders an earlier
+    #: transform resolved (B-065); `arguments` keeps the plan as written.
+    bound_arguments: dict[str, Any] | None = None
     #: The v1 idempotency key (`run:index:tool`) of a step migrated from a v1
     #: checkpoint whose dispatch may have reached the server; used for the
     #: step's first resend only.
@@ -142,6 +145,9 @@ class Checkpoint(BaseModel):
     steps: list[StepRecord] = []
     attempts: list[AttemptRecord] = []
     transform_notes: list[str] = []
+    #: Placeholder values earlier transforms resolved and the raw artifacts
+    #: confirmed, by name (B-065, research_agent.agent.bindings).
+    bindings: dict[str, str] = {}
     stats: dict[str, Any] = {}
     partial: bool = False
     stop_reason: str | None = None

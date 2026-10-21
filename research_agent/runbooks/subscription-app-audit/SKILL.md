@@ -87,7 +87,9 @@ quartile and category. Depth on the subject app beats breadth across rivals.
    name. Fallback (on_error=skip): `apple_app_store` + `google_play_store`
    search; last resort `firecrawl_search` for the canonical
    apps.apple.com / play.google.com URLs. Validate with `apple_product` /
-   `google_play_product`.
+   `google_play_product`. Transform: hand each resolved id to the later
+   steps as a placeholder (`{{<brand>_apple_id}}`, `{{<brand>_play_id}}`);
+   every later step that takes an id uses those names.
 3. **Competitor set** (skip if `competitors` given) — Parallel:
    `dataforseo_labs_apple_app_competitors` +
    `dataforseo_labs_google_app_competitors` for the subject app

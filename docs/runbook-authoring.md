@@ -90,7 +90,11 @@ Follow the flagship (`saas-competitor-teardown/SKILL.md`):
    organic traffic"), never vague ("analyze competitors"). Prefer one batched
    call over per-item fan-out for bulk-capable tools. Transform steps are
    first-class: they run as LLM passes over prior artifacts and cost no tool
-   calls.
+   calls. When a later step needs a value only an earlier step returns (a
+   store id, a package name), say in the runbook which step resolves it and
+   that a Transform hands it on: the planner writes the argument as
+   `{{name}}` and the transform returns it; an unresolved placeholder is
+   not sent (B-065).
 4. `## Verification (hard rules)` — the numeric disciplines: triangulation
    (>=2 independent sources for key numbers), error bands on estimates,
    VERIFIED/ASSUMED tags, [CONFLICT] instead of silent averaging, LLM output

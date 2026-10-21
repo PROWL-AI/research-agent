@@ -212,6 +212,13 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   whose outcome is unknown, five refusals of required steps in a row across the run (optional steps neither count
   nor reset it), and every budget. A budget stop keeps its own `terminal_code`; its `stop_reason` also names the
   refused steps. A resume asks every `failed` step again (a new attempt, which the provider may bill again).
+- **A value only an earlier step returns is a placeholder.** The plan is written before any tool runs, so an
+  argument such as an app's numeric store id is planned as `{{headspace_apple_id}}`, with a transform before the
+  step that names it. That transform ends its note with a fenced `bindings` block; a value is kept only when a raw
+  artifact of the run states it verbatim (`checkpoint.bindings`), and the step sends the filled arguments
+  (`bound_arguments`; `arguments` keeps the plan as written). A placeholder nobody resolved is never sent: the step
+  is `skipped_on_error` (or `failed`, when required) with `not sent: no earlier step resolved {{name}}`, and it does
+  not count toward the refusals in a row (B-065).
 - Runbooks declare their **tool allowlist** and **budget**
   (`max_tool_calls` / `max_usd` / `max_minutes`). On budget exhaustion the agent
   emits a partial report that marks what is missing — it never fails silently.

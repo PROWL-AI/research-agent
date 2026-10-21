@@ -1,0 +1,128 @@
+"""Values a later step needs that only an earlier step returns (B-065).
+
+The plan is written once, before any tool runs, so an argument that depends on
+a result (an app's numeric store id, a package name found by a search) cannot
+be written literally. The planner writes it as a placeholder, ``{{name}}``, and
+puts a transform before the step whose instruction says where the value is.
+That transform ends its note with a fenced ``bindings`` block; a value is kept
+only when it appears verbatim in a raw artifact of the run, so a model cannot
+invent an id. Before dispatch the step's arguments are filled; a placeholder
+nobody resolved is never sent (the provider would refuse it and bill the call).
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from typing import Any, Iterable
+
+#: Any ``{{...}}`` the planner wrote, valid name or not: an invalid one is an
+#: unresolved placeholder too, never text to send to a provider.
+_PLACEHOLDER_RE = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
+_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_BLOCK_RE = re.compile(r"```bindings\s*\n(.*?)\n?```", re.DOTALL)
+#: A value shorter than this matches too much text to prove anything.
+_MIN_GROUNDED_LEN = 3
+
+
+def placeholders(value: Any) -> set[str]:
+    """Every placeholder name inside a JSON-like value (strings only)."""
+    found: set[str] = set()
+    if isinstance(value, str):
+        found.update(m.group(1) for m in _PLACEHOLDER_RE.finditer(value))
+    elif isinstance(value, dict):
+        for item in value.values():
+            found |= placeholders(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            found |= placeholders(item)
+    return found
+
+
+def substitute(value: Any, bindings: dict[str, str]) -> tuple[Any, set[str]]:
+    """(value with every bound placeholder filled, the names still missing).
+
+    A string that is exactly one placeholder becomes the bound value; a
+    placeholder inside longer text is replaced in place."""
+    missing: set[str] = set()
+
+    def fill(item: Any) -> Any:
+        if isinstance(item, str):
+            whole = _PLACEHOLDER_RE.fullmatch(item.strip())
+            if whole and whole.group(1) in bindings:
+                return bindings[whole.group(1)]
+
+            def one(m: re.Match[str]) -> str:
+                name = m.group(1)
+                if name in bindings:
+                    return bindings[name]
+                missing.add(name)
+                return m.group(0)
+
+            return _PLACEHOLDER_RE.sub(one, item)
+        if isinstance(item, dict):
+            return {k: fill(v) for k, v in item.items()}
+        if isinstance(item, list):
+            return [fill(v) for v in item]
+        return item
+
+    return fill(value), missing
+
+
+def wanted(steps: Iterable[Any], bound: dict[str, str]) -> list[str]:
+    """Names later data steps use that nothing has resolved yet, in plan order."""
+    names: list[str] = []
+    for record in steps:
+        if getattr(record, "kind", "data") != "data":
+            continue
+        for name in sorted(placeholders(record.arguments)):
+            if name not in bound and name not in names and _NAME_RE.match(name):
+                names.append(name)
+    return names
+
+
+def parse(note: str) -> dict[str, str]:
+    """The last ``bindings`` block of a transform note, scalars only."""
+    blocks = _BLOCK_RE.findall(note or "")
+    if not blocks:
+        return {}
+    try:
+        data = json.loads(blocks[-1])
+    except ValueError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: dict[str, str] = {}
+    for name, value in data.items():
+        if not isinstance(name, str) or not _NAME_RE.match(name):
+            continue
+        if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+            continue
+        text = str(value).strip()
+        if text:
+            out[name] = text
+    return out
+
+
+def strip_block(note: str) -> str:
+    """The note without its ``bindings`` blocks (the writer reads the prose)."""
+    return _BLOCK_RE.sub("", note or "").rstrip()
+
+
+def grounded(candidates: dict[str, str], names: Iterable[str], texts: Iterable[str]) -> tuple[dict[str, str], dict[str, str]]:
+    """(kept, rejected-with-reason): a value is kept when its name was asked
+    for and the value appears verbatim in one of the raw artifact texts."""
+    asked = set(names)
+    corpus = list(texts)
+    kept: dict[str, str] = {}
+    rejected: dict[str, str] = {}
+    for name, value in candidates.items():
+        if name not in asked:
+            rejected[name] = "not asked for by any later step"
+        elif len(value) < _MIN_GROUNDED_LEN:
+            rejected[name] = "value too short to check"
+        elif not any(value in text for text in corpus):
+            rejected[name] = "value not found in any raw artifact"
+        else:
+            kept[name] = value
+    return kept, rejected

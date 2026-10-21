@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 
+from research_agent.agent import bindings as plan_bindings
 from research_agent.agent.citations import FidelityResult
 from research_agent.agent.writer import WriterOutcome, disclose_partial, ledger_only_report, produce_report
 from research_agent.agent.metering import attach_run_meter, budget_stats
@@ -362,6 +363,12 @@ Rules:
   "instruction": "<what to synthesize, and from which prior steps>"} for the
   runbook's Transform: markers (synthesis/extraction between tool calls). They
   need no tool schema and do not consume the tool-call budget.
+- A value only an earlier step returns (an app's numeric store id, a package name, a
+  domain found by a search) is written as a placeholder "{{snake_case_name}}" in the
+  argument that needs it, and a transform step BEFORE that step names the placeholder
+  and the step whose artifact states the value (e.g. "From resolve_app_store_ids: give
+  headspace_apple_id and headspace_play_id"). A placeholder no earlier transform
+  resolves is not sent; never put any other template text in an argument.
 - Prefer one batched tool call over per-item fan-out when the tool supports bulk
   input (e.g. dataforseo_bl_bulk_ranks takes multiple domains in one call).
 - Keep the total number of tool-call steps within the tool-call budget.
@@ -1004,10 +1011,32 @@ class Orchestrator:
                  step_id=record.step_id, reason="raw_write", error=exc)
             save_state(checkpoint, store)
             return
-        checkpoint.transform_notes.append(str(result))
+        self._resolve_bindings(record, checkpoint, store, str(result))
+        checkpoint.transform_notes.append(plan_bindings.strip_block(str(result)))
         record.state = RAW_SAVED
         save_state(checkpoint, store)
         await extract_step(ctx, record, str(result))
+
+    def _resolve_bindings(self, record: StepRecord, checkpoint: Checkpoint, store: ArtifactStore, note: str) -> None:
+        """Keep the placeholder values this transform named that a raw
+        artifact of the run states verbatim (B-065); log the rest."""
+        candidates = plan_bindings.parse(note)
+        if not candidates:
+            return
+        position = next((i for i, s in enumerate(checkpoint.steps) if s.step_id == record.step_id),
+                        len(checkpoint.steps))
+        names = plan_bindings.wanted(checkpoint.steps[position + 1:], checkpoint.bindings)
+        texts = []
+        for s in checkpoint.steps[:position]:
+            if s.kind == "data" and s.raw_ref and s.state in (COMPLETED, RAW_SAVED):
+                try:
+                    texts.append(store.read_artifact(s.raw_ref))
+                except OSError as exc:
+                    log.warning("bindings: %s unreadable: %s", s.raw_ref, exc)
+        kept, rejected = plan_bindings.grounded(candidates, names, texts)
+        checkpoint.bindings.update(kept)
+        emit(log, "bindings.resolved", run_id=checkpoint.run_id, step_id=record.step_id,
+             kept=sorted(kept), rejected=rejected or None)
 
     async def _run_transform(self, record: StepRecord, checkpoint: Checkpoint, store: ArtifactStore) -> str:
         instruction = record.instruction or (
@@ -1044,11 +1073,21 @@ class Orchestrator:
             "\n\n## Steps that returned no data (do not fill their gap from elsewhere; say it is missing)\n"
             + "\n".join(f"- {_refusal_text(s)}" for s in refused[-10:])
         ) if refused else ""
+        names = plan_bindings.wanted(checkpoint.steps[position + 1:], checkpoint.bindings)
+        bindings_part = (
+            "\n\n## Values later steps need (B-065)\n"
+            f"Later steps of the plan need: {', '.join(names)}. For each one an artifact above states, "
+            "end your answer with one fenced block, the value copied exactly as the artifact writes it:\n"
+            "```bindings\n{\"<name>\": \"<value>\"}\n```\n"
+            "Leave out a name no artifact states; never guess one. A value not found verbatim in the "
+            "raw artifacts is discarded."
+        ) if names else ""
         user = (
             f"## Instruction\n{instruction}\n\n"
             "## Recent raw artifacts\n"
             + ("\n\n".join(context_parts) if context_parts else "(no artifacts yet)")
             + refused_part
+            + bindings_part
         )
         return await _complete_escalating(
             self.llm,
