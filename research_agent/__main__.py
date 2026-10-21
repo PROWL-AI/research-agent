@@ -215,27 +215,39 @@ async def _cmd_run(
     # crashed run's terminal state under the run lock; the CLI only reports.
     run_id = run_id or Orchestrator._new_run_id(runbook_name)
 
-    async with ProwlClient(
-        api_key=config.prowl_api_key, mcp_url=config.prowl_mcp_url
-    ) as prowl, LLMClient(
-        base_url=config.llm_base_url,
-        api_key=config.llm_api_key,
-        model_cheap=config.llm_model,
-        model_strong=config.llm_model_strong,
-    ) as llm:
-        orchestrator = Orchestrator(prowl, llm, runs_root=_runs_root())
-        try:
-            result = await orchestrator.run(runbook_name, inputs, run_id=run_id, max_llm_usd=max_llm_usd)
-        except RunbookError as exc:
-            # Usage error (unknown/invalid runbook) — README promises exit 2.
-            print(f"error: {exc}", file=sys.stderr)
-            return 2
-        except (OrchestratorError, InputError) as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            return 1
-        except Exception as exc:
-            print(f"error: run {run_id} failed: {exc}", file=sys.stderr)
-            return 1
+    try:
+        async with ProwlClient(
+            api_key=config.prowl_api_key, mcp_url=config.prowl_mcp_url
+        ) as prowl, LLMClient(
+            base_url=config.llm_base_url,
+            api_key=config.llm_api_key,
+            model_cheap=config.llm_model,
+            model_strong=config.llm_model_strong,
+        ) as llm:
+            orchestrator = Orchestrator(prowl, llm, runs_root=_runs_root())
+            try:
+                result = await orchestrator.run(runbook_name, inputs, run_id=run_id, max_llm_usd=max_llm_usd)
+            except RunbookError as exc:
+                # Usage error (unknown/invalid runbook) — README promises exit 2.
+                print(f"error: {exc}", file=sys.stderr)
+                return 2
+            except (OrchestratorError, InputError) as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                return 1
+            except Exception as exc:
+                print(f"error: run {run_id} failed: {exc}", file=sys.stderr)
+                return 1
+    except BaseExceptionGroup as group:
+        # B-063: a dropped Prowl connection arrives as an exception group from the
+        # MCP client's task group, after the run recorded itself `cancelled`.
+        leaves = _leaf_errors(group)
+        if not leaves:
+            raise
+        reason = f"{type(leaves[0]).__name__}: {leaves[0]}"
+        Orchestrator.record_transport_failure(_runs_root(), run_id, reason)
+        print(f"error: run {run_id} failed: the connection to Prowl dropped ({reason}); "
+              f"run it again with --run-id {run_id} to resume", file=sys.stderr)
+        return 1
 
     print(f"run {result.run_id}: {result.status} (terminal: {result.terminal_code})")
     print(f"  report: {result.report_path}")
@@ -244,6 +256,15 @@ async def _cmd_run(
     if result.skipped_steps:
         print(f"  skipped: {len(result.skipped_steps)} steps")
     return 0 if result.status == "complete" else 1
+
+
+def _leaf_errors(group: BaseException) -> list[BaseException]:
+    """The non-cancellation errors inside an exception group, depth first."""
+    if isinstance(group, BaseExceptionGroup):
+        return [leaf for exc in group.exceptions for leaf in _leaf_errors(exc)]
+    if isinstance(group, (asyncio.CancelledError, KeyboardInterrupt, SystemExit, GeneratorExit)):
+        return []
+    return [group]
 
 
 def _cmd_validate(online: bool) -> int:

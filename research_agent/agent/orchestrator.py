@@ -441,6 +441,38 @@ class Orchestrator:
             lock.release()
 
     @staticmethod
+    def record_transport_failure(runs_root: Path, run_id: str, reason: str) -> bool:
+        """Correct a run the transport killed (B-063). The MCP client's task group
+        turns a dropped connection into a cancellation of its scope, so `run`
+        records `cancelled`; the caller sees the real error after the scope exits
+        and calls this. Under the run's lock, a run left `cancelled` becomes
+        `failed`/`error` with the reason (resumable, like any failed run).
+        Returns whether it changed anything; never raises."""
+        store = ArtifactStore(Path(runs_root) / run_id)
+        lock = RunLock(store.run_dir)
+        try:
+            if not store.run_dir.is_dir() or not lock.acquire(blocking=False):
+                return False
+        except OSError:
+            return False
+        try:
+            checkpoint = store.load_checkpoint()
+            if checkpoint is None or checkpoint.terminal_code != terminal.CANCELLED:
+                return False
+            checkpoint.status = "failed"
+            checkpoint.stop_reason = f"transport failure: {reason}"[:300]
+            checkpoint.terminal_code = terminal.ERROR
+            store.save_checkpoint(checkpoint)
+            emit(log, "run.terminal", logging.WARNING, run_id=run_id, status="failed",
+                 terminal_code=terminal.ERROR, partial=checkpoint.partial)
+            return True
+        except Exception as exc:  # noqa: BLE001
+            log.error("run %s: transport-failure correction failed: %s", run_id, exc)
+            return False
+        finally:
+            lock.release()
+
+    @staticmethod
     def _write_terminal(
         store: ArtifactStore,
         runbook_name: str,

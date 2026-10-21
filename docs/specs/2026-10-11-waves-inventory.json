@@ -681,7 +681,7 @@
       "id": "B-032",
       "title": "Server-side dedupe of a same-key resend is unverified offline (Prowl retry window, 15 min default); CORE-14",
       "source": "wave-2 product certification; prowl-app persistence/wallet.py retry window",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [
@@ -690,7 +690,8 @@
       ],
       "closable_in_one_pass": false,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed: live probe 2026-10-21, resend billed 0.0 (server cache caveat)"
     },
     {
       "id": "B-033",
@@ -1081,6 +1082,19 @@
       "wave": 6,
       "release": "this",
       "evidence": "closed: reasoning off for repair; 53 to 3 issues on the real report (2026-10-21)"
+    },
+    {
+      "id": "B-063",
+      "title": "A Prowl transport failure is recorded as cancelled",
+      "source": "accept-teardown-20261021, 2026-10-21",
+      "status": "closed",
+      "area": "service",
+      "node": "N-STATE",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 2,
+      "release": "this",
+      "evidence": "closed: CLI records a transport failure as error (2026-10-21)"
     }
   ]
 }
