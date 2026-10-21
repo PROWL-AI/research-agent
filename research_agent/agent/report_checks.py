@@ -60,9 +60,15 @@ def _cited(sentence: str) -> list[str]:
     return list(dict.fromkeys(ids))
 
 
+#: A fenced chart or code line: its JSON strings are data, not quotations (B-062).
+_FENCED_RE = re.compile(r"^\s*```")
+
+
 def _quotations(sentence: str) -> list[str]:
-    """Quoted text of three words or more that reads as a quotation of a source —
-    not a search phrase ("how to use Notion" search traffic)."""
+    """Quoted text of three words or more that reads as a quotation of a source:
+    not a search phrase ("how to use Notion" search traffic), not a chart's JSON."""
+    if _FENCED_RE.match(sentence):
+        return []
     found = []
     for match in _QUOTE_RE.finditer(sentence):
         quoted = match.group(1)

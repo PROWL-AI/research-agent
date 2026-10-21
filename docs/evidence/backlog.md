@@ -21,6 +21,8 @@
 
 ## Closed
 
+- **B-062 · The repair pass returned nothing on a long report: reasoning spent its whole budget** · closed · measured on `accept-finance-20261021` (the first run to end `complete`/`completed`: 40 steps, 208 claims, 18.6 min, LLM USD 0.110, tools USD 0.338): the repair call on `xiaomi/mimo-v2.6-pro` spent 8005 reasoning tokens of 8000 and returned no text; with reasoning off the same request returned 37 line patches in 2633 tokens (USD 0.0024). Repair now runs with reasoning off; three real passes on that report took its issues 53 to 5 to 3. The chart-JSON quote false positive found there is exempted (fixture first, mutant `chart-not-quote`), branch `fix/b062-repair-reasoning`, 2026-10-21
+
 - **B-059 · The repair pass rewrites the whole report, so on a long report it is cut even at 24000 tokens and its pass is thrown awa** · closed · the repair pass sends only the lines at fault with their issues and patches the lines returned (`L<n>: …`); repair budget 8000; a model that rewrites the whole report is still accepted (`test_repair_patches_only_the_lines_with_issues`, `test_an_empty_patch_deletes_its_line`), branch `fix/b059-b061`, 2026-10-21
 
 - **B-060 · Three more judge false positives on `accept-finance-20261020d`: section references ("§3", "§4") read as figures (`value_** · closed · `honest-real-shapes` first, then exemptions for a template-label figure, the assumption marker and ids inside a conflict tag in `report_checks.py`; three mutants killed; on the three real reports only real defects remain, branch `fix/b059-b061`, 2026-10-21

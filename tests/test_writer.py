@@ -317,12 +317,14 @@ async def test_repair_patches_only_the_lines_with_issues(tmp_path):
     class Patch:
         async def complete(self, messages, **kwargs):
             sent["user"], sent["max_tokens"] = messages[-1]["content"], kwargs.get("max_tokens")
+            sent["reasoning"] = kwargs.get("reasoning")
             n = draft.split("\n").index("Traffic is 100,000 monthly visitors.")
             return f"L{n}: Traffic is 100,000 monthly visitors [C1]."
 
     repaired = await repair_report(Patch(), draft, lint, Ledger(tmp_path / "ledger.json"))
     assert "Paragraph 7 is fine" not in sent["user"]  # only the faulty line travels
     assert sent["max_tokens"] <= 8000
+    assert sent["reasoning"] is False  # B-062: reasoning spent the whole repair budget
     assert "Traffic is 100,000 monthly visitors [C1]." in repaired
     assert repaired.count("Paragraph") == 400 and repaired.endswith("The end.\n")
 

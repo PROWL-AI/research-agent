@@ -1068,6 +1068,19 @@
       "wave": 5,
       "release": "this",
       "evidence": "closed: fix/b059-b061 (2026-10-21)"
+    },
+    {
+      "id": "B-062",
+      "title": "Repair returned nothing: reasoning spent its whole budget",
+      "source": "accept-finance-20261021, 2026-10-21",
+      "status": "closed",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this",
+      "evidence": "closed: reasoning off for repair; 53 to 3 issues on the real report (2026-10-21)"
     }
   ]
 }
