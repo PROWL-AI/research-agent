@@ -1,5 +1,37 @@
 # Research-agent handoff
 
+## Current entry, 2026-10-21 evening (supersedes every "Exact next task" below)
+
+Status: `main` carries B-065 (PR #29, `a8af16e`) and the B-068 lint fix with this entry; the Fabric service
+`prowl-research.default` runs release `a8af16e` (`ready`, `degraded: []`); only that release is kept.
+Board: 14 of 85 open (`python3 scripts/plan/assign_waves.py --check` exits 0). Suite 645 passed; ruff on
+`research_agent/` unchanged (5 pre-existing).
+
+Done since 2026-10-20 (PRs #23 to #29 plus this one): B-049 to B-064 (step-failure policy, reasoning off on cheap
+stages, one escalation on a cut answer, line-patch repair, judge false positives, transport error recorded as
+`error`, verifier re-vendored to DEC-0045), B-032 and B-040 closed live, then:
+- **B-065** a value only an earlier step returns (an app's store id) is planned as `{{name}}`; a transform returns it
+  in a `bindings` block, kept only when a raw artifact states it verbatim; an unresolved placeholder is never sent.
+  Found on `accept-subscription-20261021`, where 20 of 26 skipped steps were the provider refusing the literal text.
+- **KA-G02 subscription receipt** `accept-subscription-20261021b` (local `runs/`): 26 data calls, USD 0.30 tools,
+  `partial`/`step_failed` (the Apple ids the resolver never returned stayed unsent), judge PASS 0.78 (USD 0.0096).
+  The report opens with an identity warning: the resolver gave Headspace the Balance app (B-067).
+- **B-067** (owner prowl-app, open): `resolve_app_store_ids` keeps the best fuzzy match across query variants, so a
+  rival with the same generic words wins and no brand or publisher check applies; no Apple ids at all.
+- **B-068** drafting residue inside a citation (`[C186? no, …]`) is now a lint issue the repair pass rewrites.
+- **B-066** (open): dashboard against the eight perception principles; 2, 4, 5 and 7 to change through the UX chain.
+- Board replies sent: roll call (thread fa6af7fb), dashboard principles (thread 89bbc415, row B-066).
+
+Open and who holds it: B-017 person half (the operator labels one report: `runs/accept-subscription-20261021b/report.md`
+or `runs/accept-finance-20261021/report.md`, local); B-020 (fabric-agent-contract, thread 3b4bd63d, no reply as of
+21:24 UTC; their last merge #136 has no row); KA-G03 (hub JWKS); KA-01, KA-02, KA-G04, B-067 (prowl-app); FD-13;
+FD-14 (the host 0.7.19 accepted `open` for `/dashboard`, but its window was off screen and no capture could be taken;
+take it when the host shows this service); B-042 (registry owner); B-066.
+
+**Exact next task:** B-066 through `super-ux` (scenarios first, then `app.js` `metrics()`/`overview()`), then re-run
+`subscription-app-audit` once prowl-app fixes B-067 (or with an app whose store title is distinctive) to show the
+Apple half bound. Reply on thread 7e3ea949 (released) and 2031b147 (verified) when B-066 lands.
+
 ## Current entry — wave program, updated 2026-10-17 (supersedes "Exact next task" below)
 
 Objective: close every open item of this agent in its final form, in waves

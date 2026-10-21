@@ -1109,6 +1109,60 @@
       "wave": 6,
       "release": "this",
       "evidence": "closed: fixture first, quote-gap exemption, mutant killed (2026-10-21)"
+    },
+    {
+      "id": "B-065",
+      "title": "A placeholder the static plan cannot fill",
+      "source": "accept-subscription-20261021, 2026-10-21",
+      "status": "closed",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "closed: transform bindings grounded in raw, unresolved never sent; live accept-subscription-20261021b (2026-10-21)",
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-066",
+      "title": "Dashboard against the eight perception principles",
+      "source": "board thread 89bbc415, 2026-10-21",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "open: principles 2, 4, 5, 7 through the UX chain",
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-067",
+      "title": "resolve_app_store_ids returns another brand's app",
+      "source": "accept-subscription-20261021b, 2026-10-21",
+      "status": "open",
+      "area": "external",
+      "node": "N-EXT",
+      "blocked_by": [
+        "prowl-app"
+      ],
+      "closable_in_one_pass": false,
+      "evidence": "open: prowl-app api_tools/searchapi.py at b2131035",
+      "wave": null,
+      "release": "external"
+    },
+    {
+      "id": "B-068",
+      "title": "Drafting residue inside a citation",
+      "source": "accept-subscription-20261021b, 2026-10-21",
+      "status": "closed",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "closed: malformed_citation lint and repair (2026-10-21)",
+      "wave": 6,
+      "release": "this"
     }
   ]
 }

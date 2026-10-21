@@ -341,3 +341,17 @@ async def test_an_empty_patch_deletes_its_line(tmp_path):
             return "L4: "
 
     assert (await repair_report(Delete(), draft, lint, Ledger(tmp_path / "ledger.json"))).rstrip() == "# R\n\nKeep."
+
+
+def test_drafting_residue_inside_a_citation_is_a_lint_issue(tmp_path):
+    """B-068: accept-subscription-20261021b shipped a hesitation inside a citation."""
+    from research_agent.agent.writer import lint_report
+    from research_agent.evidence.ledger import Ledger
+
+    ledger = Ledger(tmp_path / "ledger.json")
+    report = ("The top record is a clinic [C186? no — [C237][C251]] with likes.\n"
+              "Clean refs stay clean [C1][C2] and [C3, C4] and [CONFLICT] here.\n")
+    kinds = [i.kind for i in lint_report(report, ledger).issues if i.kind == "malformed_citation"]
+    assert kinds == ["malformed_citation"]
+    issue = next(i for i in lint_report(report, ledger).issues if i.kind == "malformed_citation")
+    assert issue.text.startswith("[C186?")

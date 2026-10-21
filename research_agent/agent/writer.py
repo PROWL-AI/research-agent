@@ -31,6 +31,9 @@ _NUMBER_RE = re.compile(
 )
 _YEAR_PREFIX_RE = re.compile(r"(?:^|\b(?:in|on|of|from|by|year)\s+)$", re.IGNORECASE)
 _BARE_ID_RE = re.compile(r"\bC(\d+)\b")
+#: A citation bracket holding the writer's own hesitation ("[C186? no, [C237]]"):
+#: a question mark or a nested bracket inside it is drafting residue (B-068).
+_MALFORMED_CITATION_RE = re.compile(r"\[C\d+[^\]\[\n]*?[?\[][^\n]*?\]")
 _CONFLICT_REGISTER_RE = re.compile(r"^\s*-\s*C\d+\b|\bvs\s+C\d+\b")
 _SOURCE_LOG_ROW_RE = re.compile(r"^\s*\|\s*C\d+\s*\|.*$", re.MULTILINE)
 _ASSUMPTION_MARKER = "(target, assumption — not data)"
@@ -127,6 +130,9 @@ Rules:
   Never leave a bare number behind, and NEVER invent a citation to cover one.
 - For each missing_ref (a [C..] that does not exist in the ledger): replace it
   with the correct claim id, or handle the figure per the actions above.
+- For each malformed_citation (a bracket with a question mark, a note or a
+  nested bracket inside it): replace it with plain [C..] refs that support the
+  sentence; no commentary inside a citation.
 - Where two ledger claims conflict on the same subject, cite BOTH with
   [CONFLICT].
 - For status_mislabel, conflict_hidden, quote_not_in_ledger and value_mismatch,
@@ -278,6 +284,16 @@ def lint_report(report_md: str, ledger: Ledger) -> LintResult:
                     detail=f"citation [{ref}] does not exist in the ledger",
                 )
             )
+
+    for match in _MALFORMED_CITATION_RE.finditer(report_md):
+        result.issues.append(
+            LintIssue(
+                kind="malformed_citation",
+                text=match.group(0)[:120],
+                detail="drafting residue inside a citation; keep only the claim ids that support the sentence",
+                context=match.group(0),
+            )
+        )
 
     scan_text = _SOURCE_LOG_ROW_RE.sub("", report_md)
     for match in _NUMBER_RE.finditer(scan_text):

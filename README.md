@@ -204,6 +204,8 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   does not hold as verified, a conflict cited without its [CONFLICT] tag, a quotation no cited claim holds, a figure no
   cited claim carries. `lint_issues_before`/`lint_issues_after` count both (B-057). The repair pass sends only the lines
   at fault and patches the lines it gets back (`L<n>: …`), so a long report is not rewritten whole (B-059).
+  The citation lint also flags drafting residue inside a citation (a question mark, a note or a nested bracket, such
+  as `[C186? no, [C237]]`) as `malformed_citation`, which the repair pass rewrites to plain claim ids (B-068).
 - **One refused step does not end the run.** A tool that is refused (no results, not found, a provider, scope or
   argument error) marks that step `failed` (or `skipped_on_error` when the plan marked it optional) with the
   server's reason, and the run goes on; with a refused required step it ends `partial` / `step_failed`, and the
