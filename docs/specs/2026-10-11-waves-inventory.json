@@ -790,13 +790,14 @@
       "id": "B-040",
       "title": "The USD 5 default max_llm_usd is not measured against a heavy runbook (80-90 steps); measure one live run's stats.llm_budget and record it beside the default",
       "source": "wave-4 product certification 2026-10-17 · research_agent/config.py DEFAULT_MAX_LLM_USD",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed: 101-step teardown spent USD 0.239 of 5 (2026-10-21)"
     },
     {
       "id": "B-041",
@@ -1095,6 +1096,19 @@
       "wave": 2,
       "release": "this",
       "evidence": "closed: CLI records a transport failure as error (2026-10-21)"
+    },
+    {
+      "id": "B-064",
+      "title": "A quote gap read as a quotation",
+      "source": "accept-teardown-20261021b, 2026-10-21",
+      "status": "closed",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this",
+      "evidence": "closed: fixture first, quote-gap exemption, mutant killed (2026-10-21)"
     }
   ]
 }

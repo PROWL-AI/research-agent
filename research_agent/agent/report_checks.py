@@ -74,6 +74,11 @@ def _quotations(sentence: str) -> list[str]:
         quoted = match.group(1)
         if len(quoted.split()) < 3:
             continue
+        if quoted != quoted.strip() or " | " in quoted:
+            # a closing quote paired with the next opening one (a sentence split
+            # inside a quotation, or across table cells): the gap between two
+            # quotations, not one (B-064)
+            continue
         around = sentence[max(0, match.start() - 25):match.start()] + " " + sentence[match.end():match.end() + 25]
         if _KEYWORD_CONTEXT_RE.search(around):
             continue
