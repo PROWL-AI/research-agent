@@ -90,3 +90,51 @@ def test_rewrite_cli_errors_on_unknown_run(monkeypatch, capsys, tmp_path):
     monkeypatch.delenv("PROWL_API_KEY", raising=False)
     assert main(["rewrite", "nope"]) == 1
     assert "no checkpoint" in capsys.readouterr().err
+
+
+async def test_a_dropped_prowl_connection_is_recorded_as_an_error_not_a_cancel(tmp_path, monkeypatch, mini_runbooks_dir, capsys):
+    # B-063: the MCP client's task group turns a dropped connection into a cancel
+    # of its scope; the run wrote `cancelled` and the CLI printed a raw group.
+    import asyncio
+    import json
+
+    import research_agent.__main__ as cli
+    from research_agent.agent.orchestrator import Orchestrator
+
+    monkeypatch.setattr("research_agent.runbook.RUNBOOKS_DIR", mini_runbooks_dir)
+    monkeypatch.setenv("RESEARCH_RUNS_DIR", str(tmp_path / "runs"))
+    monkeypatch.setenv("PROWL_API_KEY", "prowl_test")
+    monkeypatch.setenv("RESEARCH_LLM_API_KEY", "test")
+
+    class DroppingProwl:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            if exc[0] is asyncio.CancelledError:
+                raise BaseExceptionGroup("unhandled errors in a TaskGroup",
+                                         [ConnectionError("Server disconnected without sending a response.")])
+            return None
+
+    async def cancelled_run(self, runbook_name, inputs, run_id=None, max_llm_usd=None):
+        run_dir = tmp_path / "runs" / run_id
+        run_dir.mkdir(parents=True)
+        from research_agent.evidence.store import ArtifactStore, Checkpoint
+
+        cp = Checkpoint(run_id=run_id, runbook=runbook_name)
+        cp.status, cp.partial, cp.stop_reason, cp.terminal_code = "partial", True, "cancelled", "cancelled"
+        ArtifactStore(run_dir).save_checkpoint(cp)
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr("research_agent.prowl_client.ProwlClient", DroppingProwl)
+    monkeypatch.setattr(Orchestrator, "run", cancelled_run)
+    code = await cli._cmd_run("mini-teardown", {"competitors": ["a.com"]}, "dropped")
+    assert code == 1
+    err = capsys.readouterr().err
+    assert "connection to Prowl dropped" in err and "Traceback" not in err and "--run-id dropped" in err
+    saved = json.loads((tmp_path / "runs" / "dropped" / "checkpoint.json").read_text())
+    assert (saved["status"], saved["terminal_code"]) == ("failed", "error")
+    assert "Server disconnected" in saved["stop_reason"]
