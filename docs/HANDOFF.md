@@ -2,8 +2,8 @@
 
 ## Current entry, 2026-10-21 evening (supersedes every "Exact next task" below)
 
-Status: `main` carries B-065 (PR #29, `a8af16e`) and the B-068 lint fix with this entry; the Fabric service
-`prowl-research.default` runs release `a8af16e` (`ready`, `degraded: []`); only that release is kept.
+Status: `main` carries B-065 (PR #29, `a8af16e`) and B-068 (PR #30, `10853df`); the Fabric service
+`prowl-research.default` runs release `10853df` (`ready`, `degraded: []`); only that release is kept.
 Board: 14 of 85 open (`python3 scripts/plan/assign_waves.py --check` exits 0). Suite 645 passed; ruff on
 `research_agent/` unchanged (5 pre-existing).
 
