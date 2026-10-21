@@ -455,6 +455,10 @@ async def repair_report(
         max_tokens=_REPAIR_MAX_TOKENS,
         temperature=0.2,
         stage="repair",
+        # B-062, measured on accept-finance-20261021: with reasoning on, mimo spent all
+        # 8000 output tokens reasoning and returned nothing; off, the same request
+        # returned 37 line patches in 2633 tokens.
+        reasoning=False,
     )
     patches = {int(n): text for n, text in _PATCH_RE.findall(answer) if int(n) in by_line}
     if not patches:
