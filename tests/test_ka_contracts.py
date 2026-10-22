@@ -716,7 +716,9 @@ async def test_service_timeout_has_its_own_code_and_carries_terminal_code(tmp_pa
         record = store.job(job["id"])
         assert record["status"] == "failed"
         assert record["error"]["code"] == "timeout"
-        assert record["error"]["terminalCode"] == "cancelled"
+        # B-075: the pinned interop error schema allows only code, message and data.
+        assert set(record["error"]) <= {"code", "message", "data"}
+        assert record["error"]["data"]["terminalCode"] == "cancelled"
         assert ArtifactStore(tmp_path / "runs" / job["id"]).load_checkpoint().terminal_code == "cancelled"
     finally:
         await rt.close()
@@ -732,7 +734,9 @@ async def test_service_shutdown_marks_job_interrupted_and_checkpoint_cancelled(t
         await rt.close()
         record = store.job(job["id"])
         assert record["phase"] == "interrupted"
-        assert record["error"]["terminalCode"] == "cancelled"
+        # B-075: the pinned interop error schema allows only code, message and data.
+        assert set(record["error"]) <= {"code", "message", "data"}
+        assert record["error"]["data"]["terminalCode"] == "cancelled"
         assert ArtifactStore(tmp_path / "runs" / job["id"]).load_checkpoint().terminal_code == "cancelled"
     finally:
         store.db.close()

@@ -398,8 +398,9 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             continue
         if resend:
             # A re-send reuses its attempt's idempotency key, which the server matches with
-            # the params: send exactly what the earlier attempt sent, never a new spelling.
-            arguments = record.bound_arguments if record.bound_arguments is not None else arguments
+            # the params: send exactly what the earlier attempt sent, never a new spelling or a
+            # fresh substitution. No bound_arguments means the attempt sent record.arguments (B-077).
+            arguments = record.bound_arguments if record.bound_arguments is not None else record.arguments
         else:
             arguments = tool_limits.canonical(record.tool, arguments)
         record.bound_arguments = arguments if arguments != record.arguments else None

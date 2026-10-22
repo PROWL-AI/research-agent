@@ -330,13 +330,14 @@ class Runtime:
     def _with_terminal(self, job_id, error):
         """A research job's error carries the run checkpoint's terminal_code, so the
         job view and research.artifact.get name the same outcome (docs/FABRIC.md,
-        "Job phase and run terminal state")."""
+        "Job phase and run terminal state"). It goes in `data`, the one open slot of
+        the pinned interop error schema (B-075)."""
         try:
             checkpoint = ArtifactStore(self.store.root / "runs" / run_dir_name(self.store.job(job_id))).load_checkpoint()
         except (ValueError, OSError):
             checkpoint = None
         if checkpoint is not None and checkpoint.terminal_code:
-            error = {**error, "terminalCode": checkpoint.terminal_code}
+            error = {**error, "data": {**error.get("data", {}), "terminalCode": checkpoint.terminal_code}}
         return error
 
     async def tutorial(self, job):

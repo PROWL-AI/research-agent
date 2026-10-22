@@ -51,6 +51,14 @@ async def main():
         job = rt.store.job(job["id"])
         check("interop-job", job_view(job))
         check("interop-result", job["result"])
+        # B-075: a failed research job's error, in the shape the runtime writes and in the
+        # shape a build before the fix stored (top-level terminalCode), read strictly.
+        for n, error in enumerate([
+            {"code": "timeout", "message": "Wall-clock timeout reached.", "data": {"terminalCode": "cancelled"}},
+            {"code": "execution-failed", "message": "RuntimeError: inspect call receipts.", "terminalCode": "error"},
+        ]):
+            failed = rt.create({"kind": "tutorial"}, "contract-failed-" + str(n), "00-" + "3" * 32 + "-" + "4" * 16 + "-01")
+            check("interop-job", job_view(rt.store.transition(failed["id"], "failed", "failed", error=error)))
         check("service-usage", rt.store.usage())
         check("service-events-page", rt.store.events())
         import httpx
@@ -66,6 +74,7 @@ async def main():
                     "tool-schemas-match",
                     "input-required-job",
                     "completed-job",
+                    "failed-job",
                     "interop-result",
                     "events",
                     "usage",

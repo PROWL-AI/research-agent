@@ -485,3 +485,37 @@ def test_the_chain_owner_can_resume_and_cancel_an_operator_continuation_and_nobo
         assert store.job(pending["id"])["status"] == "cancelled"
     finally:
         store.db.close()
+
+
+def test_job_lifecycle_and_service_events_reach_the_event_log(tmp_path):
+    """B-080: the service's own events (job.*, service.*) went to SQLite only, so the
+    event log stayed empty while the service ran jobs."""
+    from research_agent.service.cli import configure_logging
+    from research_agent.service.store import Store
+
+    package = logging.getLogger("research_agent")
+    before = list(package.handlers), package.level, package.propagate
+    store = None
+    try:
+        path = configure_logging(tmp_path / "logs")
+        store = Store(tmp_path / "data")
+        store.event("service.started", "Сервис запущен.")
+        job = {"id": "pr-0123456789abcdef0123", "traceparent": None}
+        store.event("job.failed", "Запрос завершился с ошибкой. Проверьте шаги.", job, "error", True)
+        for handler in package.handlers:
+            handler.flush()
+        text = path.read_text(encoding="utf-8")
+        assert "event=service.started severity=info" in text
+        assert "event=job.failed severity=error job_id=pr-0123456789abcdef0123" in text
+        assert "ERROR research_agent.service.store" in text
+        # The person-facing text stays on the dashboard (D3).
+        assert "Сервис запущен" not in text and "Запрос завершился" not in text
+    finally:
+        if store is not None:
+            store.db.close()
+        for handler in package.handlers:
+            if handler not in before[0]:
+                handler.close()
+        package.handlers[:] = before[0]
+        package.setLevel(before[1])
+        package.propagate = before[2]
