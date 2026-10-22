@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
+from research_agent.agent import tool_limits
 from research_agent.evidence.ledger import Ledger, _atomic_write_text
 from research_agent.llm import LLMBudgetExceeded, LLMClient, LLMError
 from research_agent.runbook import Runbook
@@ -184,7 +185,7 @@ def disclose_partial(report_md: str, reason: str | None) -> str:
     return "\n".join(([title, ""] if title else []) + [note, ""] + rest) + ("\n" if report_md.endswith("\n") else "")
 
 
-def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str) -> WriterOutcome:
+def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str, coverage_notes: list[str] | None = None) -> WriterOutcome:
     """The report when no LLM budget is left for the writer: the evidence as
     gathered, every claim with its status and source — nothing synthesized."""
     lines = [
@@ -204,6 +205,8 @@ def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str) -> WriterO
         lines.append(f"| {text} [{c.id}] | {value} | {c.status.value} | {c.source_tool} |")
     if not ledger.claims:
         lines.append("| (no evidence gathered) | | | |")
+    if coverage_notes:
+        lines += ["", "Source coverage:", *(f"- {note}" for note in coverage_notes)]
     return WriterOutcome(report_md="\n".join(lines) + "\n", lint_before=0, lint_after=0, revised=False)
 
 
@@ -336,6 +339,7 @@ async def write_report(
     partial: bool = False,
     skipped_steps: list[dict[str, Any]] | None = None,
     transform_notes: list[str] | None = None,
+    coverage_notes: list[str] | None = None,
 ) -> str:
     partial_note = ""
     if partial:
@@ -345,8 +349,12 @@ async def write_report(
         # did not run. Everything else is named with its state.
         refused = [s for s in steps if s.get("state") in ("failed", "skipped_on_error")
                    and s.get("tool") != "transform" and not str(s.get("reason") or "").startswith("raw_write")]
+        # A step whose arguments held no value was never sent (B-065, B-070, B-071): the
+        # plan's gap, not the source's answer, so the report must not blame the source.
+        not_sent = [s for s in refused if "not sent:" in str(s.get("reason") or "")]
+        refused = [s for s in refused if s not in not_sent]
         not_run = [s for s in steps if s.get("state") in ("pending", "skipped_budget")]
-        other = [s for s in steps if s not in refused and s not in not_run]
+        other = [s for s in steps if s not in refused and s not in not_sent and s not in not_run]
         lines = ["\n## PARTIAL RUN",
                  "Mark the report as partial in its first line and list the sections that are missing or thin."]
         if refused:
@@ -354,6 +362,11 @@ async def write_report(
             lines.append("These steps were refused by the data source (no data from them; say so, never fill "
                          "the gap from elsewhere): "
                          + "; ".join(f"{s.get('step', '?')}: {str(s.get('reason') or '')[:200]}" for s in refused) + ".")
+        if not_sent:
+            lines.append("These steps were not sent: the plan had no usable value for an argument, so the data "
+                         "source was never asked (no data from them; say so as a gap of this run, not as the "
+                         "source's answer, and never fill it from elsewhere): "
+                         + "; ".join(f"{s.get('step', '?')}: {str(s.get('reason') or '')[:200]}" for s in not_sent) + ".")
         if not_run:
             lines.append("These steps did not run (the run stopped before them): "
                          + ", ".join(s.get("step", "?") for s in not_run) + ".")
@@ -364,6 +377,18 @@ async def write_report(
         if not steps:
             lines.append("Skipped steps: none.")
         partial_note = "\n".join(lines) + "\n"
+    else:
+        # A complete run can still hold an optional step that was never sent (every
+        # runbook calls tiktok_ads_library as optional): the report says so rather than
+        # letting the missing source read as a finding.
+        not_sent = [s for s in (skipped_steps or []) if "not sent:" in str(s.get("reason") or "")]
+        if not_sent:
+            partial_note = ("\n## STEPS NOT SENT\nThese optional steps were not sent: the plan had no usable value "
+                            "for an argument, so the data source was never asked. Name each as a gap of this run "
+                            "where its section would use it (never as the source's answer, never as a finding such "
+                            "as a channel the subject does not use): "
+                            + "; ".join(f"{s.get('step', '?')}: {str(s.get('reason') or '')[:200]}" for s in not_sent)
+                            + ".\n")
 
     system = WRITER_SYSTEM_TEMPLATE.format(
         output_instructions=runbook.output_instructions or "(no output instructions)",
@@ -382,6 +407,10 @@ async def write_report(
             " use as context, cite the ledger for numbers)\n"
             + "\n\n---\n\n".join(transform_notes)
         )
+    if coverage_notes:
+        # B-071: the writer never sees step arguments, so what a limited source covers is told here.
+        user += "\n\n## Source coverage (state it wherever these results are used)\n" + "\n".join(
+            f"- {note}" for note in coverage_notes)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     try:
         return await llm.complete(
@@ -518,10 +547,12 @@ async def write_and_repair(
     partial: bool = False,
     skipped_steps: list[dict[str, Any]] | None = None,
     transform_notes: list[str] | None = None,
+    coverage_notes: list[str] | None = None,
 ) -> WriterOutcome:
     draft = await write_report(
         llm, runbook, ledger, brief,
         partial=partial, skipped_steps=skipped_steps, transform_notes=transform_notes,
+        coverage_notes=coverage_notes,
     )
     lint_current = _writing_lint(draft, ledger)
     lint_before = len(lint_current.issues)
@@ -621,12 +652,14 @@ async def produce_report(
     partial: bool = False,
     skipped_steps: list[dict[str, Any]] | None = None,
     transform_notes: list[str] | None = None,
+    coverage_notes: list[str] | None = None,
 ) -> tuple[WriterOutcome, "FidelityResult"]:
     from research_agent.agent.citations import verify_citations
 
     outcome = await write_and_repair(
         llm, runbook, ledger, brief,
         partial=partial, skipped_steps=skipped_steps, transform_notes=transform_notes,
+        coverage_notes=coverage_notes,
     )
     fidelity = await verify_citations(llm, outcome.report_md, ledger)
     if fidelity.unverified:
@@ -694,6 +727,7 @@ async def _rewrite_locked(llm: LLMClient, run_dir: Path, run_id: str,
             partial=checkpoint.partial,
             skipped_steps=checkpoint.skipped_steps,
             transform_notes=checkpoint.transform_notes,
+            coverage_notes=tool_limits.coverage_notes(s.tool for s in checkpoint.steps if s.state == "completed"),
         )
     except LLMBudgetExceeded as exc:
         checkpoint.stats["llm_budget"] = budget_stats(meter, checkpoint)

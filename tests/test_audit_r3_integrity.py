@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from research_agent.agent.orchestrator import Orchestrator, OrchestratorError, PlanItem
+from research_agent.agent.orchestrator import Orchestrator, OrchestratorError
 from research_agent.evidence.ledger import Ledger, LedgerError
 from research_agent.evidence.store import ArtifactStore, Checkpoint
 

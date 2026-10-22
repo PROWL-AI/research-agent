@@ -221,6 +221,17 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   (`bound_arguments`; `arguments` keeps the plan as written). A placeholder nobody resolved is never sent: the step
   is `skipped_on_error` (or `failed`, when required) with `not sent: no earlier step resolved {{name}}`, and it does
   not count toward the refusals in a row (B-065).
+- **Template text and known-refused values are not sent either.** Live runs showed the planner writing other shapes
+  than `{{name}}` (`[substitute landing_page_url of ...]`, `<video_id from youtube_search ...>`,
+  `{youtube_search.latest_video_id}`, `PLACEHOLDER_FROM_STEP_22`); providers billed each one, and an LLM-answer tool
+  even "completed" on the literal text. Such a step is `skipped_on_error` (or `failed`) with `not sent: an argument
+  holds template text, not a value: ...` (B-070). A value a provider is known to refuse while its schema is silent
+  (`research_agent/agent/tool_limits.py`, each limit with its source: `tiktok_ads_library` takes `country` only as
+  `all` or a European code) is told to the planner and, if planned anyway, not sent:
+  `not sent: <tool> does not take country='US' (a known provider limit)` (B-071). Neither counts as a refusal, the
+  writer reports such a step as a gap of the run (not the source's answer), in a partial run and in a complete one,
+  and is told what a limited source covers (TikTok: Europe only); an accepted value is sent in the provider's spelling;
+  `research.tools.call` refuses a known-refused value before a job exists and again at dispatch.
 - Runbooks declare their **tool allowlist** and **budget**
   (`max_tool_calls` / `max_usd` / `max_minutes`). On budget exhaustion the agent
   emits a partial report that marks what is missing — it never fails silently.

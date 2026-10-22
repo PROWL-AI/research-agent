@@ -33,7 +33,7 @@ def code_digest():
 #: The dashboard's declaration (ED-9, DEC-0036): the kit it ships and the
 #: estate themes the host may apply.
 DASHBOARD_EXTENSION = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
-DASHBOARD_KIT = "fabric-dashboard-kit@1.1.0"
+DASHBOARD_KIT = "fabric-dashboard-kit@1.1.1"
 DASHBOARD_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
 
 
@@ -47,7 +47,6 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
     started = now()
     build = build or {"digest": code_digest()}
     cookie = "prowl_operator_" + str(port)
-    origin = rt.origin
 
     @asynccontextmanager
     async def lifespan(app):

@@ -34,7 +34,7 @@ MUTANTS = [
     ("veto", J, "self.passed = self.total >= threshold and not self.defects", "self.passed = self.total >= threshold", JT),
     ("missing_ref", RC, 'add("missing_ref", ref,', 'None and add("missing_ref", ref,', JT),
     ("quote", RC, 'add("quote_not_in_ledger", cited[0].id, sentence)', "pass", JT),
-    ("value", RC, 'add("value_mismatch", cited[0].id, sentence)', "pass", JT),
+    ("value", RC, 'add("value_mismatch", value_cited[0].id, sentence)', "pass", JT),
     ("conflict", RC, 'add("conflict_hidden", ref, line)', "pass", JT),
     ("partial", RC, "if checkpoint is not None and checkpoint.partial and not partial_disclosed(report_md):", "if False:", JT),
     ("quote-backing", RC, "/ len(words) >= 0.7", "/ len(words) >= 0.0", JT),
@@ -81,7 +81,7 @@ MUTANTS = [
     ("unit-scale", RC, "values.append(value * (_SCALE.get(word) or _LETTER_SCALE[word]))", "pass", JT),
     # (register-bracketed retired: since the legend rule, a bare CONFLICT in a heading is covered by legend-not-register)
     ("partially", "research_agent/agent/writer.py", r"\bpartial(?:ly)?\b", r"\bpartial\b", JT),
-    ("dry-run-exit-2", "scripts/install-fabric-service.py", "if problem:raise SystemExit(2)", "if False:raise SystemExit(2)", JT),
+    ("dry-run-exit-2", "scripts/install-fabric-service.py", "if problem:\n            raise SystemExit(2)", "if False:\n            raise SystemExit(2)", JT),
     # B-045
     ("status-mislabel", RC, 'add("status_mislabel", ref, line)', "pass", JT),
     # B-046 / B-047
@@ -90,10 +90,33 @@ MUTANTS = [
     ("register-parenthesised", RC, r'_CONFLICT_REGISTER_RE = re.compile(r"[\[(]CONFLICT[\])]|', r'_CONFLICT_REGISTER_RE = re.compile(r"\[CONFLICT\]|', JT),
     ("unit-letter-needs-currency", RC, r'|(?:\b(?:USD|EUR|GBP)\s*|[$€£]\s*)([kmb])\b|\b([kmb])\s*(?:USD|EUR|GBP)\b"', r'|\b([kmb])\b|\b(x)\b"', JT),
     ("chain-note", "research_agent/service/static/app.js", "+(j.chainOwner?` <span", "+(false?` <span", ["tests/test_dashboard_labels.py"]),
-    ("dry-run-problem", "scripts/install-fabric-service.py", 'problem=None if held else f"vault', 'problem=None if True else f"vault',
+    ("dry-run-problem", "scripts/install-fabric-service.py", 'problem = None if held else f"vault', 'problem = None if True else f"vault',
      ["tests/test_installer.py"]),
-    ("installer-held-slots", "scripts/install-fabric-service.py", "held=[s for s in SLOTS if s not in missing]", "held=list(SLOTS)",
+    ("installer-held-slots", "scripts/install-fabric-service.py", "held = [s for s in SLOTS if s not in missing]", "held = list(SLOTS)",
      ["tests/test_installer.py"]),
+    # B-070 / B-071: a step whose argument is template text or a known-refused value is not sent
+    ("template-not-sent", "research_agent/agent/subagent.py", "    template = template_text(arguments)\n", "    template = []\n",
+     ["tests/test_not_sent_arguments.py"]),
+    ("limit-not-sent", "research_agent/agent/subagent.py", "    limits = tool_limits.refused(tool, arguments)\n", "    limits = []\n",
+     ["tests/test_not_sent_arguments.py"]),
+    ("direct-limit-refused", "research_agent/service/runtime.py", "        refuse_known_limits(request)\n", "",
+     ["tests/test_not_sent_arguments.py"]),
+    ("coverage-told", "research_agent/agent/writer.py", "    if coverage_notes:\n        # B-071", "    if False:\n        # B-071",
+     ["tests/test_not_sent_arguments.py"]),
+    ("not-sent-complete-run", "research_agent/agent/writer.py", "        if not_sent:\n            partial_note = (",
+     "        if False:\n            partial_note = (", ["tests/test_not_sent_arguments.py"]),
+    ("live-recheck", "research_agent/service/runtime.py", "            refuse_known_limits(req)\n        async with", "        async with",
+     ["tests/test_not_sent_arguments.py"]),
+    ("live-spelling", "research_agent/service/runtime.py", 'params = tool_limits.canonical(req["tool"], req["params"])',
+     'params = req["params"]', ["tests/test_not_sent_arguments.py"]),
+    ("dispatch-refusal-reason", "research_agent/service/runtime.py", "        except LimitRefused as exc:\n", "        except ZeroDivisionError as exc:\n",
+     ["tests/test_not_sent_arguments.py"]),
+    ("resend-same-params", "research_agent/agent/subagent.py", "        if resend:\n            # A re-send",
+     "        if False:\n            # A re-send", ["tests/test_not_sent_arguments.py"]),
+    ("resend-not-judged", "research_agent/agent/subagent.py", "reason = None if resend else _not_sent_reason(",
+     "reason = _not_sent_reason(", ["tests/test_not_sent_arguments.py"]),
+    ("providers-spelling", "research_agent/agent/subagent.py", "        arguments = tool_limits.canonical(record.tool, arguments)\n", "",
+     ["tests/test_not_sent_arguments.py"]),
 ]
 
 

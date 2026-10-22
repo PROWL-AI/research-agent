@@ -498,7 +498,6 @@ class TestCliHonesty:
         self, patched_runbooks, monkeypatch, tmp_path
     ):
         from research_agent.__main__ import main
-        from research_agent.agent.orchestrator import OrchestratorError
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("PROWL_API_KEY", "p")

@@ -23,6 +23,27 @@ _NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _BLOCK_RE = re.compile(r"```bindings\s*\n(.*?)\n?```", re.DOTALL)
 #: A value shorter than this matches too much text to prove anything.
 _MIN_GROUNDED_LEN = 3
+#: Template text the planner wrote in another shape than ``{{name}}`` (B-070). The
+#: planner is told never to, and live runs show it still does; each shape below was
+#: sent to a provider, refused and billed:
+_TEMPLATE_RES = (
+    # "[substitute landing_page_url of the longest-running ... ad]" (accept-teardown-20261021b): the
+    # verb opens an instruction of three words or more, so "how to [insert] a row" or "[Substitute
+    # Teacher] movie" is a value; a CSS "[placeholder='Email']" is a value too.
+    re.compile(r"\[\s*(?:substitute|insert|replace|fill in)\s+\S+(?:\s+\S+){2,30}\s*\]", re.I),
+    re.compile(r"\[\s*placeholder\s[^\]=]{1,200}\]", re.I),
+    # "PLACEHOLDER_FROM_STEP_22" (accept-finance-20261020c)
+    re.compile(r"\bPLACEHOLDER(?:_[A-Z0-9]+)*\b"),
+)
+#: Shapes that are template text only when they are the whole argument: inside prose (a prompt
+#: to an LLM-backed tool: "Extract {company.name}", "as <plan name from the table>") they are text.
+_WHOLE_TEMPLATE_RES = (
+    # "<video_id from youtube_search result ...>", "<... report URL from search or IR map>"
+    # (accept-finance-20261020). Runs are bounded: an unbounded one is quadratic on a long argument.
+    re.compile(r"<[A-Za-z_][^<>]{0,200}?\s(?:from|placeholder)\s[^<>]{0,200}>", re.I),
+    # "{youtube_search.latest_official_call_video_id}" (accept-finance-20261021)
+    re.compile(r"\{\s*[A-Za-z_]\w{0,63}(?:\.\w{1,64}|\[\d{1,4}\]){1,8}\s*\}"),
+)
 
 
 def placeholders(value: Any) -> set[str]:
@@ -36,6 +57,25 @@ def placeholders(value: Any) -> set[str]:
     elif isinstance(value, (list, tuple)):
         for item in value:
             found |= placeholders(item)
+    return found
+
+
+def template_text(value: Any) -> list[str]:
+    """Each piece of template text (not a ``{{name}}``) inside a JSON-like value,
+    in order; such an argument is never sent (B-070)."""
+    found: list[str] = []
+    if isinstance(value, str):
+        for pattern in _TEMPLATE_RES:
+            found.extend(m.group(0) for m in pattern.finditer(value))
+        whole = value.strip()
+        if len(whole) <= 512 and any(p.fullmatch(whole) for p in _WHOLE_TEMPLATE_RES):
+            found.append(whole)
+    elif isinstance(value, dict):
+        for item in value.values():
+            found.extend(template_text(item))
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            found.extend(template_text(item))
     return found
 
 

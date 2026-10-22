@@ -8,7 +8,7 @@ planted defects. It is not a calibration of a judge model: the fixtures were wri
 | Gate | Result | Evidence |
 |---|---|---|
 | A lenient model (0.95 on every dimension) fails every planted-defect fixture (in-sample, author-written) | PASS: 6 / 6 planted fail, 5 / 5 honest pass (the fifth, `honest-real-shapes`, holds the four honest shapes a real report was falsely flagged for, B-055) | [offline run](offline-calibration.log); `tests/test_judge_calibration.py` |
-| Each defence is load-bearing | 46 / 46 planted mutations killed | [mutations](mutations.log); `python scripts/mutation_check.py` |
+| Each defence is load-bearing | 62 / 62 planted mutations killed (2026-10-22, tree of `550dc99`; the judge's own rows plus the dispatch guards of B-070/B-071) | [mutations](mutations.log); `python scripts/mutation_check.py` |
 | The judge's own spend is checked by estimate before each call and recorded beside the run | PASS (offline, mocked provider) | `test_the_judge_spend_is_recorded_beside_the_run_not_in_it`, `test_the_judge_refuses_to_spend_above_its_ceiling` |
 | A model that does not answer is a judge error (exit 2), and the judge needs no Prowl key | PASS (offline, unreachable provider) | `test_the_judge_needs_no_prowl_key_and_a_model_failure_is_exit_2` |
 | The checks on real reports | surveyed, see below | [survey](local-runs-survey.json); `python evals/survey_runs.py` |

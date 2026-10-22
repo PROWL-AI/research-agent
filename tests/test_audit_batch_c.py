@@ -18,7 +18,7 @@ from research_agent.evidence.store import (
     validate_run_id,
 )
 
-from conftest import FakeLLM, FakeProwl
+from conftest import FakeLLM
 
 DUMMY_CONFIG = Config(
     prowl_api_key="test",

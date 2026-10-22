@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, Field
 
 from research_agent.agent import bindings as plan_bindings
+from research_agent.agent import tool_limits
 from research_agent.agent.citations import FidelityResult
 from research_agent.agent.writer import WriterOutcome, disclose_partial, ledger_only_report, produce_report
 from research_agent.agent.metering import attach_run_meter, budget_stats
@@ -51,7 +52,6 @@ from research_agent.evidence.store import (
     SKIPPED_BUDGET,
     SKIPPED_ON_ERROR,
     ArtifactStore,
-    AttemptRecord,
     Checkpoint,
     CheckpointMigrationError,
     StepRecord,
@@ -368,7 +368,9 @@ Rules:
   argument that needs it, and a transform step BEFORE that step names the placeholder
   and the step whose artifact states the value (e.g. "From resolve_app_store_ids: give
   headspace_apple_id and headspace_play_id"). A placeholder no earlier transform
-  resolves is not sent; never put any other template text in an argument.
+  resolves is not sent; never put any other template text in an argument
+  ("[substitute ...]", "<id from ...>", "{step.field}", "PLACEHOLDER"): a step whose
+  argument holds one is not sent either.
 - Prefer one batched tool call over per-item fan-out when the tool supports bulk
   input (e.g. dataforseo_bl_bulk_ranks takes multiple domains in one call).
 - Keep the total number of tool-call steps within the tool-call budget.
@@ -683,6 +685,7 @@ class Orchestrator:
                 self.llm, runbook, ledger, brief,
                 partial=checkpoint.partial, skipped_steps=disclosures,
                 transform_notes=checkpoint.transform_notes,
+                coverage_notes=tool_limits.coverage_notes(s.tool for s in checkpoint.steps if s.state == COMPLETED),
             )
         except LLMBudgetExceeded as exc:
             # Even the writer reserve is spent: the evidence still ships, as a
@@ -708,7 +711,8 @@ class Orchestrator:
                 llm_stop = terminal.budget_stop_text(terminal.BUDGET_LLM, meter.max_usd)
                 reason = (checkpoint.stop_reason if checkpoint.stop_reason.startswith(llm_stop)
                           else f"{llm_stop}; {checkpoint.stop_reason}")
-                outcome, fidelity = ledger_only_report(runbook, ledger, reason), FidelityResult(report_md="")
+                coverage = tool_limits.coverage_notes(s.tool for s in checkpoint.steps if s.state == COMPLETED)
+                outcome, fidelity = ledger_only_report(runbook, ledger, reason, coverage), FidelityResult(report_md="")
         if meter.refusals and checkpoint.stop_reason is None:
             # A repair pass or a citation batch the cap refused was handled
             # quietly (draft kept, batch unchecked); the run still says so.
@@ -814,12 +818,16 @@ class Orchestrator:
     ) -> list[Any]:
         """The planner's raw plan; validation happens once, in build_steps."""
         schemas = await self._tool_schemas(runbook.meta.tools, catalog)
+        notes = tool_limits.planner_notes(name for name in runbook.meta.tools if name in schemas)
+        limits = (f"## Argument limits the schemas do not state (a step that breaks one is not sent)\n{notes}\n\n"
+                  if notes else "")
         budget = runbook.meta.budget
         user = (
             f"## Brief (run inputs)\n{json.dumps(brief, indent=2)}\n\n"
             f"## Budget\nmax_tool_calls={budget.max_tool_calls}, "
             f"max_usd={budget.max_usd}, max_minutes={budget.max_minutes}\n\n"
             f"## Allowlisted tool schemas (live catalog)\n{json.dumps(schemas, indent=2, default=str)}\n\n"
+            f"{limits}"
             "Output the plan JSON now."
         )
         messages = [

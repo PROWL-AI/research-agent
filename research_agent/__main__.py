@@ -414,7 +414,6 @@ def _cmd_prune(older_than: str, keep_last: int, yes: bool) -> int:
         print("error: --keep-last must be >= 0", file=sys.stderr)
         return 2
     from research_agent.evidence.runlock import RunLock, is_locked_elsewhere
-    from research_agent.evidence.store import ArtifactStore
 
     runs_root = _runs_root()
     if not runs_root.is_dir():

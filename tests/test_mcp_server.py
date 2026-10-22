@@ -7,7 +7,6 @@ import pytest
 import research_agent.mcp_server as srv
 from research_agent.config import Config, ConfigError
 
-from conftest import FakeLLM, FakeProwl
 
 DUMMY_CONFIG = Config(
     prowl_api_key="test",

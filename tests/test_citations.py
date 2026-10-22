@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import pytest
 
 from research_agent.agent.citations import verify_citations
 from research_agent.agent.orchestrator import Orchestrator

@@ -1,7 +1,5 @@
-import json
 from pathlib import Path
 
-import pytest
 
 from research_agent.evidence.ledger import Ledger
 from research_agent.evidence.store import ArtifactStore, Checkpoint

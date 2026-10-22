@@ -110,8 +110,11 @@ out of that, one-page creative briefs that describe a testable bet. Depth on
    `tiktok_ads_library` + `foreplay_get_ads_by_brand_ids` (one bulk call when
    ≥3 Foreplay brand IDs exist; otherwise `foreplay_discovery_ads` per brand;
    `foreplay_get_ads_by_page_id` when only the Meta page is known)
-   (on_error=skip). An empty library is a valid finding, not an error —
-   record which channels each brand skips.
+   (on_error=skip). `tiktok_ads_library` holds ads shown in European
+   markets only: pass `country` as `all` when `geo` is outside Europe
+   (`US` is refused), and treat its result as Europe-only. An empty library is
+   a valid finding, not an error: record which channels each brand skips
+   (an empty European TikTok result says nothing about another market).
 5. **Advertiser deep-dive** (2 direct + 1 adjacent only) — Fan-out per
    deep-dive brand: `foreplay_brand_analytics` (creative cadence, spend
    trajectory, format distribution) + `meta_ad_library_page_info` (likes,

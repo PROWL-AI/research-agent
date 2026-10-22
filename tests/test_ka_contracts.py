@@ -595,7 +595,7 @@ async def test_usd_budget_stop_maps_to_budget_usd_end_to_end(wired):
 
 async def test_minutes_budget_stop_maps_to_budget_minutes_end_to_end(wired, monkeypatch):
     import research_agent.agent.orchestrator as orch_mod
-    from datetime import datetime as real_dt, timedelta, timezone
+    from datetime import datetime as real_dt, timedelta
 
     class Later(real_dt):
         @classmethod
@@ -650,7 +650,8 @@ def test_prune_deletes_through_a_tombstone_and_skips_os_errors(wired, capsys, mo
     for rid in ("old-a", "old-b"):
         s = ArtifactStore(wired / rid)
         s.save_checkpoint(Checkpoint(run_id=rid, runbook="mini-teardown", status="complete", created_at=old))
-        cp = s.load_checkpoint(); cp.created_at = old
+        cp = s.load_checkpoint()
+        cp.created_at = old
         s.checkpoint_path.write_text(cp.model_dump_json(), encoding="utf-8")
     real_rmtree = shutil.rmtree
     seen = []

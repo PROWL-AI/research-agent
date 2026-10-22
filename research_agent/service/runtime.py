@@ -10,6 +10,7 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
+from research_agent.agent import tool_limits
 from research_agent.evidence.store import ArtifactStore
 from research_agent.evidence.ledger import Ledger
 from research_agent.agent.orchestrator import Orchestrator, build_brief
@@ -188,6 +189,21 @@ def validate_request(request):
     return request
 
 
+class LimitRefused(ValueError):
+    """A known provider limit refused the request; nothing was sent (B-071)."""
+
+
+def refuse_known_limits(request):
+    """B-071 on the direct path: research.tools.call refuses a value the provider is known
+    to refuse (agent/tool_limits.py) before a job exists, rather than have it billed. Its
+    caller writes the params on purpose, so template text is not judged here (B-070 guards
+    planned steps). Checked after an idempotent replay, which answers its job as before."""
+    if request.get("kind") == "tool":
+        broken = tool_limits.refused(request["tool"], request["params"])
+        if broken:
+            raise LimitRefused(f"{request['tool']} does not take {', '.join(broken)} (a known provider limit)")
+
+
 class Runtime:
     def __init__(self, store: Store):
         self.store = store
@@ -207,6 +223,7 @@ class Runtime:
         existing = self.store.replay(request, key, delegation)
         if existing is not None:
             return existing
+        refuse_known_limits(request)
         run_dir = chain_owner = None
         if request.get("resumeJobId"):
             run_dir = self._check_resumable(request, delegation)
@@ -303,6 +320,10 @@ class Runtime:
             raise
         except TimeoutError:
             self.store.transition(job_id, "failed", "failed", error=self._with_terminal(job_id, {"code": "timeout", "message": "Wall-clock timeout reached; gathered evidence stays in the run checkpoint. No automatic retry."}))
+        except LimitRefused as exc:
+            # Refused at dispatch (a job created before the limit was known): nothing was
+            # sent, so the reader gets the reason rather than "inspect call receipts".
+            self.store.transition(job_id, "failed", "failed", error={"code": "request-rejected", "message": str(exc)[:300]})
         except Exception as exc:
             self.store.transition(job_id, "failed", "failed", error=self._with_terminal(job_id, {"code": "execution-failed", "message": type(exc).__name__ + ": inspect call receipts and provider health; no automatic retry."}))
 
@@ -339,9 +360,14 @@ class Runtime:
         req, settings = job["request"], job["config"]
         cfg = replace(Config.from_env(require_llm=req["kind"] == "research"),
                       llm_model=settings["cheap_model"], llm_model_strong=settings["strong_model"])
+        if req["kind"] == "tool":
+            # Checked again at dispatch, before any connection: a job created before a limit was
+            # known may wait for approval.
+            refuse_known_limits(req)
         async with ObservedProwl(cfg.prowl_api_key, cfg.prowl_mcp_url).observe(self.store, job) as prowl:
             if req["kind"] == "tool":
-                result = await prowl.call_tool(req["tool"], req["params"], idempotency_key=job["id"])
+                params = tool_limits.canonical(req["tool"], req["params"])
+                result = await prowl.call_tool(req["tool"], params, idempotency_key=job["id"])
                 clean = scrub(result)
                 encoded = json.dumps(clean, ensure_ascii=False)
                 if len(encoded.encode()) > 8_000_000:
@@ -350,7 +376,11 @@ class Runtime:
                 folder = self.store.root / "runs" / job["id"]
                 folder.mkdir(parents=True, exist_ok=True, mode=0o700)
                 _atomic_write_text(folder / "result.json", encoded)
-                return {"data": bounded(clean), "artifact": "result.json", "quality": "provider response; not independently verified"}
+                out = {"data": bounded(clean), "artifact": "result.json", "quality": "provider response; not independently verified"}
+                coverage = tool_limits.statements([req["tool"]])
+                if coverage:
+                    out["coverage"] = coverage
+                return out
             async with ObservedLLM(cfg.llm_base_url, cfg.llm_api_key, cfg.llm_model, cfg.llm_model_strong).observe(self.store, job) as llm:
                 orch = Orchestrator(prowl, llm, self.store.root / "runs", max_workers=settings["max_workers"])
                 # A resume runs on the earlier job's run directory: its saved raw,
@@ -379,7 +409,8 @@ class Runtime:
         envelope = {"id": "urn:prowl:result:" + job["id"], "contractVersion": "0.1.0", "outcome": outcome,
                     "done": [{"claimId": "RUN_COMPLETED", "statement": statement}],
                     "proof": [], "scope": scope, "notVerified": [attribution_gap(job),
-                    {"claim": "Research claims", "reason": output.get("quality", "not independently verified")}],
+                    {"claim": "Research claims", "reason": output.get("quality", "not independently verified")},
+                    *({"claim": "Source coverage", "reason": note} for note in output.get("coverage", []))],
                     "artifacts": [], "createdAt": now(), "producer": producer, "output": output, "usage": usage}
         if job.get("traceparent"):
             envelope["trace"] = {"traceparent": job["traceparent"]}

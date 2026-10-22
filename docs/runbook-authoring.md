@@ -94,7 +94,15 @@ Follow the flagship (`saas-competitor-teardown/SKILL.md`):
    store id, a package name), say in the runbook which step resolves it and
    that a Transform hands it on: the planner writes the argument as
    `{{name}}` and the transform returns it; an unresolved placeholder is
-   not sent (B-065).
+   not sent (B-065), and neither is any other template text in an
+   argument (B-070). When a provider refuses a value its schema does not
+   rule out, add the limit, with its source, to
+   `research_agent/agent/tool_limits.py` rather than to one runbook: every
+   planner that may call the tool is told it (B-071). When the limit also
+   narrows what a result covers (a market, a period), fill its `coverage`
+   (an instruction to the writer, which never sees step arguments) and its
+   `statement` (the same fact for a person: the dashboard's «Охват
+   источника» and a direct result's `coverage` and `notVerified`).
 4. `## Verification (hard rules)` — the numeric disciplines: triangulation
    (>=2 independent sources for key numbers), error bands on estimates,
    VERIFIED/ASSUMED tags, [CONFLICT] instead of silent averaging, LLM output

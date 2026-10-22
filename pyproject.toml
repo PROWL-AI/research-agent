@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.14"]
 
 [project.scripts]
 prowl-research = "research_agent.__main__:main"
@@ -40,3 +40,14 @@ research_agent = ["runbooks/**/*", "report/templates/**/*", "service/static/*", 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+# This checkout sits inside another repository's folder (0xDEV/pyproject.toml has its own
+# [tool.ruff]); without this section ruff silently used that one: target 3.10 (false F821 on
+# BaseExceptionGroup) and a rule set nobody here chose (B-069).
+[tool.ruff]
+target-version = "py311"
+line-length = 150
+extend-exclude = ["node_modules", "runs"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
