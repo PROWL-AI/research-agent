@@ -33,7 +33,8 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from pydantic import BaseModel, Field
 
-from research_agent.agent.bindings import substitute
+from research_agent.agent import tool_limits
+from research_agent.agent.bindings import substitute, template_text
 from research_agent.agent.orchestrator import PlanItem
 from research_agent.events import emit
 from research_agent.evidence.store import CheckpointWriteError  # noqa: F401 — re-exported
@@ -59,6 +60,25 @@ if TYPE_CHECKING:
     from research_agent.agent.orchestrator import Orchestrator
 
 log = logging.getLogger(__name__)
+
+
+def _not_sent_reason(tool: str, arguments: Any, missing: set[str]) -> str | None:
+    """Why a data step's filled arguments must not be sent, or None to send them.
+
+    An unresolved ``{{name}}`` (B-065), template text in another shape (B-070) and
+    a value the provider is known to refuse (B-071) are each refused by the
+    provider and billed; none of them is the step's real question."""
+    if missing:
+        names = ", ".join("{{" + n + "}}" for n in sorted(missing))
+        return f"not sent: no earlier step resolved {names}"
+    template = template_text(arguments)
+    if template:
+        shown = ", ".join(repr(t if len(t) <= 80 else t[:77] + "...") for t in template[:3])
+        return f"not sent: an argument holds template text, not a value: {shown}"
+    limits = tool_limits.refused(tool, arguments)
+    if limits:
+        return f"not sent: {tool} does not take {', '.join(limits)} (a known provider limit)"
+    return None
 
 #: Effort classes (plan, decision 2): lookup = one inline agent, comparison =
 #: a few workers, deep = a wide fan-out. Worker counts are deliberately modest:
@@ -351,14 +371,17 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             return summary
 
         arguments, missing = substitute(record.arguments, checkpoint.bindings)
-        if missing:
-            # Never sent: the provider would refuse the literal placeholder and
-            # bill the call (B-065). Not a refusal, so the cap neither counts
+        reason = _not_sent_reason(record.tool, arguments, missing)
+        if reason is not None:
+            # Never sent: the provider would refuse the literal text and bill the
+            # call (B-065, B-070, B-071). Not a refusal, so the cap neither counts
             # nor resets.
-            names = ", ".join("{{" + n + "}}" for n in sorted(missing))
-            reason = f"not sent: no earlier step resolved {names}"
-            emit(log, "step.unbound", logging.WARNING, run_id=checkpoint.run_id,
-                 step_id=record.step_id, tool=record.tool, missing=sorted(missing))
+            if missing:
+                emit(log, "step.unbound", logging.WARNING, run_id=checkpoint.run_id,
+                     step_id=record.step_id, tool=record.tool, missing=sorted(missing))
+            else:
+                emit(log, "step.not_sent", logging.WARNING, run_id=checkpoint.run_id,
+                     step_id=record.step_id, tool=record.tool, reason=reason)
             if record.on_error_skip:
                 _set_state(checkpoint, record, SKIPPED_ON_ERROR, reason)
                 status = "skipped"

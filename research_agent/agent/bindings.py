@@ -23,6 +23,20 @@ _NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _BLOCK_RE = re.compile(r"```bindings\s*\n(.*?)\n?```", re.DOTALL)
 #: A value shorter than this matches too much text to prove anything.
 _MIN_GROUNDED_LEN = 3
+#: Template text the planner wrote in another shape than ``{{name}}`` (B-070). The
+#: planner is told never to, and live runs show it still does; each shape below was
+#: sent to a provider, refused and billed:
+_TEMPLATE_RES = (
+    # "[substitute landing_page_url of the longest-running ... ad]" (accept-teardown-20261021b)
+    re.compile(r"\[\s*(?:substitute|insert|replace|fill in|placeholder|value from|from step)\b[^\]]*\]", re.I),
+    # "<video_id from youtube_search result ...>", "<... report URL from search or IR map>"
+    # (accept-finance-20261020)
+    re.compile(r"<[A-Za-z_][^<>]*\b(?:from|placeholder)\b[^<>]*>", re.I),
+    # "{youtube_search.latest_official_call_video_id}" (accept-finance-20261021)
+    re.compile(r"(?<!\{)\{\s*[A-Za-z_]\w*(?:\.\w+|\[\d+\])+\s*\}(?!\})"),
+    # "PLACEHOLDER_FROM_STEP_22" (accept-finance-20261020c)
+    re.compile(r"\bPLACEHOLDER(?:_[A-Z0-9]+)*\b"),
+)
 
 
 def placeholders(value: Any) -> set[str]:
@@ -36,6 +50,22 @@ def placeholders(value: Any) -> set[str]:
     elif isinstance(value, (list, tuple)):
         for item in value:
             found |= placeholders(item)
+    return found
+
+
+def template_text(value: Any) -> list[str]:
+    """Each piece of template text (not a ``{{name}}``) inside a JSON-like value,
+    in order; such an argument is never sent (B-070)."""
+    found: list[str] = []
+    if isinstance(value, str):
+        for pattern in _TEMPLATE_RES:
+            found.extend(m.group(0) for m in pattern.finditer(value))
+    elif isinstance(value, dict):
+        for item in value.values():
+            found.extend(template_text(item))
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            found.extend(template_text(item))
     return found
 
 

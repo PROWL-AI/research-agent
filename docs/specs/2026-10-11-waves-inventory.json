@@ -1163,6 +1163,86 @@
       "evidence": "closed: malformed_citation lint and repair (2026-10-21)",
       "wave": 6,
       "release": "this"
+    },
+    {
+      "id": "B-069",
+      "title": "ruff read another repository's config; no lint in CI",
+      "source": "ruff --show-settings, 2026-10-22",
+      "status": "closed",
+      "area": "docs",
+      "node": "N-DOCS",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "closed: own [tool.ruff], 95 findings fixed, ruff check in nightly (2026-10-22)",
+      "wave": 1,
+      "release": "this"
+    },
+    {
+      "id": "B-070",
+      "title": "Template text other than {{name}} sent to providers",
+      "source": "saved runs accept-finance-20261020..21, accept-teardown-20261021b",
+      "status": "closed",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "closed: bindings.template_text, not sent, tests/test_not_sent_arguments.py (2026-10-22)",
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-071",
+      "title": "tiktok_ads_library country=US refused and billed",
+      "source": "accept-subscription-20261021 and -b",
+      "status": "closed",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "closed: tool_limits.py told to the planner and checked before dispatch (2026-10-22)",
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-072",
+      "title": "Dashboard kit 1.1.0 behind 1.1.1",
+      "source": "fabric-agent-adapter SessionStart notice, 2026-10-22",
+      "status": "closed",
+      "area": "service",
+      "node": "N-FAB",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "closed: kit 1.1.1 installed, declaration raised, WebKit check PASS (2026-10-22)",
+      "wave": 5,
+      "release": "this"
+    },
+    {
+      "id": "B-073",
+      "title": "tiktok_ads_library schema offers 'US' as the example country",
+      "source": "accept-subscription-20261021, prowl_tool_info 2026-10-22",
+      "status": "open",
+      "area": "external",
+      "node": "N-EXT",
+      "blocked_by": [
+        "prowl-app"
+      ],
+      "closable_in_one_pass": false,
+      "evidence": "open: prowl-app tool description; our side guarded by B-071",
+      "wave": null,
+      "release": "external"
+    },
+    {
+      "id": "B-074",
+      "title": "No way to hand a whole earlier output to an LLM-analysis tool",
+      "source": "accept-teardown-20261021b (gemini_analyze_website)",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "open: the planner wrote [substitute full ... output] (now not sent, B-070); needs a design",
+      "wave": 6,
+      "release": "this"
     }
   ]
 }
