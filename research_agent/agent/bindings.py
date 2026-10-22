@@ -27,13 +27,16 @@ _MIN_GROUNDED_LEN = 3
 #: planner is told never to, and live runs show it still does; each shape below was
 #: sent to a provider, refused and billed:
 _TEMPLATE_RES = (
-    # "[substitute landing_page_url of the longest-running ... ad]" (accept-teardown-20261021b)
-    re.compile(r"\[\s*(?:substitute|insert|replace|fill in|placeholder|value from|from step)\b[^\]]*\]", re.I),
+    # "[substitute landing_page_url of the longest-running ... ad]" (accept-teardown-20261021b): the
+    # verb opens an instruction of three words or more, so "how to [insert] a row" or "[Substitute
+    # Teacher] movie" is a value; a CSS "[placeholder='Email']" is a value too.
+    re.compile(r"\[\s*(?:substitute|insert|replace|fill in)\s+\S+(?:\s+\S+){2,30}\s*\]", re.I),
+    re.compile(r"\[\s*placeholder\s[^\]=]{1,200}\]", re.I),
     # "<video_id from youtube_search result ...>", "<... report URL from search or IR map>"
-    # (accept-finance-20261020)
-    re.compile(r"<[A-Za-z_][^<>]*\b(?:from|placeholder)\b[^<>]*>", re.I),
+    # (accept-finance-20261020). Runs are bounded: an unbounded one is quadratic on a long argument.
+    re.compile(r"<[A-Za-z_][^<>]{0,200}?\s(?:from|placeholder)\s[^<>]{0,200}>", re.I),
     # "{youtube_search.latest_official_call_video_id}" (accept-finance-20261021)
-    re.compile(r"(?<!\{)\{\s*[A-Za-z_]\w*(?:\.\w+|\[\d+\])+\s*\}(?!\})"),
+    re.compile(r"(?<!\{)\{\s*[A-Za-z_]\w{0,63}(?:\.\w{1,64}|\[\d{1,4}\]){1,8}\s*\}(?!\})"),
     # "PLACEHOLDER_FROM_STEP_22" (accept-finance-20261020c)
     re.compile(r"\bPLACEHOLDER(?:_[A-Z0-9]+)*\b"),
 )

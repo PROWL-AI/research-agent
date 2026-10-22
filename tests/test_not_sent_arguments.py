@@ -46,6 +46,13 @@ REAL_VALUES = [
     '{"a": 1}',
     "price < 10 from 5 > 2",
     "https://apps.apple.com/us/app/id{{balance_apple_id}}",  # a {{name}}: B-065's path, not this one
+    # shapes the unit verifier found the first patterns flagged (2026-10-22)
+    "input[placeholder='Email']",
+    "<input placeholder='Search'>",
+    "[Substitute Teacher] movie",
+    "how to [insert] a row",
+    "[fill in the blank] worksheet",
+    "<john@from.com>",
 ]
 
 
@@ -58,6 +65,16 @@ def test_template_text_seen_on_live_runs_is_found(value):
 @pytest.mark.parametrize("value", REAL_VALUES)
 def test_real_values_are_not_template_text(value):
     assert bindings.template_text({"arg": value}) == []
+
+
+def test_template_text_stays_linear_on_a_long_argument():
+    """An unbounded pattern took 30 s on 136 KB and stalled every worker of the segment."""
+    import time
+
+    value = "<a " + "data from source " * 8000
+    started = time.perf_counter()
+    bindings.template_text({"a": value})
+    assert time.perf_counter() - started < 0.5
 
 
 def test_the_tiktok_country_limit_refuses_us_and_takes_all_and_europe():
