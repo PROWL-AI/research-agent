@@ -1,5 +1,42 @@
 # Research-agent handoff
 
+## Current entry, 2026-10-22 (supersedes every "Exact next task" below)
+
+Status: `main` is `1e9f1f1` (PR #31); the Fabric service `prowl-research.default` runs release `1e9f1f182625`
+(`ready`, `degraded: []`, kit `fabric-dashboard-kit@1.1.1`; `scripts/smoke-installed-service.py` PASS through the
+gateway, 0 provider calls). The installer keeps the previous release `10853dfe8e54` for rollback, by design.
+Checks on `main`: `ruff check .` clean (the repository's own config now), suite 691 passed, `validate` all runbooks
+valid, `scripts/plan/assign_waves.py --check` exit 0 (open 20 of 95), mutation check 62 of 62 killed
+([receipt](evidence/judge-calibration/mutations.log)), dashboard WebKit PASS
+([receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.1.json)). Branches: only `main` remains on the remote; every
+deleted branch was an ancestor of `main` (32 in all; GitHub had removed 20 after their merges).
+
+Done in PR #31 (six verification rounds: unit, seam and product tiers; the last two seam rounds and the last
+product round found nothing blocking):
+- **B-069** ruff read the parent folder's `0xDEV/pyproject.toml` (another repository): three false `F821`, 95
+  findings unseen, no lint anywhere. Own `[tool.ruff]`, all findings fixed, lint in the nightly; every check after a
+  successful install runs whatever an earlier one said.
+- **B-070** template text other than `{{name}}` (`[substitute ...]`, `<id from ...>`, `{step.field}`,
+  `PLACEHOLDER_...`) is never sent: 12 of 342 saved data steps carried one, 8 refused and billed, 4 "completed" on
+  the literal text. A dispatched `outcome_unknown` step is re-sent as it was, never judged again.
+- **B-071** measured provider limits (`research_agent/agent/tool_limits.py`; `tiktok_ads_library` country: `all` or a
+  European code, US refused) are told to the planner, enforced before dispatch on both paths (planned steps and
+  `research.tools.call`), sent in the provider's spelling, and their coverage reaches the writer (`Source coverage`),
+  the fallback report, the direct result (`coverage`, `notVerified`) and the dashboard («Охват источника»). The
+  writer reports a not-sent step as a gap of the run, in a partial and in a complete run.
+- **B-072** dashboard kit 1.1.1. Docs: README, FABRIC.md (both keys in the vault since 2026-10-18; the refusal
+  shape), runbook-authoring, CORE-19, CORE-17 count, ads-creative-research (TikTok is Europe-only).
+
+Open and who holds it (board: [`evidence/backlog.md`](evidence/backlog.md)): B-067 (prowl-app: the app-store
+resolver returns another brand's app; blocks a correct subscription audit), B-073 (prowl-app: TikTok schema offers
+'US'), B-017 person half (the operator labels one report), B-020 (fabric-agent-contract, thread 3b4bd63d, no reply),
+B-042 (registry owner), KA-G03 (hub JWKS), FD-13, FD-14, B-074 (design: hand a whole earlier output to an
+LLM-analysis tool), B-075 (job errors carry `terminalCode`, which the pinned interop error schema forbids), B-066 and
+B-078 (dashboard, through the UX chain), B-076 and B-077 (small follow-ups).
+
+**Exact next task:** B-075 (a contract breach on every failed research job read strictly), then B-066 with B-078
+through `super-ux` (scenarios first). Re-run `subscription-app-audit` once prowl-app fixes B-067.
+
 ## Current entry, 2026-10-21 evening (supersedes every "Exact next task" below)
 
 Status: `main` carries B-065 (PR #29, `a8af16e`) and B-068 (PR #30, `10853df`); the Fabric service

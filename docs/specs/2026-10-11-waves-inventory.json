@@ -1173,7 +1173,7 @@
       "node": "N-DOCS",
       "blocked_by": [],
       "closable_in_one_pass": true,
-      "evidence": "closed: own [tool.ruff], 95 findings fixed, ruff check in nightly (2026-10-22)",
+      "evidence": "closed: own [tool.ruff], 95 findings fixed, ruff check in nightly (2026-10-22; PR #31 1e9f1f1)",
       "wave": 1,
       "release": "this"
     },
@@ -1186,7 +1186,7 @@
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
-      "evidence": "closed: bindings.template_text, not sent, tests/test_not_sent_arguments.py (2026-10-22)",
+      "evidence": "closed: bindings.template_text, not sent, tests/test_not_sent_arguments.py (2026-10-22; PR #31 1e9f1f1)",
       "wave": 6,
       "release": "this"
     },
@@ -1199,7 +1199,7 @@
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
-      "evidence": "closed: tool_limits.py told to the planner and checked before dispatch (2026-10-22)",
+      "evidence": "closed: tool_limits.py told to the planner and checked before dispatch (2026-10-22; PR #31 1e9f1f1)",
       "wave": 6,
       "release": "this"
     },
@@ -1212,7 +1212,7 @@
       "node": "N-FAB",
       "blocked_by": [],
       "closable_in_one_pass": true,
-      "evidence": "closed: kit 1.1.1 installed, declaration raised, WebKit check PASS (2026-10-22)",
+      "evidence": "closed: kit 1.1.1 installed, declaration raised, WebKit check PASS (2026-10-22; PR #31 1e9f1f1)",
       "wave": 5,
       "release": "this"
     },
@@ -1267,6 +1267,32 @@
       "blocked_by": [],
       "closable_in_one_pass": true,
       "evidence": "open: scripts/test-dashboard.mjs has no tool job with coverage",
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-077",
+      "title": "Dispatch follow-ups from the B-070/B-071 verification",
+      "source": "verification rounds 5-6, 2026-10-22",
+      "status": "open",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "open: fallback report statement, resend fallback, two unpinned behaviours",
+      "wave": 6,
+      "release": "this"
+    },
+    {
+      "id": "B-078",
+      "title": "Coverage on the dashboard for research jobs and its wording",
+      "source": "verification round 6, 2026-10-22",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "open: with B-066 through the UX chain",
       "wave": 4,
       "release": "this"
     }
