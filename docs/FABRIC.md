@@ -54,7 +54,7 @@ Every paid request initially requires the operator's authenticated dashboard ses
 }
 ```
 
-`params` accepts the selected tool's input object. Upstream schema, credentials and authorization still apply. Parameters are not shell commands. Same idempotencyKey and request returns the same job; changed request with the same key is rejected. Keys are local to this service instance, not a claim of upstream exactly-once execution.
+`params` accepts the selected tool's input object. Upstream schema, credentials and authorization still apply. One local rule comes first: a value the provider is known to refuse while its schema is silent (`research_agent/agent/tool_limits.py`, each limit with its source; today `tiktok_ads_library` takes `country` only as `all` or a European code) is refused before a job exists, as JSON-RPC `-32602` `<tool> does not take country='US' (a known provider limit)`; a replay of an existing job's key still answers that job (B-071). Parameters are not shell commands. Same idempotencyKey and request returns the same job; changed request with the same key is rejected. Keys are local to this service instance, not a claim of upstream exactly-once execution.
 
 ## Install and operate
 
@@ -83,7 +83,7 @@ MCP registration: the `prowl-research` entry lives in each agent client's own co
 
 **Delegation (DEC-0039, FD-12).** Callers call this service directly; the estate hub only issues delegation tokens. A loopback caller with the service's agent token is T0 and needs no token; a delegation token it sends is still verified and recorded on the job. A caller with only a delegation token, or off the machine, is T2 and must present a valid one. Configure `RESEARCH_DELEGATION_ISSUER`, `RESEARCH_DELEGATION_JWKS` (and optionally `RESEARCH_DELEGATION_AUDIENCE`, default `prowl-research.default`); the well-known document then declares `auth.delegation`. Without them a presented token is refused (fail closed). The service binds loopback only; a caller from another machine has no route to it. Route, refusals and the pending host-chain receipt: [HUB-PACKET](evidence/fabric-dashboard/HUB-PACKET.md).
 
-**Dashboard.** The page uses `fabric-dashboard-kit@1.1.1` (DEC-0036): kit chrome and navigation, the estate themes and scheme (the host's appearance wins), fluid grids and keyboard-reachable scroll boxes; the well-known document declares the dashboard extension (minWidth 360). Layout probe: `check_dashboard_layout.mjs` 17 rules PASS at 320–1280 px (2026-10-17).
+**Dashboard.** The page uses `fabric-dashboard-kit@1.1.1` (DEC-0036): kit chrome and navigation, the estate themes and scheme (the host's appearance wins), fluid grids and keyboard-reachable scroll boxes; the well-known document declares the dashboard extension (minWidth 360). Layout probe: `check_dashboard_layout.mjs` 17 rules PASS at 320–1280 px (2026-10-17). On kit 1.1.1 (2026-10-22): `scripts/test-dashboard.mjs` WebKit PASS at 1440, 390 and 360 px.
 
 ## Names
 

@@ -99,6 +99,10 @@ MUTANTS = [
      ["tests/test_not_sent_arguments.py"]),
     ("limit-not-sent", "research_agent/agent/subagent.py", "    limits = tool_limits.refused(tool, arguments)\n", "    limits = []\n",
      ["tests/test_not_sent_arguments.py"]),
+    ("direct-limit-refused", "research_agent/service/runtime.py", "        refuse_known_limits(request)\n", "",
+     ["tests/test_not_sent_arguments.py"]),
+    ("coverage-told", "research_agent/agent/writer.py", "    if coverage_notes:\n", "    if False:\n",
+     ["tests/test_not_sent_arguments.py"]),
 ]
 
 

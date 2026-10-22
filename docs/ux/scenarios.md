@@ -428,7 +428,7 @@
 - **Expected result:** трансформация получает список нужных имён и отдаёт блок `bindings`; значение принимается, только если сырой ответ прогона содержит его дословно (`checkpoint.bindings`); шаг отправляет заполненные аргументы (`bound_arguments`), а `arguments` хранит план как написан; заметка трансформации для writer идёт без блока.
 - **Failure outcome:** плейсхолдер, который никто не разрешил, или выдуманное значение не отправляются вовсе: шаг `skipped_on_error` (обязательный: `failed`, прогон `partial`/`step_failed`) с причиной `not sent: no earlier step resolved {{имя}}`, без попытки и без оплаты; в счётчик отказов подряд это не входит.
 - **Wave:** 6 (N-ACC, B-065)
-- **Coverage:** `tests/test_plan_bindings.py` (10 тестов)
+- **Coverage:** `tests/test_plan_bindings.py` (10 тестов); как writer называет неотправленный шаг: CORE-19
 
 ### CORE-19: Шаблонный текст и значение, которое провайдер заведомо отклоняет, не отправляются
 - **Status:** UNVERIFIED
@@ -437,8 +437,8 @@
 - **Preconditions:** план прошёл проверку; ограничение записано в `research_agent/agent/tool_limits.py` с источником
 - **Steps:**
   1. Запустить прогон, в плане которого такой шаг.
-- **Expected result:** планировщик получает раздел «Argument limits the schemas do not state» с ограничениями инструментов своего runbook; шаг с шаблонным текстом или запрещённым значением не отправляется: `skipped_on_error` (обязательный: `failed`, прогон `partial`/`step_failed`) с причиной `not sent: an argument holds template text, not a value: ...` или `not sent: <tool> does not take country='US' (a known provider limit)`, без попытки и без оплаты; остальные шаги идут дальше.
-- **Failure outcome:** в счётчик отказов подряд такой шаг не входит; настоящее значение (`"Novo Nordisk" going concern`, URL, JSON) отправляется как раньше.
+- **Expected result:** планировщик получает раздел «Argument limits the schemas do not state» с ограничениями инструментов своего runbook; шаг с шаблонным текстом или запрещённым значением не отправляется: `skipped_on_error` (обязательный: `failed`, прогон `partial`/`step_failed`) с причиной `not sent: an argument holds template text, not a value: ...` или `not sent: <tool> does not take country='US' (a known provider limit)`, без попытки и без оплаты; остальные шаги идут дальше. Writer получает такие шаги отдельным списком «not sent» и называет их пробелом этого прогона, а не ответом источника (так же для неразрешённых `{{имя}}` из CORE-18); для отправленного инструмента с ограничением writer получает раздел «Source coverage» (TikTok: только Европа), и пустой европейский результат не читается как «не рекламируется в TikTok».
+- **Failure outcome:** в счётчик отказов подряд такой шаг не входит; настоящее значение (`"Novo Nordisk" going concern`, URL, JSON, `{company.name}` внутри промпта) отправляется как раньше. Прямой `research.tools.call` (и форма «Новый запрос» на дашборде) с заведомо отклоняемым значением получает отказ `-32602` до создания задания; шаблонный текст на этом пути не проверяется (значения пишет сам вызывающий); повтор ключа уже созданного задания отвечает этим заданием.
 - **Wave:** 6 (N-ACC, B-070, B-071)
-- **Coverage:** `tests/test_not_sent_arguments.py` (35 тестов; аргументы взяты из сохранённых прогонов); прямой вызов `research.tools.call` отклоняет те же значения при проверке запроса
+- **Coverage:** `tests/test_not_sent_arguments.py` (37 тестов; аргументы взяты из сохранённых прогонов)
 

@@ -685,6 +685,7 @@ class Orchestrator:
                 self.llm, runbook, ledger, brief,
                 partial=checkpoint.partial, skipped_steps=disclosures,
                 transform_notes=checkpoint.transform_notes,
+                coverage_notes=tool_limits.coverage_notes(s.tool for s in checkpoint.steps if s.state == COMPLETED),
             )
         except LLMBudgetExceeded as exc:
             # Even the writer reserve is spent: the evidence still ships, as a

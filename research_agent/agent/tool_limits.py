@@ -24,6 +24,8 @@ class ArgumentLimit:
     allowed: frozenset[str]
     note: str
     source: str
+    #: What a result of this tool covers, for the writer (it never sees step arguments).
+    coverage: str = ""
 
 
 #: SearchApi "TikTok Ads Library Countries" (docs/parameters/tiktok-ads-library/country,
@@ -40,9 +42,12 @@ LIMITS: dict[str, dict[str, ArgumentLimit]] = {
             allowed=_TIKTOK_ADS_COUNTRIES,
             note=("the TikTok Ads Library holds ads shown in European markets only: pass `all` or one of "
                   "AT BE BG HR CY CZ DK EE FI FR DE GR HU IS IE IT LV LI LT LU MT NL NO PL PT RO SK SI ES SE "
-                  "CH TR GB (upper case). US and any other market are refused; for them pass `all` and say "
-                  "in the report that the result covers Europe only."),
+                  "CH TR GB. US and any other market are refused; for them pass `all` (the writer is told "
+                  "the result covers Europe only)."),
             source="live run accept-subscription-20261021 (HTTP 400) and SearchApi's country list, 2026-10-22",
+            coverage=("`tiktok_ads_library` results cover ads shown in European markets only (EU/EEA, UK, CH, TR): "
+                      "say so wherever they are used, and never read an empty result as \"does not advertise on "
+                      "TikTok\" for any other market."),
         ),
     },
 }
@@ -55,14 +60,23 @@ def planner_notes(tools: Iterable[str]) -> str:
     return "\n".join(lines)
 
 
+def coverage_notes(tools: Iterable[str]) -> list[str]:
+    """What the results of the given (sent) tools cover, once per tool, for the writer."""
+    notes: list[str] = []
+    for tool in dict.fromkeys(tools):
+        notes.extend(limit.coverage for limit in LIMITS.get(tool, {}).values() if limit.coverage)
+    return notes
+
+
 def refused(tool: str, arguments: Any) -> list[str]:
     """Each argument of `arguments` that breaks a known limit of `tool`, as
-    "name='value'"; an empty list when the step may be sent."""
+    "name='value'"; an empty list when the step may be sent. Case is not compared:
+    only the value itself was measured as refused, not its spelling."""
     if not isinstance(arguments, dict):
         return []
     out = []
     for argument, limit in LIMITS.get(tool, {}).items():
         value = arguments.get(argument)
-        if isinstance(value, str) and value not in limit.allowed:
+        if isinstance(value, str) and value.upper() not in {a.upper() for a in limit.allowed}:
             out.append(f"{argument}={value!r}")
     return out

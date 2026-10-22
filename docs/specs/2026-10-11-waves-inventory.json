@@ -1239,7 +1239,7 @@
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
-      "closable_in_one_pass": true,
+      "closable_in_one_pass": false,
       "evidence": "open: the planner wrote [substitute full ... output] (now not sent, B-070); needs a design",
       "wave": 6,
       "release": "this"

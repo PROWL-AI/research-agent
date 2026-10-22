@@ -34,6 +34,7 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install
+        id: install
         run: |
           python -m pip install --upgrade pip
           pip install -e '.[dev]'
@@ -41,13 +42,15 @@ jobs:
       - name: Lint
         run: ruff check .
 
+      # A failed check must not hide the next one's result; a failed install would only add noise.
       - name: Tests
-        # A lint finding must not hide the night's suite result.
-        if: success() || failure()
+        if: steps.install.outcome == 'success' && !cancelled()
         run: python -m pytest tests/ -q
 
       - name: Runbooks validate (offline)
+        if: steps.install.outcome == 'success' && !cancelled()
         run: python -m research_agent validate
 
       - name: Wave inventory is current
+        if: steps.install.outcome == 'success' && !cancelled()
         run: python scripts/plan/assign_waves.py --check

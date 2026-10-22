@@ -11,7 +11,6 @@ from dataclasses import replace
 from pathlib import Path
 
 from research_agent.agent import tool_limits
-from research_agent.agent.bindings import template_text
 from research_agent.evidence.store import ArtifactStore
 from research_agent.evidence.ledger import Ledger
 from research_agent.agent.orchestrator import Orchestrator, build_brief
@@ -183,18 +182,22 @@ def validate_request(request):
             raise ValueError("Invalid tool name")
         if not isinstance(request.get("params"), dict):
             raise ValueError("params must be an object")
-        # The same values a planned step is never sent with (B-070, B-071): refused here,
-        # before an approvable job exists, rather than billed by the provider.
-        if template_text(request["params"]):
-            raise ValueError("params hold template text, not values: " + ", ".join(template_text(request["params"])[:3]))
-        if tool_limits.refused(request["tool"], request["params"]):
-            raise ValueError(f"{request['tool']} does not take {', '.join(tool_limits.refused(request['tool'], request['params']))}"
-                             " (a known provider limit)")
     if len(json.dumps(request)) > 64000:
         raise ValueError("Request exceeds 64 KB")
     if scrub(request) != request:
         raise ValueError("Credentials belong in the service environment, not request arguments")
     return request
+
+
+def refuse_known_limits(request):
+    """B-071 on the direct path: research.tools.call refuses a value the provider is known
+    to refuse (agent/tool_limits.py) before a job exists, rather than have it billed. Its
+    caller writes the params on purpose, so template text is not judged here (B-070 guards
+    planned steps). Checked after an idempotent replay, which answers its job as before."""
+    if request.get("kind") == "tool":
+        broken = tool_limits.refused(request["tool"], request["params"])
+        if broken:
+            raise ValueError(f"{request['tool']} does not take {', '.join(broken)} (a known provider limit)")
 
 
 class Runtime:
@@ -216,6 +219,7 @@ class Runtime:
         existing = self.store.replay(request, key, delegation)
         if existing is not None:
             return existing
+        refuse_known_limits(request)
         run_dir = chain_owner = None
         if request.get("resumeJobId"):
             run_dir = self._check_resumable(request, delegation)

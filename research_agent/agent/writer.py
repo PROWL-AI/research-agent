@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
+from research_agent.agent import tool_limits
 from research_agent.evidence.ledger import Ledger, _atomic_write_text
 from research_agent.llm import LLMBudgetExceeded, LLMClient, LLMError
 from research_agent.runbook import Runbook
@@ -336,6 +337,7 @@ async def write_report(
     partial: bool = False,
     skipped_steps: list[dict[str, Any]] | None = None,
     transform_notes: list[str] | None = None,
+    coverage_notes: list[str] | None = None,
 ) -> str:
     partial_note = ""
     if partial:
@@ -391,6 +393,10 @@ async def write_report(
             " use as context, cite the ledger for numbers)\n"
             + "\n\n---\n\n".join(transform_notes)
         )
+    if coverage_notes:
+        # B-071: the writer never sees step arguments, so what a limited source covers is told here.
+        user += "\n\n## Source coverage (state it wherever these results are used)\n" + "\n".join(
+            f"- {note}" for note in coverage_notes)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     try:
         return await llm.complete(
@@ -527,10 +533,12 @@ async def write_and_repair(
     partial: bool = False,
     skipped_steps: list[dict[str, Any]] | None = None,
     transform_notes: list[str] | None = None,
+    coverage_notes: list[str] | None = None,
 ) -> WriterOutcome:
     draft = await write_report(
         llm, runbook, ledger, brief,
         partial=partial, skipped_steps=skipped_steps, transform_notes=transform_notes,
+        coverage_notes=coverage_notes,
     )
     lint_current = _writing_lint(draft, ledger)
     lint_before = len(lint_current.issues)
@@ -630,12 +638,14 @@ async def produce_report(
     partial: bool = False,
     skipped_steps: list[dict[str, Any]] | None = None,
     transform_notes: list[str] | None = None,
+    coverage_notes: list[str] | None = None,
 ) -> tuple[WriterOutcome, "FidelityResult"]:
     from research_agent.agent.citations import verify_citations
 
     outcome = await write_and_repair(
         llm, runbook, ledger, brief,
         partial=partial, skipped_steps=skipped_steps, transform_notes=transform_notes,
+        coverage_notes=coverage_notes,
     )
     fidelity = await verify_citations(llm, outcome.report_md, ledger)
     if fidelity.unverified:
@@ -703,6 +713,7 @@ async def _rewrite_locked(llm: LLMClient, run_dir: Path, run_id: str,
             partial=checkpoint.partial,
             skipped_steps=checkpoint.skipped_steps,
             transform_notes=checkpoint.transform_notes,
+            coverage_notes=tool_limits.coverage_notes(s.tool for s in checkpoint.steps if s.state == "completed"),
         )
     except LLMBudgetExceeded as exc:
         checkpoint.stats["llm_budget"] = budget_stats(meter, checkpoint)

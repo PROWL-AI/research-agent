@@ -184,16 +184,23 @@ async def test_the_planner_prompt_carries_the_limits_of_allowlisted_tools(lookup
     assert "only a.com or b.com" in planner["messages"][-1]["content"]
 
 
-def test_a_direct_tool_request_with_template_text_or_a_refused_value_is_refused_before_a_job():
-    """research.tools.call dispatches params directly: the same values are refused at validation."""
-    from research_agent.service.runtime import validate_request
+def test_a_direct_tool_request_with_a_known_refused_value_is_refused_before_a_job(tmp_path, monkeypatch):
+    """research.tools.call dispatches params directly: a known-refused value is refused before a
+    job exists; template text is the caller's own choice there; a replay answers its job."""
+    from research_agent.service.runtime import Runtime, refuse_known_limits
+    from research_agent.service.store import Store
 
     with pytest.raises(ValueError, match="known provider limit"):
-        validate_request({"kind": "tool", "tool": "tiktok_ads_library", "params": {"query": "x", "country": "US"}})
-    with pytest.raises(ValueError, match="template text"):
-        validate_request({"kind": "tool", "tool": TOOL, "params": {"domain": "PLACEHOLDER_FROM_STEP_3"}})
-    ok = {"kind": "tool", "tool": "tiktok_ads_library", "params": {"query": "x", "country": "all"}}
-    assert validate_request(ok) == ok
+        refuse_known_limits({"kind": "tool", "tool": "tiktok_ads_library", "params": {"query": "x", "country": "US"}})
+    refuse_known_limits({"kind": "tool", "tool": "tiktok_ads_library", "params": {"query": "x", "country": "fr"}})
+    refuse_known_limits({"kind": "tool", "tool": TOOL, "params": {"domain": "PLACEHOLDER text generator"}})
+
+    monkeypatch.setenv("PROWL_API_KEY", "test-key")
+    rt = Runtime(Store(tmp_path))
+    bad = {"kind": "tool", "tool": "tiktok_ads_library", "params": {"query": "x", "country": "US"}}
+    with pytest.raises(ValueError, match="known provider limit"):
+        rt.create(bad, "direct-1")
+    assert rt.store.jobs() == []
 
 
 async def test_the_writer_is_told_a_not_sent_step_is_the_plan_gap_not_a_refusal(lookup_runbook, tmp_path):
@@ -210,3 +217,20 @@ async def test_the_writer_is_told_a_not_sent_step_is_the_plan_gap_not_a_refusal(
     sent_line = next(line for line in writer[-1].splitlines() if "templated" in line)
     assert sent_line.startswith("These steps were not sent")
     assert "refused by the data source" not in writer[-1]
+
+
+def test_the_country_limit_ignores_case():
+    assert tool_limits.refused("tiktok_ads_library", {"country": "fr"}) == []
+    assert tool_limits.refused("tiktok_ads_library", {"country": "us"}) == ["country='us'"]
+
+
+async def test_the_writer_is_told_what_a_limited_source_covers(lookup_runbook, tmp_path, monkeypatch):
+    limit = tool_limits.ArgumentLimit(allowed=frozenset({"all"}), note="n", source="test",
+                                      coverage="results cover Europe only")
+    monkeypatch.setitem(tool_limits.LIMITS, TOOL, {"country": limit})
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [{"step": "s", "tool": TOOL, "arguments": {"domain": "a.com", "country": "all"}}]}
+    await Orchestrator(FakeProwl(), llm, runs_root=tmp_path / "runs").run("notsent-lookup", BRIEF, run_id="cover")
+    writer = [m["content"] for call in llm.calls for m in call["messages"] if "## Source coverage" in m["content"]]
+    assert writer and "results cover Europe only" in writer[-1]
+    assert tool_limits.coverage_notes(["meta_ad_library"]) == []
