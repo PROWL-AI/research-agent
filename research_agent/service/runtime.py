@@ -375,7 +375,7 @@ class Runtime:
                 folder.mkdir(parents=True, exist_ok=True, mode=0o700)
                 _atomic_write_text(folder / "result.json", encoded)
                 out = {"data": bounded(clean), "artifact": "result.json", "quality": "provider response; not independently verified"}
-                coverage = tool_limits.coverage_notes([req["tool"]])
+                coverage = tool_limits.statements([req["tool"]])
                 if coverage:
                     out["coverage"] = coverage
                 return out

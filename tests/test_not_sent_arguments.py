@@ -331,7 +331,9 @@ async def test_a_direct_call_is_sent_in_the_providers_spelling_and_returns_its_c
     assert _StubObservedProwl.sent == [("tiktok_ads_library", {"query": "x", "country": "GB"})]
     done = rt.store.job(job["id"])
     assert done["status"] == "completed"
-    assert "European markets only" in " ".join(done["result"]["output"]["coverage"])
+    assert done["result"]["output"]["coverage"] == tool_limits.statements(["tiktok_ads_library"])
+    assert "European markets only" in done["result"]["output"]["coverage"][0]
+    assert "say so" not in done["result"]["output"]["coverage"][0]  # a fact for a person, not the writer's order
     assert any(n["claim"] == "Source coverage" for n in done["result"]["notVerified"])
 
 

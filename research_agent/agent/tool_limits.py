@@ -24,8 +24,10 @@ class ArgumentLimit:
     allowed: frozenset[str]
     note: str
     source: str
-    #: What a result of this tool covers, for the writer (it never sees step arguments).
+    #: What a result of this tool covers, as an instruction to the writer (it never sees step arguments).
     coverage: str = ""
+    #: The same fact for a person or a caller: the dashboard and a direct result's envelope.
+    statement: str = ""
 
 
 #: SearchApi "TikTok Ads Library Countries" (docs/parameters/tiktok-ads-library/country,
@@ -48,6 +50,8 @@ LIMITS: dict[str, dict[str, ArgumentLimit]] = {
             coverage=("`tiktok_ads_library` results cover ads shown in European markets only (EU/EEA, UK, CH, TR): "
                       "say so wherever they are used, and never read an empty result as \"does not advertise on "
                       "TikTok\" for any other market."),
+            statement=("TikTok Ads Library: ads shown in European markets only (EU/EEA, UK, CH, TR); "
+                       "an empty result says nothing about any other market."),
         ),
     },
 }
@@ -80,6 +84,14 @@ def canonical(tool: str, arguments: Any) -> Any:
             match = next((a for a in limit.allowed if a.upper() == value.upper()), None)
             if match is not None:
                 out[argument] = match
+    return out
+
+
+def statements(tools: Iterable[str]) -> list[str]:
+    """What the results of the given tools cover, once per tool, for a person or a caller."""
+    out: list[str] = []
+    for tool in dict.fromkeys(tools):
+        out.extend(limit.statement for limit in LIMITS.get(tool, {}).values() if limit.statement)
     return out
 
 
