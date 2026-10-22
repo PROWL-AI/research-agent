@@ -302,7 +302,7 @@ async def test_second_process_cannot_acquire_lock_or_create_tokens(tmp_path):
     fd = lock(tmp_path)
     try:
         r = subprocess.run(
-            [sys.executable, "-m", "research_agent.service.cli", "serve", "--root", str(tmp_path), "--port", "18766"], capture_output=True, timeout=5
+            [sys.executable, "-m", "research_agent.service.cli", "serve", "--root", str(tmp_path), "--port", "18766", "--log-dir", str(tmp_path / "logs")], capture_output=True, timeout=5
         )
         assert r.returncode == 75 and not (tmp_path / "host.token").exists()
     finally:

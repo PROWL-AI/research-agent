@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 const root=await mkdtemp(join(tmpdir(),'prowl-ui-'));
 const origin='http://127.0.0.1:18765';
 const env={...process.env};for(const key of ['PROWL_API_KEY','RESEARCH_LLM_API_KEY','OPENROUTER_API_KEY'])delete env[key];
-const child=spawn('.venv/bin/python',['-m','research_agent.service.cli','serve','--root',root,'--port','18765'],{env,stdio:['ignore','ignore','pipe']});
+const child=spawn('.venv/bin/python',['-m','research_agent.service.cli','serve','--root',root,'--port','18765','--log-dir',join(root,'logs')],{env,stdio:['ignore','ignore','pipe']});
 let error='';child.stderr.on('data',d=>error+=d.toString());
 // Screenshots go to a fresh temporary folder unless DASHBOARD_EVIDENCE_DIR names one on purpose:
 // a routine run must never overwrite committed evidence.

@@ -13,10 +13,13 @@ async def main():
     async with streamablehttp_client("http://127.0.0.1:47845/mcp/prowl-research", headers={"x-agw-key": role}) as (r, w, _):
         async with ClientSession(r, w) as mcp:
             await mcp.initialize()
+            # One key per installed build: a fixed key returned the first install's completed
+            # job to every later smoke, which then never saw input_required.
+            build = httpx.get(origin + "/.well-known/fabric-service", timeout=5).json()["service"]["build"]["commit"][:12]
             result = await mcp.call_tool(
                 "research.tutorial",
                 {
-                    "idempotencyKey": "installed-service-tutorial",
+                    "idempotencyKey": "installed-" + build + "-tutorial",
                     "context": {
                         "requester": "Codex · проверка подключения",
                         "chain": "Учебная цепочка Fabric",
