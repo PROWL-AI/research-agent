@@ -83,7 +83,7 @@ MCP registration: the `prowl-research` entry lives in each agent client's own co
 
 **Delegation (DEC-0039, FD-12).** Callers call this service directly; the estate hub only issues delegation tokens. A loopback caller with the service's agent token is T0 and needs no token; a delegation token it sends is still verified and recorded on the job. A caller with only a delegation token, or off the machine, is T2 and must present a valid one. Configure `RESEARCH_DELEGATION_ISSUER`, `RESEARCH_DELEGATION_JWKS` (and optionally `RESEARCH_DELEGATION_AUDIENCE`, default `prowl-research.default`); the well-known document then declares `auth.delegation`. Without them a presented token is refused (fail closed). The service binds loopback only; a caller from another machine has no route to it. Route, refusals and the pending host-chain receipt: [HUB-PACKET](evidence/fabric-dashboard/HUB-PACKET.md).
 
-**Dashboard.** The page uses `fabric-dashboard-kit@1.1.2` (DEC-0036): kit chrome and navigation, the estate themes and scheme (the host's appearance wins), fluid grids and keyboard-reachable scroll boxes; the well-known document declares the dashboard extension (minWidth 360). Layout probe: `check_dashboard_layout.mjs` 17 rules PASS at 320–1280 px (2026-10-17). On kit 1.1.1 (2026-10-22): `scripts/test-dashboard.mjs` WebKit PASS at 1440, 390 and 360 px ([receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.1.json)).
+**Dashboard.** The page uses `fabric-dashboard-kit@1.1.2` (DEC-0036): kit chrome and navigation, the estate themes and scheme (the host's appearance wins), fluid grids and keyboard-reachable scroll boxes; the well-known document declares the dashboard extension (minWidth 360). Layout probe: `check_dashboard_layout.mjs` 17 rules PASS at 320–1280 px (2026-10-17). On kit 1.1.2 (2026-10-22, B-079): `scripts/test-dashboard.mjs` WebKit PASS at 1440, 390 and 360 px ([receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.2.json); kit 1.1.1: [receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.1.json)).
 
 ## Names
 
@@ -100,12 +100,12 @@ A research job (`fabric.job.get`) and the run checkpoint it drives (`research.ar
 | every planned step ran | `completed` | `succeeded` | `complete` / `completed` |
 | budget stop (tools, USD, minutes, LLM), evidence incomplete, a required step that failed (refused while the run went on, or a refusal that stopped it) | `completed` | `partial` (the `done` statement names the `terminal_code`) | `partial` / `budget_tools`, `budget_usd`, `budget_minutes`, `budget_llm`, `evidence_incomplete`, `step_failed` |
 | the caller cancelled the job | `cancelled` | — (job error) | `partial` / `cancelled` |
-| past the wall-clock timeout | `failed`, error `timeout` + `data.terminalCode` | — | `partial` / `cancelled` |
+| past the wall-clock timeout | `failed`, error `timeout` + `data.terminalCode` | none | `partial` / `cancelled` |
 | the service shut down mid-run | `interrupted` | — | `partial` / `cancelled` |
-| an exception escaped the run | `failed`, error `execution-failed` + `data.terminalCode` | — | `failed` / `error` |
+| an exception escaped the run | `failed`, error `execution-failed` + `data.terminalCode` | none | `failed` / `error` |
 | the service process crashed | `working` until restart recovery marks it `interrupted` | — | `running` until reconciliation under the run lock marks it `interrupted` (resumable) |
 
-The terminal code sits in `error.data`, the one open slot of the pinned interop error schema (`code`, `message`, `data`, nothing else); a job stored by a build before 2026-10-22 had it beside `code` and is served in the new shape (B-075, checked by `scripts/verify-fabric-contract.py`). Tool and tutorial jobs that return report `succeeded`. Envelope outcomes are the contract's set (`succeeded`, `partial`, `failed`, `cancelled`, `blocked`); the service reaches only the first two in an envelope: every other end is a typed job error.
+The terminal code sits in `error.data`, the one open slot of the pinned interop error schema (`code`, `message`, `data`, nothing else); a job stored by a build before B-075 (release `1e9f1f182625` and earlier) had it beside `code` and is served in the new shape (B-075, checked by `scripts/verify-fabric-contract.py`). Tool and tutorial jobs that return report `succeeded`. Envelope outcomes are the contract's set (`succeeded`, `partial`, `failed`, `cancelled`, `blocked`); the service reaches only the first two in an envelope: every other end is a typed job error.
 
 ## Resume (B-039)
 

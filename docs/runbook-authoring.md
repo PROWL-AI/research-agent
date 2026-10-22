@@ -102,7 +102,8 @@ Follow the flagship (`saas-competitor-teardown/SKILL.md`):
    narrows what a result covers (a market, a period), fill its `coverage`
    (an instruction to the writer, which never sees step arguments) and its
    `statement` (the same fact for a person: the dashboard's «Охват
-   источника» and a direct result's `coverage` and `notVerified`).
+   источника», a direct result's `coverage` and `notVerified`, and the
+   evidence-only fallback report's «Source coverage» lines).
 4. `## Verification (hard rules)` — the numeric disciplines: triangulation
    (>=2 independent sources for key numbers), error bands on estimates,
    VERIFIED/ASSUMED tags, [CONFLICT] instead of silent averaging, LLM output

@@ -290,7 +290,7 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   `rewrite_report`, which also re-saves the ledger; judge status shares are
   not comparable across this change. Events: `claim.verified`,
   `claim.conflict`, `claim.quote_not_found` (with `run_id`; under the service
-  they go to `~/Library/Logs/prowl-research/events.log`, rotated at 5 × 5 MB, beside the service's own `job.*` and `service.*` events with their severity and job id; the person-facing text stays on the dashboard).
+  they go to `~/Library/Logs/prowl-research/events.log`, rotated at 5 × 5 MB, beside the service's own `job.*`, `service.*` and `config.changed` events with their severity and job id; the person-facing text stays on the dashboard).
 - Charts are rendered deterministically from ledger data, never described by
   the LLM.
 

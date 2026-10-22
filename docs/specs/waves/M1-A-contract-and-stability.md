@@ -31,8 +31,8 @@ Contradictions: none between the sources. `docs/FABRIC.md` describes the shape t
   of this kind fails the contract check, not a reader in production. An offline test pins that every error the
   service writes has only `code`, `message`, `data`.
 - **D3 (B-080).** Every `Store.event()` also writes one INFO line (`job.*`, `service.*`) to the `research_agent.service`
-  logger, which `events.log` carries; the line holds kind, level, subject id and the event text, nothing else (the
-  text is already person-facing and secret-free). SQLite stays the dashboard's source.
+  logger, which `events.log` carries; the line holds the kind, the severity and the job id; the person-facing text
+  stays in SQLite, which stays the dashboard's source.
 - **D4 (B-077).** The evidence-only fallback report prints the person-facing coverage `statement`; a re-send of an
   `outcome_unknown` step without `bound_arguments` sends `record.arguments`; tests pin that the dispatch-time limit
   check runs before any Prowl connection and that the refusal message is cut at 300 characters.
