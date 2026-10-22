@@ -37,6 +37,8 @@ Contradictions: none between the sources. `docs/FABRIC.md` describes the shape t
   `outcome_unknown` step without `bound_arguments` sends `record.arguments`; tests pin that the dispatch-time limit
   check runs before any Prowl connection and that the refusal message is cut at 300 characters.
 - **D5 (B-079).** Upgrade the vendored kit to 1.1.2 with the kit's own script; the WebKit dashboard check reruns.
+  The kit 1.1.2 install also adds `fabric-button.js` (Fabric's button, DEC-0040); the page does not link it, and
+  adopting it is a change to what the page shows, so it is left out here and belongs to wave B if anywhere.
 
 ## REQ
 
