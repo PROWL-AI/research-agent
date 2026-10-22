@@ -55,7 +55,7 @@ A finding that blocks nothing becomes a row, not more work.
 
 | Wave | State | Commits |
 |---|---|---|
-| A | closed (merge pending) | PR #32: `9b7a965`, `5ecc28e`, `8a62bed`; seam pass, product fail on docs then fixed |
+| A | **closed** | PR #32 (`6e7da40`) and #33 (`04d9df4`); installed release `6e7da4031bc9`, smoke PASS (`pr-01cfe46d5b2d46dd0508`); seam pass, product fail on docs then fixed and rechecked; B-082 filed |
 | B | not started | |
 | C | not started | |
 | Close | not started | |

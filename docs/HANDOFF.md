@@ -8,7 +8,13 @@ new rows: B-079 (kit 1.1.2), B-080 (job lifecycle only in SQLite, `events.log` 0
 never ran a research job). Waves: A (B-075, B-077, B-079, B-080), B (B-066, B-078, B-076 through `super-ux`),
 C (B-074 design), Close (B-081, docs, board replies). Rows owned elsewhere and human acts are outside M1.
 
-**Exact next task:** wave A, starting with B-075.
+Wave A closed 2026-10-22: PR #32 (B-075 job error in `error.data.terminalCode`, B-077, B-079 kit 1.1.2, B-080 service
+events in `events.log`) and PR #33 (smoke key per build; test servers log to their temp dir). Installed release
+`6e7da4031bc9`, `ready`; smoke PASS; suite 703, mutation 65 of 65, contract check with a failed job PASS at `7a14a48`.
+New row B-082 (v1 `legacy_key` resend). Note: `events.log` holds four lines from a dashboard test run of 12:59 UTC
+(job `pr-7050c37886149a656b99`, before PR #33); they are not the installed service's jobs.
+
+**Exact next task:** wave B (B-066, B-078, B-076) through `super-ux`, scenarios first.
 
 ## Current entry, 2026-10-22 (supersedes every "Exact next task" below)
 
