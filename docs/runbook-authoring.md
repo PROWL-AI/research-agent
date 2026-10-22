@@ -101,9 +101,10 @@ Follow the flagship (`saas-competitor-teardown/SKILL.md`):
    planner that may call the tool is told it (B-071). When the limit also
    narrows what a result covers (a market, a period), fill its `coverage`
    (an instruction to the writer, which never sees step arguments) and its
-   `statement` (the same fact for a person: the dashboard's «Охват
-   источника», a direct result's `coverage` and `notVerified`, and the
-   evidence-only fallback report's «Source coverage» lines).
+   `statement` (the same fact for a person: a direct result's `coverage`
+   and `notVerified`, and the evidence-only fallback report's «Source
+   coverage» lines), and its `statement_ru` (the dashboard's «Охват
+   источника», shown for every job that used the tool).
 4. `## Verification (hard rules)` — the numeric disciplines: triangulation
    (>=2 independent sources for key numbers), error bands on estimates,
    VERIFIED/ASSUMED tags, [CONFLICT] instead of silent averaging, LLM output

@@ -380,3 +380,37 @@ async def test_restart_recovery_error_has_only_the_interop_keys(tmp_path):
     s.recover()
     assert set(s.job(j["id"])["error"]) <= ALLOWED_ERROR_KEYS
     s.db.close()
+
+
+def _job_detail(app, job_id):
+    async def get():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1:18764") as c:
+            await login(c)
+            return (await c.get("/api/jobs/" + job_id)).json()
+    return get()
+
+
+async def test_dashboard_coverage_is_derived_for_a_tool_job_in_russian(app):
+    """B-078: the callout comes from the tools a job used, in the dashboard's language."""
+    store = app.state.runtime.store
+    job = store.create({"kind": "tool", "tool": "tiktok_ads_library", "params": {"country": "all"}}, "cov-tool")[0]
+    body = await _job_detail(app, job["id"])
+    assert body["display"]["coverage"] == [
+        "TikTok Ads Library: только реклама, показанная в Европе (ЕС/ЕЭЗ, Великобритания, Швейцария, Турция); "
+        "пустой результат ничего не говорит о других рынках."]
+    other = store.create({"kind": "tool", "tool": "google_search", "params": {"q": "x"}}, "cov-none")[0]
+    assert (await _job_detail(app, other["id"]))["display"]["coverage"] == []
+    await app.state.runtime.close()
+
+
+async def test_dashboard_coverage_is_derived_for_a_research_job_from_its_completed_steps(app, tmp_path):
+    from research_agent.evidence.store import ArtifactStore, Checkpoint, StepRecord
+    store = app.state.runtime.store
+    job = store.create({"kind": "research", "runbook": "ads-creative-research", "inputs": {}}, "cov-research")[0]
+    run = ArtifactStore(tmp_path / "runs" / job["id"])
+    steps = [StepRecord(step_id="s-1", raw_index=0, step="ads", tool="tiktok_ads_library", arguments={"country": "all"}, state="completed"),
+             StepRecord(step_id="s-2", raw_index=1, step="never", tool="google_search", arguments={}, state="pending")]
+    run.save_checkpoint(Checkpoint(run_id=job["id"], runbook="ads-creative-research", steps=steps))
+    body = await _job_detail(app, job["id"])
+    assert len(body["display"]["coverage"]) == 1 and body["display"]["coverage"][0].startswith("TikTok Ads Library")
+    await app.state.runtime.close()

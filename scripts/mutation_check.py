@@ -122,6 +122,8 @@ MUTANTS = [
      'error = {**error, "terminalCode": checkpoint.terminal_code}', ["tests/test_ka_contracts.py"]),
     ("legacy-error-served-in-data", "research_agent/service/protocol.py",
      'view["error"] = interop_error(job["error"])', 'view["error"] = job["error"]', ["tests/test_service.py"]),
+    ("dashboard-coverage-derived", "research_agent/service/app.py",
+     'return {"coverage": tool_limits.statements_ru(tools)}', 'return {"coverage": []}', ["tests/test_service.py"]),
     ("service-events-in-file-log", "research_agent/service/store.py",
      "        emit(log, kind, _LOG_LEVELS.get(level, logging.INFO), **fields)\n", "", ["tests/test_service_parity.py"]),
 ]

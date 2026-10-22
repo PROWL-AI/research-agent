@@ -6,18 +6,18 @@
 ## Index
 | ID | Title | Status |
 |---|---|---|
-| SCN-001 | Обзор и свежесть | validated |
+| SCN-001 | Обзор и свежесть | implemented |
 | SCN-002 | Найти запрос | implemented |
-| SCN-003 | Прочитать результат | validated |
+| SCN-003 | Прочитать результат | implemented |
 | SCN-004 | Решение человека | implemented |
 | SCN-005 | Отмена | implemented |
-| SCN-006 | Учёт расходов | validated |
+| SCN-006 | Учёт расходов | implemented |
 | SCN-007 | Настройки | implemented |
 | SCN-008 | Безопасное обучение | implemented |
 | SCN-009 | Внешний вид, навигация и состояние сервиса | implemented |
 
 ### SCN-001: Обзор и свежесть
-- **Status:** validated
+- **Status:** implemented
 - **Product:** unobserved
 - **Feature:** Fabric dashboard
 - **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
@@ -32,7 +32,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-22 (M1-B); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Обзор
 
 ### SCN-002: Найти запрос
@@ -54,7 +54,7 @@
 - **Screen:** Запросы
 
 ### SCN-003: Прочитать результат
-- **Status:** validated
+- **Status:** implemented
 - **Product:** unobserved
 - **Feature:** Fabric dashboard
 - **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
@@ -68,7 +68,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-22 (M1-B); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Детали
 
 ### SCN-004: Решение человека
@@ -108,7 +108,7 @@
 - **Screen:** Детали
 
 ### SCN-006: Учёт расходов
-- **Status:** validated
+- **Status:** implemented
 - **Product:** unobserved
 - **Feature:** Fabric dashboard
 - **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
@@ -123,7 +123,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-22 (M1-B); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Расходы
 
 ### SCN-007: Настройки

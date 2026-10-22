@@ -17,6 +17,9 @@ from .delegation import DelegationPolicy, is_loopback, refusal_http
 from .protocol import EFFECTS, Protocol, CAPABILITIES, artifact
 from .runtime import Runtime, runbooks
 from .store import Store, Conflict, now
+from .runtime import run_dir_name
+from research_agent.agent import tool_limits
+from research_agent.evidence.store import COMPLETED, ArtifactStore
 
 STATIC = Path(__file__).parent / "static"
 
@@ -36,6 +39,25 @@ DASHBOARD_EXTENSION = "https://fabric.passioncode.ai/agent-contract/extensions/d
 DASHBOARD_KIT = "fabric-dashboard-kit@1.1.2"
 DASHBOARD_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
 
+
+
+def display(store, job):
+    """What the dashboard shows that the stored job does not carry in its language:
+    the coverage of every limited tool the job used, derived now so a job stored
+    before B-078 shows it too (a tool job: its tool; research: its completed steps)."""
+    if job is None:
+        return {"coverage": []}
+    request = job.get("request") or {}
+    tools = []
+    if request.get("kind") == "tool":
+        tools = [request.get("tool", "")]
+    elif request.get("kind") == "research":
+        try:
+            checkpoint = ArtifactStore(store.root / "runs" / run_dir_name(job)).load_checkpoint()
+        except (ValueError, OSError):
+            checkpoint = None
+        tools = [s.tool for s in checkpoint.steps if s.state == COMPLETED] if checkpoint else []
+    return {"coverage": tool_limits.statements_ru(tools)}
 
 def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=None, delegation=None):
     delegation = delegation if delegation is not None else DelegationPolicy.from_env(EFFECTS)
@@ -166,7 +188,7 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
                 costs = [c["costUsd"] for c in calls if c["costUsd"] is not None]
                 summaries.append({k: job[k] for k in ["id", "status", "phase", "createdAt", "updatedAt", "request"]} | {
                     "delegation": job.get("delegation"), "via": job.get("via"), "runDir": job.get("runDir"),
-                    "chainOwner": job.get("chainOwner"),
+                    "chainOwner": job.get("chainOwner"), "errorCode": (job.get("error") or {}).get("code"),
                     "costUsd": sum(costs) if costs else None, "unpricedCalls": sum(c["costUsd"] is None for c in calls), "calls": len(calls)})
             return JSONResponse({"at": now(), "health": health(), "jobs": summaries, "config": store.config(), "usage": store.usage(), "runbooks": runbooks()})
         if path == "/api/jobs" and request.method == "POST":
@@ -175,7 +197,8 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
         if path.startswith("/api/jobs/"):
             job_id = request.path_params["job_id"]
             if request.method == "GET":
-                return JSONResponse({"job": store.job(job_id), "calls": store.calls(job_id)})
+                job = store.job(job_id)
+                return JSONResponse({"job": job, "calls": store.calls(job_id), "display": display(store, job)})
             data = await body(request)
             if data.get("action") == "cancel":
                 return JSONResponse(rt.cancel(job_id))
