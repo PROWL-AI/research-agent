@@ -1,4 +1,3 @@
-import sys
 
 from research_agent.__main__ import main
 

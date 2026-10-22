@@ -47,7 +47,6 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
     started = now()
     build = build or {"digest": code_digest()}
     cookie = "prowl_operator_" + str(port)
-    origin = rt.origin
 
     @asynccontextmanager
     async def lifespan(app):

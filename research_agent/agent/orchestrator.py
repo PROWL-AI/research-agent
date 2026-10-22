@@ -51,7 +51,6 @@ from research_agent.evidence.store import (
     SKIPPED_BUDGET,
     SKIPPED_ON_ERROR,
     ArtifactStore,
-    AttemptRecord,
     Checkpoint,
     CheckpointMigrationError,
     StepRecord,

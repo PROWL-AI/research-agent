@@ -304,7 +304,6 @@ class TestLedgerValuelessClaims:
 
 class TestSingleWorkerCrash:
     async def test_unexpected_worker_error_becomes_a_failed_summary(self, tmp_path: Path):
-        from research_agent.agent.orchestrator import PlanItem
         from research_agent.agent.subagent import WorkerContext, run_data_segment
 
         class BoomOrch:
