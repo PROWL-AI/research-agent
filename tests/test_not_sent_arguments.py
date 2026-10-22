@@ -288,3 +288,101 @@ def test_the_evidence_only_report_carries_the_coverage_note(tmp_path):
     outcome = ledger_only_report(get_runbook("ads-creative-research"), Ledger(tmp_path / "ledger.json"), "budget",
                                  tool_limits.coverage_notes(["tiktok_ads_library"]))
     assert "European markets only" in outcome.report_md
+
+
+class _StubObservedProwl:
+    """The service's Prowl client without a network: records what it would send."""
+
+    sent: list = []
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def observe(self, store, job):
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def call_tool(self, name, arguments, idempotency_key=None):
+        _StubObservedProwl.sent.append((name, dict(arguments)))
+        return {"ads": []}
+
+
+@pytest.fixture
+def stub_service(tmp_path, monkeypatch):
+    from research_agent.service import runtime as service_runtime
+    from research_agent.service.store import Store
+
+    monkeypatch.setenv("PROWL_API_KEY", "test-key")
+    monkeypatch.setattr(service_runtime, "ObservedProwl", _StubObservedProwl)
+    _StubObservedProwl.sent = []
+    return service_runtime.Runtime(Store(tmp_path))
+
+
+async def test_a_direct_call_is_sent_in_the_providers_spelling_and_returns_its_coverage(stub_service):
+    rt = stub_service
+    job = rt.create({"kind": "tool", "tool": "tiktok_ads_library", "params": {"query": "x", "country": "gb"}}, "spell-1")
+    rt.store.decide(job["id"], job["proposal"]["digest"], True)
+    await rt.execute(job["id"])
+    assert _StubObservedProwl.sent == [("tiktok_ads_library", {"query": "x", "country": "GB"})]
+    done = rt.store.job(job["id"])
+    assert done["status"] == "completed"
+    assert "European markets only" in " ".join(done["result"]["output"]["coverage"])
+    assert any(n["claim"] == "Source coverage" for n in done["result"]["notVerified"])
+
+
+async def test_a_job_created_before_a_limit_is_refused_at_dispatch_with_its_reason(stub_service, monkeypatch):
+    rt = stub_service
+    known = tool_limits.LIMITS["tiktok_ads_library"]
+    monkeypatch.setitem(tool_limits.LIMITS, "tiktok_ads_library", {})  # the limit is not known yet
+    job = rt.create({"kind": "tool", "tool": "tiktok_ads_library", "params": {"query": "x", "country": "US"}}, "old-1")
+    tool_limits.LIMITS["tiktok_ads_library"] = known  # the upgrade: the limit is known when the job is sent
+    rt.store.decide(job["id"], job["proposal"]["digest"], True)
+    await rt.execute(job["id"])
+    done = rt.store.job(job["id"])
+    assert _StubObservedProwl.sent == []
+    assert done["status"] == "failed"
+    assert done["error"]["code"] == "request-rejected" and "known provider limit" in done["error"]["message"]
+
+
+async def test_an_outcome_unknown_resend_sends_what_the_earlier_attempt_sent(lookup_runbook, tmp_path, monkeypatch):
+    """The re-send reuses its key and the server matches key with params: a value first sent as
+    'gb' (before its limit was known) is re-sent as 'gb', never as the new spelling 'GB'."""
+    from mcp.shared.exceptions import McpError
+    from mcp.types import CallToolResult, ErrorData
+
+    from research_agent.prowl_client import ProwlClient
+
+    class TimeoutOnce(ProwlClient):
+        def __init__(self):
+            super().__init__(api_key="test", mcp_url="http://unused.invalid")
+            self.sent, self.calls = [], 0
+            self.tool_prices = {TOOL: 0.1}
+
+        async def list_tools(self):
+            return [TOOL, "dataforseo_bl_summary"]
+
+        async def tool_info(self, name):
+            return {"name": name}
+
+        async def _rpc(self, name, arguments, retry=True):
+            self.calls += 1
+            self.sent.append((arguments["idempotency_key"], dict(arguments["params"])))
+            if self.calls == 1:
+                raise McpError(ErrorData(code=408, message="Timed out while waiting for response"))
+            return CallToolResult(content=[], structuredContent={"rows": [{"value": 1}]})
+
+    runs = tmp_path / "runs"
+    client = TimeoutOnce()
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [{"step": "s", "tool": TOOL, "arguments": {"domain": "a.com", "country": "gb"}}]}
+    first = await Orchestrator(client, llm, runs_root=runs).run("notsent-lookup", BRIEF, run_id="resend")
+    assert _step(_checkpoint(runs, "resend"), "s")["state"] == "outcome_unknown" and first.status == "partial"
+    limit = tool_limits.ArgumentLimit(allowed=frozenset({"all", "GB"}), note="n", source="test")
+    monkeypatch.setitem(tool_limits.LIMITS, TOOL, {"country": limit})  # the upgrade lands between the two
+    await Orchestrator(client, llm, runs_root=runs).run("notsent-lookup", BRIEF, run_id="resend")
+    assert client.sent[0] == client.sent[1]  # same key, same params: the server can replay

@@ -189,6 +189,10 @@ def validate_request(request):
     return request
 
 
+class LimitRefused(ValueError):
+    """A known provider limit refused the request; nothing was sent (B-071)."""
+
+
 def refuse_known_limits(request):
     """B-071 on the direct path: research.tools.call refuses a value the provider is known
     to refuse (agent/tool_limits.py) before a job exists, rather than have it billed. Its
@@ -197,7 +201,7 @@ def refuse_known_limits(request):
     if request.get("kind") == "tool":
         broken = tool_limits.refused(request["tool"], request["params"])
         if broken:
-            raise ValueError(f"{request['tool']} does not take {', '.join(broken)} (a known provider limit)")
+            raise LimitRefused(f"{request['tool']} does not take {', '.join(broken)} (a known provider limit)")
 
 
 class Runtime:
@@ -316,6 +320,10 @@ class Runtime:
             raise
         except TimeoutError:
             self.store.transition(job_id, "failed", "failed", error=self._with_terminal(job_id, {"code": "timeout", "message": "Wall-clock timeout reached; gathered evidence stays in the run checkpoint. No automatic retry."}))
+        except LimitRefused as exc:
+            # Refused at dispatch (a job created before the limit was known): nothing was
+            # sent, so the reader gets the reason rather than "inspect call receipts".
+            self.store.transition(job_id, "failed", "failed", error={"code": "request-rejected", "message": str(exc)})
         except Exception as exc:
             self.store.transition(job_id, "failed", "failed", error=self._with_terminal(job_id, {"code": "execution-failed", "message": type(exc).__name__ + ": inspect call receipts and provider health; no automatic retry."}))
 
@@ -399,7 +407,8 @@ class Runtime:
         envelope = {"id": "urn:prowl:result:" + job["id"], "contractVersion": "0.1.0", "outcome": outcome,
                     "done": [{"claimId": "RUN_COMPLETED", "statement": statement}],
                     "proof": [], "scope": scope, "notVerified": [attribution_gap(job),
-                    {"claim": "Research claims", "reason": output.get("quality", "not independently verified")}],
+                    {"claim": "Research claims", "reason": output.get("quality", "not independently verified")},
+                    *({"claim": "Source coverage", "reason": note} for note in output.get("coverage", []))],
                     "artifacts": [], "createdAt": now(), "producer": producer, "output": output, "usage": usage}
         if job.get("traceparent"):
             envelope["trace"] = {"traceparent": job["traceparent"]}

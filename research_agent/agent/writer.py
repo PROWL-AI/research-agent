@@ -206,7 +206,7 @@ def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str, coverage_n
     if not ledger.claims:
         lines.append("| (no evidence gathered) | | | |")
     if coverage_notes:
-        lines += ["", "Source coverage (B-071):", *(f"- {note}" for note in coverage_notes)]
+        lines += ["", "Source coverage:", *(f"- {note}" for note in coverage_notes)]
     return WriterOutcome(report_md="\n".join(lines) + "\n", lint_before=0, lint_after=0, revised=False)
 
 
