@@ -42,6 +42,8 @@ jobs:
         run: ruff check .
 
       - name: Tests
+        # A lint finding must not hide the night's suite result.
+        if: success() || failure()
         run: python -m pytest tests/ -q
 
       - name: Runbooks validate (offline)

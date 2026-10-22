@@ -345,8 +345,12 @@ async def write_report(
         # did not run. Everything else is named with its state.
         refused = [s for s in steps if s.get("state") in ("failed", "skipped_on_error")
                    and s.get("tool") != "transform" and not str(s.get("reason") or "").startswith("raw_write")]
+        # A step whose arguments held no value was never sent (B-065, B-070, B-071): the
+        # plan's gap, not the source's answer, so the report must not blame the source.
+        not_sent = [s for s in refused if "not sent:" in str(s.get("reason") or "")]
+        refused = [s for s in refused if s not in not_sent]
         not_run = [s for s in steps if s.get("state") in ("pending", "skipped_budget")]
-        other = [s for s in steps if s not in refused and s not in not_run]
+        other = [s for s in steps if s not in refused and s not in not_sent and s not in not_run]
         lines = ["\n## PARTIAL RUN",
                  "Mark the report as partial in its first line and list the sections that are missing or thin."]
         if refused:
@@ -354,6 +358,11 @@ async def write_report(
             lines.append("These steps were refused by the data source (no data from them; say so, never fill "
                          "the gap from elsewhere): "
                          + "; ".join(f"{s.get('step', '?')}: {str(s.get('reason') or '')[:200]}" for s in refused) + ".")
+        if not_sent:
+            lines.append("These steps were not sent: the plan had no usable value for an argument, so the data "
+                         "source was never asked (no data from them; say so as a gap of this run, not as the "
+                         "source's answer, and never fill it from elsewhere): "
+                         + "; ".join(f"{s.get('step', '?')}: {str(s.get('reason') or '')[:200]}" for s in not_sent) + ".")
         if not_run:
             lines.append("These steps did not run (the run stopped before them): "
                          + ", ".join(s.get("step", "?") for s in not_run) + ".")

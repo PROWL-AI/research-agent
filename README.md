@@ -228,7 +228,9 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   holds template text, not a value: ...` (B-070). A value a provider is known to refuse while its schema is silent
   (`research_agent/agent/tool_limits.py`, each limit with its source: `tiktok_ads_library` takes `country` only as
   `all` or a European code) is told to the planner and, if planned anyway, not sent:
-  `not sent: <tool> does not take country='US' (a known provider limit)` (B-071). Neither counts as a refusal.
+  `not sent: <tool> does not take country='US' (a known provider limit)` (B-071). Neither counts as a refusal, the
+  writer reports such a step as a gap of the run (not the source's answer), and `research.tools.call` refuses the
+  same values before a job exists.
 - Runbooks declare their **tool allowlist** and **budget**
   (`max_tool_calls` / `max_usd` / `max_minutes`). On budget exhaustion the agent
   emits a partial report that marks what is missing — it never fails silently.

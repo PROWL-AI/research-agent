@@ -10,6 +10,8 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
+from research_agent.agent import tool_limits
+from research_agent.agent.bindings import template_text
 from research_agent.evidence.store import ArtifactStore
 from research_agent.evidence.ledger import Ledger
 from research_agent.agent.orchestrator import Orchestrator, build_brief
@@ -181,6 +183,13 @@ def validate_request(request):
             raise ValueError("Invalid tool name")
         if not isinstance(request.get("params"), dict):
             raise ValueError("params must be an object")
+        # The same values a planned step is never sent with (B-070, B-071): refused here,
+        # before an approvable job exists, rather than billed by the provider.
+        if template_text(request["params"]):
+            raise ValueError("params hold template text, not values: " + ", ".join(template_text(request["params"])[:3]))
+        if tool_limits.refused(request["tool"], request["params"]):
+            raise ValueError(f"{request['tool']} does not take {', '.join(tool_limits.refused(request['tool'], request['params']))}"
+                             " (a known provider limit)")
     if len(json.dumps(request)) > 64000:
         raise ValueError("Request exceeds 64 KB")
     if scrub(request) != request:

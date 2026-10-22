@@ -440,5 +440,5 @@
 - **Expected result:** планировщик получает раздел «Argument limits the schemas do not state» с ограничениями инструментов своего runbook; шаг с шаблонным текстом или запрещённым значением не отправляется: `skipped_on_error` (обязательный: `failed`, прогон `partial`/`step_failed`) с причиной `not sent: an argument holds template text, not a value: ...` или `not sent: <tool> does not take country='US' (a known provider limit)`, без попытки и без оплаты; остальные шаги идут дальше.
 - **Failure outcome:** в счётчик отказов подряд такой шаг не входит; настоящее значение (`"Novo Nordisk" going concern`, URL, JSON) отправляется как раньше.
 - **Wave:** 6 (N-ACC, B-070, B-071)
-- **Coverage:** `tests/test_not_sent_arguments.py` (28 тестов; аргументы взяты из сохранённых прогонов)
+- **Coverage:** `tests/test_not_sent_arguments.py` (35 тестов; аргументы взяты из сохранённых прогонов); прямой вызов `research.tools.call` отклоняет те же значения при проверке запроса
 

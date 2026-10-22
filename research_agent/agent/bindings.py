@@ -32,13 +32,17 @@ _TEMPLATE_RES = (
     # Teacher] movie" is a value; a CSS "[placeholder='Email']" is a value too.
     re.compile(r"\[\s*(?:substitute|insert|replace|fill in)\s+\S+(?:\s+\S+){2,30}\s*\]", re.I),
     re.compile(r"\[\s*placeholder\s[^\]=]{1,200}\]", re.I),
+    # "PLACEHOLDER_FROM_STEP_22" (accept-finance-20261020c)
+    re.compile(r"\bPLACEHOLDER(?:_[A-Z0-9]+)*\b"),
+)
+#: Shapes that are template text only when they are the whole argument: inside prose (a prompt
+#: to an LLM-backed tool: "Extract {company.name}", "as <plan name from the table>") they are text.
+_WHOLE_TEMPLATE_RES = (
     # "<video_id from youtube_search result ...>", "<... report URL from search or IR map>"
     # (accept-finance-20261020). Runs are bounded: an unbounded one is quadratic on a long argument.
     re.compile(r"<[A-Za-z_][^<>]{0,200}?\s(?:from|placeholder)\s[^<>]{0,200}>", re.I),
     # "{youtube_search.latest_official_call_video_id}" (accept-finance-20261021)
-    re.compile(r"(?<!\{)\{\s*[A-Za-z_]\w{0,63}(?:\.\w{1,64}|\[\d{1,4}\]){1,8}\s*\}(?!\})"),
-    # "PLACEHOLDER_FROM_STEP_22" (accept-finance-20261020c)
-    re.compile(r"\bPLACEHOLDER(?:_[A-Z0-9]+)*\b"),
+    re.compile(r"\{\s*[A-Za-z_]\w{0,63}(?:\.\w{1,64}|\[\d{1,4}\]){1,8}\s*\}"),
 )
 
 
@@ -63,6 +67,9 @@ def template_text(value: Any) -> list[str]:
     if isinstance(value, str):
         for pattern in _TEMPLATE_RES:
             found.extend(m.group(0) for m in pattern.finditer(value))
+        whole = value.strip()
+        if len(whole) <= 512 and any(p.fullmatch(whole) for p in _WHOLE_TEMPLATE_RES):
+            found.append(whole)
     elif isinstance(value, dict):
         for item in value.values():
             found.extend(template_text(item))

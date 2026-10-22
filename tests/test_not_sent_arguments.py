@@ -53,13 +53,22 @@ REAL_VALUES = [
     "how to [insert] a row",
     "[fill in the blank] worksheet",
     "<john@from.com>",
+    # prompt-style text for LLM-backed tools (seam verifier, 2026-10-22): a shape inside prose is text
+    "Extract {company.name} and {company.hq} from the page",
+    "github {user.login}",
+    "List each plan as <plan name from the pricing table>",
 ]
 
 
 @pytest.mark.parametrize("value", SENT_TEMPLATES)
 def test_template_text_seen_on_live_runs_is_found(value):
     assert bindings.template_text({"arg": value}) == [value]
-    assert bindings.template_text({"nested": [{"url": f"https://x.com/{value}"}]})
+    assert bindings.template_text({"nested": [{"arg": f"  {value} "}]})
+
+
+@pytest.mark.parametrize("value", [SENT_TEMPLATES[0], SENT_TEMPLATES[5]])
+def test_an_instruction_or_placeholder_inside_a_url_is_found(value):
+    assert bindings.template_text({"url": f"https://x.com/{value}"})
 
 
 @pytest.mark.parametrize("value", REAL_VALUES)
@@ -173,3 +182,31 @@ async def test_the_planner_prompt_carries_the_limits_of_allowlisted_tools(lookup
     planner = next(c for c in llm.calls if "Output the plan JSON now." in c["messages"][-1]["content"])
     assert "## Argument limits the schemas do not state" in planner["messages"][-1]["content"]
     assert "only a.com or b.com" in planner["messages"][-1]["content"]
+
+
+def test_a_direct_tool_request_with_template_text_or_a_refused_value_is_refused_before_a_job():
+    """research.tools.call dispatches params directly: the same values are refused at validation."""
+    from research_agent.service.runtime import validate_request
+
+    with pytest.raises(ValueError, match="known provider limit"):
+        validate_request({"kind": "tool", "tool": "tiktok_ads_library", "params": {"query": "x", "country": "US"}})
+    with pytest.raises(ValueError, match="template text"):
+        validate_request({"kind": "tool", "tool": TOOL, "params": {"domain": "PLACEHOLDER_FROM_STEP_3"}})
+    ok = {"kind": "tool", "tool": "tiktok_ads_library", "params": {"query": "x", "country": "all"}}
+    assert validate_request(ok) == ok
+
+
+async def test_the_writer_is_told_a_not_sent_step_is_the_plan_gap_not_a_refusal(lookup_runbook, tmp_path):
+    runs = tmp_path / "runs"
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "templated", "tool": TOOL, "arguments": {"domain": SENT_TEMPLATES[0]}},
+        {"step": "after", "tool": TOOL, "arguments": {"domain": "b.com"}},
+    ]}
+    await Orchestrator(FakeProwl(), llm, runs_root=runs).run("notsent-lookup", BRIEF, run_id="writer")
+    writer = [m["content"] for call in llm.calls for m in call["messages"]
+              if m["role"] == "system" and "PARTIAL RUN" in m["content"]]
+    assert writer, "the writer got no partial note"
+    sent_line = next(line for line in writer[-1].splitlines() if "templated" in line)
+    assert sent_line.startswith("These steps were not sent")
+    assert "refused by the data source" not in writer[-1]
