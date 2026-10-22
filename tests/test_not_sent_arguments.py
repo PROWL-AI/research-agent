@@ -388,3 +388,48 @@ async def test_an_outcome_unknown_resend_sends_what_the_earlier_attempt_sent(loo
     monkeypatch.setitem(tool_limits.LIMITS, TOOL, {"country": limit})  # the upgrade lands between the two
     await Orchestrator(client, llm, runs_root=runs).run("notsent-lookup", BRIEF, run_id="resend")
     assert client.sent[0] == client.sent[1]  # same key, same params: the server can replay
+
+
+@pytest.mark.parametrize("value", ["US", "PLACEHOLDER_FROM_STEP_1"])
+async def test_a_dispatched_step_is_resent_not_relabelled_by_a_rule_learned_since(lookup_runbook, tmp_path,
+                                                                                   monkeypatch, value):
+    """An outcome_unknown step was sent: a limit or template rule that lands before the resume
+    re-sends it under its key rather than calling it "not sent"."""
+    from mcp.shared.exceptions import McpError
+    from mcp.types import CallToolResult, ErrorData
+
+    from research_agent.prowl_client import ProwlClient
+
+    class TimeoutOnce(ProwlClient):
+        def __init__(self):
+            super().__init__(api_key="test", mcp_url="http://unused.invalid")
+            self.sent, self.calls = [], 0
+            self.tool_prices = {TOOL: 0.1}
+
+        async def list_tools(self):
+            return [TOOL, "dataforseo_bl_summary"]
+
+        async def tool_info(self, name):
+            return {"name": name}
+
+        async def _rpc(self, name, arguments, retry=True):
+            self.calls += 1
+            self.sent.append((arguments["idempotency_key"], dict(arguments["params"])))
+            if self.calls == 1:
+                raise McpError(ErrorData(code=408, message="Timed out while waiting for response"))
+            return CallToolResult(content=[], structuredContent={"rows": [{"value": 1}]})
+
+    known = bindings._TEMPLATE_RES
+    monkeypatch.setattr(bindings, "_TEMPLATE_RES", ())  # the template rule is not known yet
+    runs = tmp_path / "runs"
+    client = TimeoutOnce()
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [{"step": "s", "tool": TOOL, "arguments": {"domain": "a.com", "country": value}}]}
+    await Orchestrator(client, llm, runs_root=runs).run("notsent-lookup", BRIEF, run_id="relabel")
+    bindings._TEMPLATE_RES = known  # the upgrade lands between the two
+    limit = tool_limits.ArgumentLimit(allowed=frozenset({"all", "GB"}), note="n", source="test")
+    monkeypatch.setitem(tool_limits.LIMITS, TOOL, {"country": limit})
+    await Orchestrator(client, llm, runs_root=runs).run("notsent-lookup", BRIEF, run_id="relabel")
+    assert len(client.sent) == 2 and client.sent[0] == client.sent[1]
+    step = _step(_checkpoint(runs, "relabel"), "s")
+    assert step["state"] == "completed" and "not sent" not in str(step["reason"])

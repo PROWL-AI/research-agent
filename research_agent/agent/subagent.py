@@ -371,7 +371,10 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             return summary
 
         arguments, missing = substitute(record.arguments, checkpoint.bindings)
-        reason = _not_sent_reason(record.tool, arguments, missing)
+        # A step whose earlier attempt was sent (outcome unknown) is re-sent as it was, never
+        # judged again: a rule learned since would call a dispatched step "not sent".
+        resend = record.state == OUTCOME_UNKNOWN and bool(record.attempt_ids)
+        reason = None if resend else _not_sent_reason(record.tool, arguments, missing)
         if reason is not None:
             # Never sent: the provider would refuse the literal text and bill the
             # call (B-065, B-070, B-071). Not a refusal, so the cap neither counts
@@ -393,7 +396,7 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             summary.outcomes.append(StepOutcome(step_id=record.step_id, step=record.step,
                                                 tool=record.tool, status=status, note=reason[:120]))
             continue
-        if record.state == OUTCOME_UNKNOWN:
+        if resend:
             # A re-send reuses its attempt's idempotency key, which the server matches with
             # the params: send exactly what the earlier attempt sent, never a new spelling.
             arguments = record.bound_arguments if record.bound_arguments is not None else arguments

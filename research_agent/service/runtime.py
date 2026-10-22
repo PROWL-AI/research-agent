@@ -323,7 +323,7 @@ class Runtime:
         except LimitRefused as exc:
             # Refused at dispatch (a job created before the limit was known): nothing was
             # sent, so the reader gets the reason rather than "inspect call receipts".
-            self.store.transition(job_id, "failed", "failed", error={"code": "request-rejected", "message": str(exc)})
+            self.store.transition(job_id, "failed", "failed", error={"code": "request-rejected", "message": str(exc)[:300]})
         except Exception as exc:
             self.store.transition(job_id, "failed", "failed", error=self._with_terminal(job_id, {"code": "execution-failed", "message": type(exc).__name__ + ": inspect call receipts and provider health; no automatic retry."}))
 
@@ -360,10 +360,12 @@ class Runtime:
         req, settings = job["request"], job["config"]
         cfg = replace(Config.from_env(require_llm=req["kind"] == "research"),
                       llm_model=settings["cheap_model"], llm_model_strong=settings["strong_model"])
+        if req["kind"] == "tool":
+            # Checked again at dispatch, before any connection: a job created before a limit was
+            # known may wait for approval.
+            refuse_known_limits(req)
         async with ObservedProwl(cfg.prowl_api_key, cfg.prowl_mcp_url).observe(self.store, job) as prowl:
             if req["kind"] == "tool":
-                # Checked again at dispatch: a job created before a limit was known may wait for approval.
-                refuse_known_limits(req)
                 params = tool_limits.canonical(req["tool"], req["params"])
                 result = await prowl.call_tool(req["tool"], params, idempotency_key=job["id"])
                 clean = scrub(result)

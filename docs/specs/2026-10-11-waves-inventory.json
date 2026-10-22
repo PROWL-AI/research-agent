@@ -1243,6 +1243,32 @@
       "evidence": "open: the planner wrote [substitute full ... output] (now not sent, B-070); needs a design",
       "wave": 6,
       "release": "this"
+    },
+    {
+      "id": "B-075",
+      "title": "Job errors carry terminalCode, which the pinned interop error schema forbids",
+      "source": "seam verification 2026-10-22",
+      "status": "open",
+      "area": "service",
+      "node": "N-FAB",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "open: runtime._with_terminal since 583f1d1",
+      "wave": 5,
+      "release": "this"
+    },
+    {
+      "id": "B-076",
+      "title": "No browser check renders the dashboard coverage callout",
+      "source": "seam verification 2026-10-22",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "open: scripts/test-dashboard.mjs has no tool job with coverage",
+      "wave": 4,
+      "release": "this"
     }
   ]
 }
