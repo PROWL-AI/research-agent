@@ -354,7 +354,10 @@ class Runtime:
                       llm_model=settings["cheap_model"], llm_model_strong=settings["strong_model"])
         async with ObservedProwl(cfg.prowl_api_key, cfg.prowl_mcp_url).observe(self.store, job) as prowl:
             if req["kind"] == "tool":
-                result = await prowl.call_tool(req["tool"], req["params"], idempotency_key=job["id"])
+                # Checked again at dispatch: a job created before a limit was known may wait for approval.
+                refuse_known_limits(req)
+                params = tool_limits.canonical(req["tool"], req["params"])
+                result = await prowl.call_tool(req["tool"], params, idempotency_key=job["id"])
                 clean = scrub(result)
                 encoded = json.dumps(clean, ensure_ascii=False)
                 if len(encoded.encode()) > 8_000_000:
@@ -363,7 +366,11 @@ class Runtime:
                 folder = self.store.root / "runs" / job["id"]
                 folder.mkdir(parents=True, exist_ok=True, mode=0o700)
                 _atomic_write_text(folder / "result.json", encoded)
-                return {"data": bounded(clean), "artifact": "result.json", "quality": "provider response; not independently verified"}
+                out = {"data": bounded(clean), "artifact": "result.json", "quality": "provider response; not independently verified"}
+                coverage = tool_limits.coverage_notes([req["tool"]])
+                if coverage:
+                    out["coverage"] = coverage
+                return out
             async with ObservedLLM(cfg.llm_base_url, cfg.llm_api_key, cfg.llm_model, cfg.llm_model_strong).observe(self.store, job) as llm:
                 orch = Orchestrator(prowl, llm, self.store.root / "runs", max_workers=settings["max_workers"])
                 # A resume runs on the earlier job's run directory: its saved raw,

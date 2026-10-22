@@ -68,10 +68,25 @@ def coverage_notes(tools: Iterable[str]) -> list[str]:
     return notes
 
 
+def canonical(tool: str, arguments: Any) -> Any:
+    """`arguments` with each limited value in the spelling the provider lists ("fr" ->
+    "FR"): only the value was measured, so it is sent as the provider's list writes it."""
+    if not isinstance(arguments, dict) or tool not in LIMITS:
+        return arguments
+    out = dict(arguments)
+    for argument, limit in LIMITS[tool].items():
+        value = out.get(argument)
+        if isinstance(value, str):
+            match = next((a for a in limit.allowed if a.upper() == value.upper()), None)
+            if match is not None:
+                out[argument] = match
+    return out
+
+
 def refused(tool: str, arguments: Any) -> list[str]:
     """Each argument of `arguments` that breaks a known limit of `tool`, as
-    "name='value'"; an empty list when the step may be sent. Case is not compared:
-    only the value itself was measured as refused, not its spelling."""
+    "name='value'"; an empty list when the step may be sent. Case is not compared
+    here; `canonical` sends the provider's spelling."""
     if not isinstance(arguments, dict):
         return []
     out = []

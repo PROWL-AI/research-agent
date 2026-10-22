@@ -101,7 +101,11 @@ MUTANTS = [
      ["tests/test_not_sent_arguments.py"]),
     ("direct-limit-refused", "research_agent/service/runtime.py", "        refuse_known_limits(request)\n", "",
      ["tests/test_not_sent_arguments.py"]),
-    ("coverage-told", "research_agent/agent/writer.py", "    if coverage_notes:\n", "    if False:\n",
+    ("coverage-told", "research_agent/agent/writer.py", "    if coverage_notes:\n        # B-071", "    if False:\n        # B-071",
+     ["tests/test_not_sent_arguments.py"]),
+    ("not-sent-complete-run", "research_agent/agent/writer.py", "        if not_sent:\n            partial_note = (",
+     "        if False:\n            partial_note = (", ["tests/test_not_sent_arguments.py"]),
+    ("providers-spelling", "research_agent/agent/subagent.py", "        arguments = tool_limits.canonical(record.tool, arguments)\n", "",
      ["tests/test_not_sent_arguments.py"]),
 ]
 

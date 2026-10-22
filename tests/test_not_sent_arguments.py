@@ -234,3 +234,57 @@ async def test_the_writer_is_told_what_a_limited_source_covers(lookup_runbook, t
     writer = [m["content"] for call in llm.calls for m in call["messages"] if "## Source coverage" in m["content"]]
     assert writer and "results cover Europe only" in writer[-1]
     assert tool_limits.coverage_notes(["meta_ad_library"]) == []
+
+
+async def test_a_refused_direct_call_answers_a_tool_error_on_the_wire(tmp_path, monkeypatch):
+    """The MCP shape the docs name: a tool result with isError and code request-rejected."""
+    from research_agent.service.protocol import Protocol
+    from research_agent.service.runtime import Runtime
+    from research_agent.service.store import Store
+
+    monkeypatch.setenv("PROWL_API_KEY", "test-key")
+    rt = Runtime(Store(tmp_path))
+    body = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+        "name": "research.tools.call",
+        "arguments": {"tool": "tiktok_ads_library", "params": {"query": "x", "country": "US"}, "idempotencyKey": "wire-1"}}}
+    got, status = await Protocol(rt).handle(body, {})
+    assert status == 200 and got["result"]["isError"] is True
+    error = got["result"]["structuredContent"]["error"]
+    assert error["code"] == "request-rejected" and "known provider limit" in error["message"]
+    assert rt.store.jobs() == []
+
+
+async def test_an_optional_not_sent_step_in_a_complete_run_reaches_the_writer(lookup_runbook, tmp_path):
+    runs = tmp_path / "runs"
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "templated", "tool": TOOL, "arguments": {"domain": SENT_TEMPLATES[0]}, "on_error_skip": True},
+        {"step": "after", "tool": TOOL, "arguments": {"domain": "b.com"}},
+    ]}
+    result = await Orchestrator(FakeProwl(), llm, runs_root=runs).run("notsent-lookup", BRIEF, run_id="complete")
+    assert result.status == "complete"
+    writer = [m["content"] for call in llm.calls for m in call["messages"]
+              if m["role"] == "system" and "STEPS NOT SENT" in m["content"]]
+    assert writer and "templated" in writer[-1]
+
+
+async def test_a_limited_value_is_sent_in_the_providers_spelling(lookup_runbook, tmp_path, monkeypatch):
+    limit = tool_limits.ArgumentLimit(allowed=frozenset({"all", "FR"}), note="n", source="test")
+    monkeypatch.setitem(tool_limits.LIMITS, TOOL, {"country": limit})
+    prowl = FakeProwl()
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [{"step": "s", "tool": TOOL, "arguments": {"domain": "a.com", "country": "fr"}}]}
+    await Orchestrator(prowl, llm, runs_root=tmp_path / "runs").run("notsent-lookup", BRIEF, run_id="spelling")
+    assert [c["arguments"]["country"] for c in prowl.tool_calls] == ["FR"]
+    assert tool_limits.canonical("tiktok_ads_library", {"country": "gb"}) == {"country": "GB"}
+    assert tool_limits.canonical("meta_ad_library", {"country": "gb"}) == {"country": "gb"}
+
+
+def test_the_evidence_only_report_carries_the_coverage_note(tmp_path):
+    from research_agent.agent.writer import ledger_only_report
+    from research_agent.evidence.ledger import Ledger
+    from research_agent.runbook import get_runbook
+
+    outcome = ledger_only_report(get_runbook("ads-creative-research"), Ledger(tmp_path / "ledger.json"), "budget",
+                                 tool_limits.coverage_notes(["tiktok_ads_library"]))
+    assert "European markets only" in outcome.report_md

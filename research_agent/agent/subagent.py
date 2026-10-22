@@ -393,6 +393,7 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             summary.outcomes.append(StepOutcome(step_id=record.step_id, step=record.step,
                                                 tool=record.tool, status=status, note=reason[:120]))
             continue
+        arguments = tool_limits.canonical(record.tool, arguments)
         record.bound_arguments = arguments if arguments != record.arguments else None
 
         attempt = _new_attempt(ctx, record)

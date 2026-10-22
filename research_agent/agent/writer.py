@@ -185,7 +185,7 @@ def disclose_partial(report_md: str, reason: str | None) -> str:
     return "\n".join(([title, ""] if title else []) + [note, ""] + rest) + ("\n" if report_md.endswith("\n") else "")
 
 
-def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str) -> WriterOutcome:
+def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str, coverage_notes: list[str] | None = None) -> WriterOutcome:
     """The report when no LLM budget is left for the writer: the evidence as
     gathered, every claim with its status and source — nothing synthesized."""
     lines = [
@@ -205,6 +205,8 @@ def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str) -> WriterO
         lines.append(f"| {text} [{c.id}] | {value} | {c.status.value} | {c.source_tool} |")
     if not ledger.claims:
         lines.append("| (no evidence gathered) | | | |")
+    if coverage_notes:
+        lines += ["", "Source coverage (B-071):", *(f"- {note}" for note in coverage_notes)]
     return WriterOutcome(report_md="\n".join(lines) + "\n", lint_before=0, lint_after=0, revised=False)
 
 
@@ -375,6 +377,18 @@ async def write_report(
         if not steps:
             lines.append("Skipped steps: none.")
         partial_note = "\n".join(lines) + "\n"
+    else:
+        # A complete run can still hold an optional step that was never sent (every
+        # runbook calls tiktok_ads_library as optional): the report says so rather than
+        # letting the missing source read as a finding.
+        not_sent = [s for s in (skipped_steps or []) if "not sent:" in str(s.get("reason") or "")]
+        if not_sent:
+            partial_note = ("\n## STEPS NOT SENT\nThese optional steps were not sent: the plan had no usable value "
+                            "for an argument, so the data source was never asked. Name each as a gap of this run "
+                            "where its section would use it (never as the source's answer, never as a finding such "
+                            "as a channel the subject does not use): "
+                            + "; ".join(f"{s.get('step', '?')}: {str(s.get('reason') or '')[:200]}" for s in not_sent)
+                            + ".\n")
 
     system = WRITER_SYSTEM_TEMPLATE.format(
         output_instructions=runbook.output_instructions or "(no output instructions)",

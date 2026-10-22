@@ -98,7 +98,9 @@ Follow the flagship (`saas-competitor-teardown/SKILL.md`):
    argument (B-070). When a provider refuses a value its schema does not
    rule out, add the limit, with its source, to
    `research_agent/agent/tool_limits.py` rather than to one runbook: every
-   planner that may call the tool is told it (B-071).
+   planner that may call the tool is told it (B-071). When the limit also
+   narrows what a result covers (a market, a period), fill its `coverage`
+   too: the writer never sees step arguments and learns it only from there.
 4. `## Verification (hard rules)` — the numeric disciplines: triangulation
    (>=2 independent sources for key numbers), error bands on estimates,
    VERIFIED/ASSUMED tags, [CONFLICT] instead of silent averaging, LLM output
