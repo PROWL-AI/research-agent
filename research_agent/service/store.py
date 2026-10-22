@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -12,8 +13,12 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from research_agent.config import DEFAULT_LLM_MODEL, DEFAULT_LLM_MODEL_STRONG
+from research_agent.events import emit
 
 TERMINAL = {"completed", "failed", "cancelled"}
+
+log = logging.getLogger(__name__)
+_LOG_LEVELS = {"error": logging.ERROR, "warning": logging.WARNING}
 
 
 def now() -> str:
@@ -187,6 +192,11 @@ class Store:
                 parts = job["traceparent"].split("-")
                 value.update(traceId=parts[1], spanId=parts[2])
         self.db.execute("INSERT INTO events(body) VALUES(?)", (json.dumps(value),))
+        # The same event in the file log (B-080): SQLite feeds the dashboard, the log is
+        # what a person reads under Logs. Only the kind, the level and the subject: the
+        # text is for the dashboard and stays there.
+        fields = {"severity": level} | ({"job_id": job["id"]} if job else {})
+        emit(log, kind, _LOG_LEVELS.get(level, logging.INFO), **fields)
         cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat().replace("+00:00", "Z")
         self.db.execute("DELETE FROM events WHERE id < (SELECT COALESCE(MAX(id),0)-999 FROM events) AND json_extract(body,'$.at') < ?", (cutoff,))
 

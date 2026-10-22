@@ -77,6 +77,15 @@ def tools_list():
     return tools
 
 
+def interop_error(error):
+    """The job error in the shape the pinned interop schema accepts: code, message and
+    data only. A job a build before B-075 stored carries terminalCode beside them."""
+    if not isinstance(error, dict) or "terminalCode" not in error:
+        return error
+    rest = {k: v for k, v in error.items() if k != "terminalCode"}
+    return {**rest, "data": {**rest.get("data", {}), "terminalCode": error["terminalCode"]}}
+
+
 def job_view(job, origin="http://127.0.0.1:18764"):
     view = {k: job[k] for k in ["id", "status", "updatedAt"]}
     view["statusMessage"] = job["phase"]
@@ -85,7 +94,7 @@ def job_view(job, origin="http://127.0.0.1:18764"):
     if job["status"] == "completed":
         view["result"] = job["result"]
     if job["status"] == "failed":
-        view["error"] = job["error"]
+        view["error"] = interop_error(job["error"])
     if job["status"] == "input_required":
         # A URL elicitation prevents an untrusted caller from supplying its own
         # assertion that a human approved. Host login stays outside MCP credentials.

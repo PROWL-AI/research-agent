@@ -330,3 +330,21 @@ async def test_late_approval_cannot_overbook_active_slot(app, monkeypatch):
     release.set()
     await asyncio.gather(*list(rt.tasks.values()))
     assert started == [newer["id"], older["id"]]
+
+
+def test_job_view_serves_a_legacy_terminal_code_inside_data():
+    """B-075: a job stored by a build before the fix carried a top-level terminalCode,
+    which the pinned interop error schema (additionalProperties: false) refuses."""
+    from research_agent.service.protocol import job_view
+    legacy = {"id": "pr-1", "status": "failed", "updatedAt": "2026-10-22T00:00:00Z", "phase": "failed",
+              "error": {"code": "timeout", "message": "Wall-clock timeout reached.", "terminalCode": "cancelled"}}
+    error = job_view(legacy)["job"]["error"]
+    assert error == {"code": "timeout", "message": "Wall-clock timeout reached.", "data": {"terminalCode": "cancelled"}}
+    assert legacy["error"]["terminalCode"] == "cancelled"  # the stored row is not mutated
+
+
+def test_job_view_keeps_an_error_without_terminal_code_as_is():
+    from research_agent.service.protocol import job_view
+    job = {"id": "pr-2", "status": "failed", "updatedAt": "2026-10-22T00:00:00Z", "phase": "interrupted",
+           "error": {"code": "interrupted", "message": "Service restarted."}}
+    assert job_view(job)["job"]["error"] == {"code": "interrupted", "message": "Service restarted."}
