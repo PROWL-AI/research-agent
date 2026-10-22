@@ -117,6 +117,13 @@ MUTANTS = [
      "reason = _not_sent_reason(", ["tests/test_not_sent_arguments.py"]),
     ("providers-spelling", "research_agent/agent/subagent.py", "        arguments = tool_limits.canonical(record.tool, arguments)\n", "",
      ["tests/test_not_sent_arguments.py"]),
+    ("terminal-code-in-data", "research_agent/service/runtime.py",
+     'error = {**error, "data": {**error.get("data", {}), "terminalCode": checkpoint.terminal_code}}',
+     'error = {**error, "terminalCode": checkpoint.terminal_code}', ["tests/test_ka_contracts.py"]),
+    ("legacy-error-served-in-data", "research_agent/service/protocol.py",
+     'view["error"] = interop_error(job["error"])', 'view["error"] = job["error"]', ["tests/test_service.py"]),
+    ("service-events-in-file-log", "research_agent/service/store.py",
+     "        emit(log, kind, _LOG_LEVELS.get(level, logging.INFO), **fields)\n", "", ["tests/test_service_parity.py"]),
 ]
 
 
