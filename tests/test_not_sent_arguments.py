@@ -286,8 +286,8 @@ def test_the_evidence_only_report_carries_the_coverage_note(tmp_path):
     from research_agent.runbook import get_runbook
 
     outcome = ledger_only_report(get_runbook("ads-creative-research"), Ledger(tmp_path / "ledger.json"), "budget",
-                                 tool_limits.coverage_notes(["tiktok_ads_library"]))
-    assert "European markets only" in outcome.report_md
+                                 tool_limits.statements(["tiktok_ads_library"]))
+    assert "European markets only" in outcome.report_md and "say so" not in outcome.report_md
 
 
 class _StubObservedProwl:
@@ -433,3 +433,177 @@ async def test_a_dispatched_step_is_resent_not_relabelled_by_a_rule_learned_sinc
     assert len(client.sent) == 2 and client.sent[0] == client.sent[1]
     step = _step(_checkpoint(runs, "relabel"), "s")
     assert step["state"] == "completed" and "not sent" not in str(step["reason"])
+
+
+# ── B-077: follow-ups from the B-070/B-071 verification ───────────────────
+
+
+class _TimeoutOnce:
+    """A real ProwlClient whose first paid call times out, so the step is left
+    outcome_unknown and the next run re-sends it (imports stay local, as above)."""
+
+    @staticmethod
+    def make():
+        from mcp.shared.exceptions import McpError
+        from mcp.types import CallToolResult, ErrorData
+
+        from research_agent.prowl_client import ProwlClient
+
+        class TimeoutOnce(ProwlClient):
+            def __init__(self):
+                super().__init__(api_key="test", mcp_url="http://unused.invalid")
+                self.sent, self.calls = [], 0
+                self.tool_prices = {TOOL: 0.1}
+
+            async def list_tools(self):
+                return [TOOL, "dataforseo_bl_summary"]
+
+            async def tool_info(self, name):
+                return {"name": name}
+
+            async def _rpc(self, name, arguments, retry=True):
+                self.calls += 1
+                self.sent.append((arguments["idempotency_key"], dict(arguments["params"])))
+                if self.calls == 1:
+                    raise McpError(ErrorData(code=408, message="Timed out while waiting for response"))
+                return CallToolResult(content=[], structuredContent={"rows": [{"value": 1}]})
+
+        return TimeoutOnce()
+
+
+async def test_the_evidence_only_fallback_prints_the_statement_not_the_writer_instruction(
+        lookup_runbook, tmp_path, monkeypatch):
+    """The ledger listing is read by a person, not by the writer: it carries the limit's
+    statement, never the order addressed to the writer ("say so wherever ...")."""
+    from research_agent.agent import orchestrator as orch_module
+    from research_agent.llm import LLMBudgetExceeded
+
+    async def refused_writer(*args, **kwargs):
+        raise LLMBudgetExceeded("max_llm_usd=1.0 leaves no room for the writer", stage="writer")
+
+    monkeypatch.setattr(orch_module, "produce_report", refused_writer)
+    tiktok = tool_limits.LIMITS["tiktok_ads_library"]["country"]
+    monkeypatch.setitem(tool_limits.LIMITS, TOOL, {"country": tiktok})  # TOOL is in the runbook allowlist
+    runs = tmp_path / "runs"
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [{"step": "s", "tool": TOOL, "arguments": {"domain": "a.com", "country": "all"}}]}
+    await Orchestrator(FakeProwl(), llm, runs_root=runs).run("notsent-lookup", BRIEF, run_id="fallback")
+    report = (runs / "fallback" / "report.md").read_text()
+    assert "evidence only" in report
+    assert tiktok.statement in report
+    assert tiktok.coverage not in report and "say so wherever" not in report
+
+
+async def test_a_resend_without_bound_arguments_sends_the_recorded_arguments(lookup_runbook, tmp_path, monkeypatch):
+    """A re-send whose record has no bound_arguments sends record.arguments, never a fresh
+    substitution: the server matches the reused key with the params."""
+    from research_agent.agent import subagent
+
+    runs = tmp_path / "runs"
+    client = _TimeoutOnce.make()
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [{"step": "s", "tool": TOOL, "arguments": {"domain": "a.com"}}]}
+    await Orchestrator(client, llm, runs_root=runs).run("notsent-lookup", BRIEF, run_id="resend-raw")
+    step = _step(_checkpoint(runs, "resend-raw"), "s")
+    assert step["state"] == "outcome_unknown" and step.get("bound_arguments") is None
+    # Between the two runs a fresh substitution would produce other arguments.
+    monkeypatch.setattr(subagent, "substitute", lambda arguments, bound: ({"domain": "z.com"}, set()))
+    await Orchestrator(client, llm, runs_root=runs).run("notsent-lookup", BRIEF, run_id="resend-raw")
+    assert [params for _, params in client.sent] == [{"domain": "a.com"}, {"domain": "a.com"}]
+    assert client.sent[0][0] == client.sent[1][0]
+
+
+async def test_a_planned_step_refused_by_a_limit_never_reaches_the_prowl_client(lookup_runbook, tmp_path,
+                                                                                domain_limit):
+    """The dispatch-time check runs before the client is asked anything: no call_tool, no
+    session opened (the real client connects lazily on its first call)."""
+    from research_agent.prowl_client import ProwlClient
+
+    class Recording(ProwlClient):
+        def __init__(self):
+            super().__init__(api_key="test", mcp_url="http://unused.invalid")
+            self.connects, self.rpcs = 0, []
+
+        async def _connect(self):
+            self.connects += 1
+            raise AssertionError("a refused step opened a Prowl connection")
+
+        async def list_tools(self):
+            return [TOOL, "dataforseo_bl_summary"]
+
+        async def tool_info(self, name):
+            return {"name": name}
+
+        async def _rpc(self, name, arguments, retry=True):
+            self.rpcs.append(name)
+            raise AssertionError("a refused step reached the Prowl client")
+
+    runs = tmp_path / "runs"
+    client = Recording()
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [{"step": "refused", "tool": TOOL, "arguments": {"domain": "us.com"},
+                                  "on_error_skip": True}]}
+    await Orchestrator(client, llm, runs_root=runs).run("notsent-lookup", BRIEF, run_id="no-connect")
+    assert client.connects == 0 and client.rpcs == [] and client._session is None
+    step = _step(_checkpoint(runs, "no-connect"), "refused")
+    assert step["state"] == "skipped_on_error" and step["attempt_ids"] == []
+
+
+class _CountingObservedProwl(_StubObservedProwl):
+    constructed = 0
+    entered = 0
+
+    def __init__(self, *args, **kwargs):
+        _CountingObservedProwl.constructed += 1
+
+    async def __aenter__(self):
+        _CountingObservedProwl.entered += 1
+        return self
+
+
+async def test_a_direct_job_refused_at_dispatch_never_opens_a_prowl_connection(stub_service, monkeypatch):
+    from research_agent.service import runtime as service_runtime
+
+    rt = stub_service
+    monkeypatch.setattr(service_runtime, "ObservedProwl", _CountingObservedProwl)
+    _CountingObservedProwl.constructed = _CountingObservedProwl.entered = 0
+    known = tool_limits.LIMITS["tiktok_ads_library"]
+    monkeypatch.setitem(tool_limits.LIMITS, "tiktok_ads_library", {})
+    job = rt.create({"kind": "tool", "tool": "tiktok_ads_library", "params": {"query": "x", "country": "US"}}, "conn-1")
+    tool_limits.LIMITS["tiktok_ads_library"] = known
+    rt.store.decide(job["id"], job["proposal"]["digest"], True)
+    await rt.execute(job["id"])
+    assert rt.store.job(job["id"])["status"] == "failed"
+    assert (_CountingObservedProwl.constructed, _CountingObservedProwl.entered) == (0, 0)
+    assert _StubObservedProwl.sent == [] and rt.store.calls(job["id"]) == []
+
+
+LONG_VALUE = "X" * 1000
+
+
+async def test_a_direct_refusal_message_is_cut_at_300_characters(stub_service, monkeypatch):
+    rt = stub_service
+    known = tool_limits.LIMITS["tiktok_ads_library"]
+    monkeypatch.setitem(tool_limits.LIMITS, "tiktok_ads_library", {})
+    job = rt.create({"kind": "tool", "tool": "tiktok_ads_library",
+                     "params": {"query": "x", "country": LONG_VALUE}}, "long-1")
+    tool_limits.LIMITS["tiktok_ads_library"] = known
+    rt.store.decide(job["id"], job["proposal"]["digest"], True)
+    await rt.execute(job["id"])
+    error = rt.store.job(job["id"])["error"]
+    assert error["code"] == "request-rejected"
+    assert len(error["message"]) == 300 and error["message"].startswith("tiktok_ads_library does not take country=")
+
+
+async def test_a_planned_refusal_reason_is_cut_at_300_characters(lookup_runbook, tmp_path, monkeypatch):
+    limit = tool_limits.ArgumentLimit(allowed=frozenset({"a.com"}), note="n", source="test")
+    monkeypatch.setitem(tool_limits.LIMITS, TOOL, {"domain": limit})
+    runs = tmp_path / "runs"
+    prowl = FakeProwl()
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [{"step": "long", "tool": TOOL, "arguments": {"domain": LONG_VALUE},
+                                  "on_error_skip": True}]}
+    await Orchestrator(prowl, llm, runs_root=runs).run("notsent-lookup", BRIEF, run_id="long")
+    step = _step(_checkpoint(runs, "long"), "long")
+    assert prowl.tool_calls == []
+    assert len(step["reason"]) == 300 and step["reason"].startswith(f"not sent: {TOOL} does not take domain=")

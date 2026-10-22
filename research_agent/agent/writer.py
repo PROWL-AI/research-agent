@@ -185,9 +185,13 @@ def disclose_partial(report_md: str, reason: str | None) -> str:
     return "\n".join(([title, ""] if title else []) + [note, ""] + rest) + ("\n" if report_md.endswith("\n") else "")
 
 
-def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str, coverage_notes: list[str] | None = None) -> WriterOutcome:
+def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str,
+                       coverage_statements: list[str] | None = None) -> WriterOutcome:
     """The report when no LLM budget is left for the writer: the evidence as
-    gathered, every claim with its status and source — nothing synthesized."""
+    gathered, every claim with its status and source — nothing synthesized.
+
+    A person reads this listing, so its source coverage is each limit's
+    `statement` (tool_limits.statements), never the writer's instruction (B-077)."""
     lines = [
         f"# {runbook.meta.name} — PARTIAL: evidence only",
         "",
@@ -205,8 +209,8 @@ def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str, coverage_n
         lines.append(f"| {text} [{c.id}] | {value} | {c.status.value} | {c.source_tool} |")
     if not ledger.claims:
         lines.append("| (no evidence gathered) | | | |")
-    if coverage_notes:
-        lines += ["", "Source coverage:", *(f"- {note}" for note in coverage_notes)]
+    if coverage_statements:
+        lines += ["", "Source coverage:", *(f"- {note}" for note in coverage_statements)]
     return WriterOutcome(report_md="\n".join(lines) + "\n", lint_before=0, lint_after=0, revised=False)
 
 

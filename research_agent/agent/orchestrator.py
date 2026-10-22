@@ -711,7 +711,8 @@ class Orchestrator:
                 llm_stop = terminal.budget_stop_text(terminal.BUDGET_LLM, meter.max_usd)
                 reason = (checkpoint.stop_reason if checkpoint.stop_reason.startswith(llm_stop)
                           else f"{llm_stop}; {checkpoint.stop_reason}")
-                coverage = tool_limits.coverage_notes(s.tool for s in checkpoint.steps if s.state == COMPLETED)
+                # A person reads this listing: the limit's statement, not the writer's order (B-077).
+                coverage = tool_limits.statements(s.tool for s in checkpoint.steps if s.state == COMPLETED)
                 outcome, fidelity = ledger_only_report(runbook, ledger, reason, coverage), FidelityResult(report_md="")
         if meter.refusals and checkpoint.stop_reason is None:
             # A repair pass or a citation batch the cap refused was handled
