@@ -1,5 +1,15 @@
 # Research-agent handoff
 
+## Current entry, 2026-10-22 midday: milestone M1 (supersedes every "Exact next task" below)
+
+Plan and stop line: [`specs/2026-10-22-milestone-m1.md`](specs/2026-10-22-milestone-m1.md). Review found `main` clean
+at `f05cf07`, no worktrees, stashes or open PRs, the service `ready` on `1e9f1f182625`, board 23 of 98 open after three
+new rows: B-079 (kit 1.1.2), B-080 (job lifecycle only in SQLite, `events.log` 0 bytes), B-081 (the installed service
+never ran a research job). Waves: A (B-075, B-077, B-079, B-080), B (B-066, B-078, B-076 through `super-ux`),
+C (B-074 design), Close (B-081, docs, board replies). Rows owned elsewhere and human acts are outside M1.
+
+**Exact next task:** wave A, starting with B-075.
+
 ## Current entry, 2026-10-22 (supersedes every "Exact next task" below)
 
 Status: `main` is `1e9f1f1` (PR #31); the Fabric service `prowl-research.default` runs release `1e9f1f182625`

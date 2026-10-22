@@ -1295,6 +1295,45 @@
       "evidence": "open: with B-066 through the UX chain",
       "wave": 4,
       "release": "this"
+    },
+    {
+      "id": "B-079",
+      "title": "Dashboard kit 1.1.2",
+      "source": "milestone M1 review, 2026-10-22",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "docs/specs/2026-10-22-milestone-m1.md section 0",
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-080",
+      "title": "Job lifecycle and service events in the file log",
+      "source": "milestone M1 review, 2026-10-22",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "docs/specs/2026-10-22-milestone-m1.md section 0",
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-081",
+      "title": "A research run through the installed service",
+      "source": "milestone M1 review, 2026-10-22",
+      "status": "open",
+      "area": "service",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "docs/specs/2026-10-22-milestone-m1.md section 0",
+      "wave": 6,
+      "release": "this"
     }
   ]
 }
