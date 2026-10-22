@@ -348,3 +348,35 @@ def test_job_view_keeps_an_error_without_terminal_code_as_is():
     job = {"id": "pr-2", "status": "failed", "updatedAt": "2026-10-22T00:00:00Z", "phase": "interrupted",
            "error": {"code": "interrupted", "message": "Service restarted."}}
     assert job_view(job)["job"]["error"] == {"code": "interrupted", "message": "Service restarted."}
+
+
+ALLOWED_ERROR_KEYS = {"code", "message", "data"}
+
+
+@pytest.mark.parametrize("raised,code", [("runtime", "execution-failed"), ("limit", "request-rejected")])
+async def test_every_runtime_written_error_has_only_the_interop_keys(app, monkeypatch, raised, code):
+    """B-075: the stored row, not only job_view, keeps the pinned error shape."""
+    from research_agent.service.runtime import LimitRefused
+    rt = app.state.runtime
+
+    async def fail(job):
+        raise RuntimeError("boom") if raised == "runtime" else LimitRefused("x" * 400)
+
+    monkeypatch.setattr(rt, "tutorial", fail)
+    job = rt.create({"kind": "tutorial"}, "shape-" + raised)
+    rt.decide(job["id"], job["proposal"]["digest"], True)
+    await asyncio.gather(*list(rt.tasks.values()), return_exceptions=True)
+    error = rt.store.job(job["id"])["error"]
+    assert error["code"] == code and set(error) <= ALLOWED_ERROR_KEYS
+    await rt.close()
+
+
+async def test_restart_recovery_error_has_only_the_interop_keys(tmp_path):
+    s = Store(tmp_path)
+    j = s.create({"kind": "tutorial"}, "restart-shape")[0]
+    s.decide(j["id"], j["proposal"]["digest"], True)
+    s.db.close()
+    s = Store(tmp_path)
+    s.recover()
+    assert set(s.job(j["id"])["error"]) <= ALLOWED_ERROR_KEYS
+    s.db.close()

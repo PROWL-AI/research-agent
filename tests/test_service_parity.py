@@ -508,6 +508,8 @@ def test_job_lifecycle_and_service_events_reach_the_event_log(tmp_path):
         assert "event=service.started severity=info" in text
         assert "event=job.failed severity=error job_id=pr-0123456789abcdef0123" in text
         assert "ERROR research_agent.service.store" in text
+        # The person-facing text stays on the dashboard (D3).
+        assert "Сервис запущен" not in text and "Запрос завершился" not in text
     finally:
         if store is not None:
             store.db.close()
