@@ -71,7 +71,8 @@ function spend(){
  const reports=state.jobs.filter(j=>j.request.kind==='research'&&j.status==='completed'&&new Date(j.updatedAt).getTime()>=since).length;
  const perReport=!reports?'нет отчётов':month.usd==null?'неизвестно':usd(month.usd/reports,month.unpriced);
  const cell=(l,v,s)=>`<div class="metric"><span class="eyebrow">${l}</span><strong>${v}</strong><small>${s}</small></div>`;
- return `<p class="subtle spend-note">Расходы по дням UTC; «≥» значит, что у части вызовов нет цены.</p><div class="metrics" aria-label="Расходы">${windows.map(([l,w])=>cell('Расходы · '+l,usd(w.usd,w.unpriced),w.calls?`${w.calls} ${plural(w.calls,'вызов','вызова','вызовов')}${w.unpriced?`, ${w.unpriced} без цены`:''}`:'вызовов не было')).join('')}${cell('На один отчёт',perReport,reports?`расходы за 30 дней на ${reports} ${plural(reports,'готовый отчёт','готовых отчёта','готовых отчётов')}`:'за 30 дней ни одно исследование не завершено')}</div>`;
+ const lower=windows.some(([,w])=>w.unpriced&&w.usd!=null);
+ return `<p class="subtle spend-note">Расходы по дням UTC${lower?'; «≥» значит, что у части вызовов нет цены':''}.</p><div class="metrics" aria-label="Расходы">${windows.map(([l,w])=>cell('Расходы · '+l,usd(w.usd,w.unpriced),w.calls?`${w.calls} ${plural(w.calls,'вызов','вызова','вызовов')}${w.unpriced?`, ${w.unpriced} без цены`:''}`:'вызовов не было')).join('')}${cell('На один отчёт',perReport,reports?`расходы за 30 дней на ${reports} ${plural(reports,'готовый отчёт','готовых отчёта','готовых отчётов')}`:'за 30 дней ни одно исследование не завершено')}</div>`;
 }
 // Principles 4 and 7: only what waits now; tutorials and checks stay out; older failures fold into one counted line.
 function attentionPanel(){
