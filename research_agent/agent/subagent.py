@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 from pydantic import BaseModel, Field
 
 from research_agent.agent import tool_limits
-from research_agent.agent.bindings import substitute, template_text
+from research_agent.agent.bindings import output_refs, output_text, slug, substitute, template_text
 from research_agent.agent.orchestrator import PlanItem
 from research_agent.events import emit
 from research_agent.evidence.store import CheckpointWriteError  # noqa: F401 — re-exported
@@ -62,12 +62,46 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-def _not_sent_reason(tool: str, arguments: Any, missing: set[str]) -> str | None:
+def _earlier_outputs(ctx: Any, checkpoint: Checkpoint, record: StepRecord) -> tuple[dict[str, str], dict[str, list[str]]]:
+    """``{"output:<step>": text}`` for each output reference of `record` that an earlier
+    completed step of that name can fill from its stored, sha256-checked raw artifact (B-074).
+    A reference nothing fills stays a missing placeholder, so the step is not sent."""
+    from research_agent.agent.orchestrator import _strip_envelope_meta
+
+    found: dict[str, str] = {}
+    ambiguous: dict[str, list[str]] = {}
+    for name in output_refs(record.arguments):
+        # A data step only (a transform note is the writer's), and one name only: two
+        # different steps that read as the same reference leave it unresolved.
+        earlier = [s for s in checkpoint.steps if s.raw_index < record.raw_index and s.state == COMPLETED
+                   and s.kind == "data" and s.raw_ref and slug(s.step) == name]
+        if len({s.step for s in earlier}) > 1:
+            ambiguous[name] = sorted({s.step for s in earlier})
+            continue
+        if not earlier:
+            continue
+        try:
+            text = ctx.store.read_artifact(earlier[-1].raw_ref, earlier[-1].raw_sha256)
+            if earlier[-1].raw_ref.endswith(".json"):
+                # The server's billing and timing and the provider's request metadata are not
+                # the result: our cost and markup never travel to the next provider.
+                text = json.dumps(_strip_envelope_meta(json.loads(text)), ensure_ascii=False, separators=(",", ":"))
+        except (OSError, ValueError):
+            continue
+        found["output:" + name] = output_text(text)
+    return found, ambiguous
+
+
+def _not_sent_reason(tool: str, arguments: Any, missing: set[str],
+                     ambiguous: dict[str, list[str]] | None = None) -> str | None:
     """Why a data step's filled arguments must not be sent, or None to send them.
 
     An unresolved ``{{name}}`` (B-065), template text in another shape (B-070) and
     a value the provider is known to refuse (B-071) are each refused by the
     provider and billed; none of them is the step's real question."""
+    if ambiguous:
+        name, steps = sorted(ambiguous.items())[0]
+        return f"not sent: {{{{output:{name}}}}} names two steps ({', '.join(steps)}); give each step its own name"
     if missing:
         names = ", ".join("{{" + n + "}}" for n in sorted(missing))
         return f"not sent: no earlier step resolved {names}"
@@ -174,18 +208,31 @@ def split_segments(steps: list[StepRecord]) -> list[tuple[str, list[StepRecord]]
     """
     segments: list[tuple[str, list[StepRecord]]] = []
     pending: list[StepRecord] = []
+
+    def flush() -> None:
+        # A step that hands on a pending step's whole output (B-074) runs one level after
+        # it; every other step stays at level 0 beside the producer, so an unrelated
+        # failure in a later level strands nothing.
+        level: dict[str, int] = {}
+        levels: list[list[StepRecord]] = []
+        for record in pending:
+            depth = 1 + max((level[n] for n in output_refs(record.arguments) if n in level), default=-1)
+            level[slug(record.step)] = max(level.get(slug(record.step), -1), depth)
+            while len(levels) <= depth:
+                levels.append([])
+            levels[depth].append(record)
+        segments.extend(("data", group) for group in levels if group)
+        pending.clear()
+
     for record in steps:
         if record.state in SETTLED_STATES:
             continue
         if record.kind == "transform":
-            if pending:
-                segments.append(("data", pending))
-                pending = []
+            flush()
             segments.append(("transform", [record]))
         else:
             pending.append(record)
-    if pending:
-        segments.append(("data", pending))
+    flush()
     return segments
 
 
@@ -209,9 +256,14 @@ def _set_state(checkpoint: Checkpoint, record: StepRecord, state: str, reason: s
          tool=record.tool, **{"from": previous, "to": state})
 
 
-def plan_item(record: StepRecord) -> PlanItem:
+def plan_item(record: StepRecord, bindings: dict[str, str] | None = None) -> PlanItem:
+    # A step that forwarded an earlier output shows the extractor its plan with the bound
+    # values only: the forwarded page is provider text, and a URL inside it is not one the
+    # request named.
+    sent = (substitute(record.arguments, bindings or {})[0] if output_refs(record.arguments)
+            else record.bound_arguments)
     return PlanItem(step=record.step, tool=record.tool,
-                    arguments=record.bound_arguments or record.arguments,
+                    arguments=sent or record.arguments,
                     instruction=record.instruction, on_error_skip=record.on_error_skip)
 
 
@@ -311,7 +363,7 @@ async def extract_step(ctx: WorkerContext, record: StepRecord, result: Any | Non
     ctx.ledger.remove_ids(sorted(stale))
     try:
         added = await ctx.extract_claims(
-            plan_item(record), result, Path(record.raw_ref), ctx.ledger, record.step_id,
+            plan_item(record, checkpoint.bindings), result, Path(record.raw_ref), ctx.ledger, record.step_id,
             raw_sha256=record.raw_sha256,
         ) or 0
     except Exception as exc:  # noqa: BLE001 — typed into the step, not swallowed
@@ -343,7 +395,8 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
     (`ToolCallError.stops_run`), an unknown dispatch outcome, or
     MAX_REFUSALS_IN_ROW refusals of required steps in a row across the run. Its
     never-started steps stay `pending` (a resume runs them); the run is partial
-    and the other workers finish."""
+    and the other workers of its segment finish; later segments (a transform, or a step that
+    waits for an earlier output) do not start in this run."""
     summary = WorkerSummary(worker_id=worker_id)
     checkpoint = ctx.checkpoint
     for position, record in enumerate(items):
@@ -370,11 +423,15 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             save_state(checkpoint, ctx.store)
             return summary
 
-        arguments, missing = substitute(record.arguments, checkpoint.bindings)
+        # An {{output:<step>}} is judged as the plan wrote it and filled only after: the
+        # earlier result is provider text, which may hold any shape the B-070 check refuses.
+        outputs, ambiguous = _earlier_outputs(ctx, checkpoint, record)
+        judged, missing = substitute(record.arguments, {**checkpoint.bindings, **{k: "[output]" for k in outputs}})
+        arguments, _ = substitute(record.arguments, {**checkpoint.bindings, **outputs})
         # A step whose earlier attempt was sent (outcome unknown) is re-sent as it was, never
         # judged again: a rule learned since would call a dispatched step "not sent".
         resend = record.state == OUTCOME_UNKNOWN and bool(record.attempt_ids)
-        reason = None if resend else _not_sent_reason(record.tool, arguments, missing)
+        reason = None if resend else _not_sent_reason(record.tool, judged, missing, ambiguous)
         if reason is not None:
             # Never sent: the provider would refuse the literal text and bill the
             # call (B-065, B-070, B-071). Not a refusal, so the cap neither counts

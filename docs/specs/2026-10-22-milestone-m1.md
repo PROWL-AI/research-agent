@@ -57,5 +57,5 @@ A finding that blocks nothing becomes a row, not more work.
 |---|---|---|
 | A | **closed** | PR #32 (`6e7da40`) and #33 (`04d9df4`); installed release `6e7da4031bc9`, smoke PASS (`pr-01cfe46d5b2d46dd0508`); seam pass, product fail on docs then fixed and rechecked; B-082 filed |
 | B | **closed** | PR #34 (`2a9d470`): scenarios first, build, product round, visual rounds 1 (fail on evidence) and 2 (pass); installed release `2a9d470d0173`, smoke PASS; B-083, B-084 filed |
-| C | not started | |
+| C | closed (merge pending) | PR #35: `93b4c71` build, `760f32c` and `8c72d98` seam rounds 1 and 2, round 3 without a blocker; B-085, B-086 filed |
 | Close | not started | |

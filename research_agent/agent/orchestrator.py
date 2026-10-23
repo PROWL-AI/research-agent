@@ -371,6 +371,11 @@ Rules:
   resolves is not sent; never put any other template text in an argument
   ("[substitute ...]", "<id from ...>", "{step.field}", "PLACEHOLDER"): a step whose
   argument holds one is not sent either.
+- To hand a whole earlier result to a later step (a scraped page to an analysis tool),
+  write "{{output:<earlier step name in snake_case>}}" in the argument, e.g.
+  "Analyse this page: {{output:scrape_clickup_homepage}}". That step's stored response
+  is sent in its place, cut at 16000 characters; a reference to a step that did not
+  complete is not sent. Never describe the output instead of referring to it.
 - Prefer one batched tool call over per-item fan-out when the tool supports bulk
   input (e.g. dataforseo_bl_bulk_ranks takes multiple domains in one call).
 - Keep the total number of tool-call steps within the tool-call budget.

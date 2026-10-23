@@ -1235,12 +1235,12 @@
       "id": "B-074",
       "title": "No way to hand a whole earlier output to an LLM-analysis tool",
       "source": "accept-teardown-20261021b (gemini_analyze_website)",
-      "status": "open",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": false,
-      "evidence": "open: the planner wrote [substitute full ... output] (now not sent, B-070); needs a design",
+      "evidence": "closed: PR #35 (M1 wave C), 2026-10-23",
       "wave": 6,
       "release": "this"
     },
@@ -1372,6 +1372,32 @@
       "closable_in_one_pass": true,
       "evidence": "m1-wave-b frames",
       "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-085",
+      "title": "Output references capped per reference, not per step",
+      "source": "seam verification of M1-C, 2026-10-23",
+      "status": "open",
+      "area": "core",
+      "node": "N-STATE",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "subagent.py _earlier_outputs",
+      "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "B-086",
+      "title": "Forwarding steps lose first under a budget stop",
+      "source": "seam verification of M1-C round 3, 2026-10-23",
+      "status": "open",
+      "area": "core",
+      "node": "N-STATE",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "subagent.py split_segments",
+      "wave": 2,
       "release": "this"
     }
   ]
