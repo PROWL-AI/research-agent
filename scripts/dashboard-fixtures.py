@@ -46,9 +46,13 @@ def main(root: Path) -> None:
         StepRecord(step_id="s-1", raw_index=0, tool="tiktok_ads_library", arguments={"country": "all"}, state="completed")]))
     tool = job({"kind": "tool", "tool": "tiktok_ads_library", "params": {"country": "all"}}, "fx-tool", "completed",
                "completed", 0.2, result={"output": {"rows": [{"ad": "fixture", "country": "FR"}]}})
-    for record, cost in [(done, 0.12), (done, None), (tool, 0.03)]:
+    job({**research, "inputs": {"brand": "Second"}}, "fx-research-done-2", "completed", "completed", 9,
+        result={"output": {"report": "Second fixture report."}})
+    # Calls today, 4 and 20 days ago: the three windows read three different sums.
+    for record, cost, days_ago in [(done, 0.12, 0), (done, None, 0), (tool, 0.03, 0), (done, 0.5, 4), (done, 2.0, 20)]:
         call = store.start_call(record["id"], "tool", "tiktok_ads_library", {"country": "all"})
-        store.finish_call(call, status="completed", costUsd=cost, costBasis="provider" if cost is not None else "unknown")
+        store.finish_call(call, status="completed", costUsd=cost, startedAt=stamp(days_ago),
+                          costBasis="provider" if cost is not None else "unknown")
     job({"kind": "tutorial"}, "fx-tutorial-failure", "failed", "failed", 0.1,
         error={"code": "execution-failed", "message": "Tutorial fixture."})
     store.db.close()

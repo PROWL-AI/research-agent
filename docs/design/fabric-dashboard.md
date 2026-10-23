@@ -1,5 +1,7 @@
 # Prowl Research — dashboard specification
 
+surface_class: internal (a signed-in operator console of a loopback service, opened through Fabric Dashboards; no logged-out reader, no public route).
+
 Design route: super-ux → sheleg-design / copywriting → task-pipeline. Product register, Editorial Luxury inherited from Prowl. Dials: variance 4 (recognisable brand), motion 2 (only paint transitions), density 7 (operator journal). No decorative motion, gradients or fabricated counters.
 
 ## Information architecture

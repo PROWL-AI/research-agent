@@ -45,7 +45,12 @@ Contradictions: none.
   the formula, so the number never reads as something else.
 - **D7.** Tool coverage is claimed only for a call that completed; it follows today's limits table, not the one of
   the call (the API `coverage` keeps what the call returned).
-- **D8.** Filed, not fixed here: B-083 (the overview's 30 UTC days and the costs tab's 31-day chart differ).
+- **D9 (visual round 1).** The dashboard is `surface_class: internal` (a signed-in operator console; recorded in
+  `docs/design/fabric-dashboard.md`), so the linter is the visual floor and no director record is owed. Frames of every
+  changed state (failure closed and open, research coverage, 360 dark) are taken by `scripts/test-dashboard.mjs` and
+  kept in `docs/evidence/fabric-dashboard/raw/m1-wave-b/`. The folded line takes the link treatment; UTC is said once
+  for the spend strip; the resume call name moved under «Подробности»; the fixture spreads calls over 0, 4 and 20 days.
+- **D8.** Filed, not fixed here: B-084 (nav and tab clipping at 360 to 390 px, older than the wave) and B-083 (the overview's 30 UTC days and the costs tab's 31-day chart differ).
 
 ## REQ
 

@@ -27,12 +27,12 @@
 - **Steps:**
   1. Открыть обзор; прочитать свежесть и состояние.
   2. Прочитать «Требуют внимания».
-- **Expected result:** Видны актуальные счётчики; при offline сохранённый снимок явно устарел. «Требуют внимания» показывает только то, что ждёт сейчас (до 8 строк, сверх них строка «И ещё N в списке запросов»): решения и ошибки последних 3 дней, без учебных и проверочных запросов; более старые ошибки сворачиваются в одну строку со счётчиком и самым частым классом («Ещё 9 ошибок старше 3 дней · чаще всего: прервано»), строка ведёт к списку запросов с фильтром «Ошибка» (M1-B, B-066 принципы 4 и 7).
+- **Expected result:** Видны актуальные счётчики; при offline сохранённый снимок явно устарел. «Требуют внимания» показывает только то, что ждёт сейчас (до 8 строк; свёрнутая строка оформлена ссылкой, сверх них строка «И ещё N в списке запросов»): решения и ошибки последних 3 дней, без учебных и проверочных запросов; более старые ошибки сворачиваются в одну строку со счётчиком и самым частым классом («Ещё 9 ошибок старше 3 дней · чаще всего: прервано»), строка ведёт к списку запросов с фильтром «Ошибка» (M1-B, B-066 принципы 4 и 7).
 - **Acceptance criteria:** Видны актуальные счётчики; при offline сохранённый снимок явно устарел; ошибка старше 3 дней не стоит в списке «Требуют внимания», а входит в счётчик свёрнутой строки; учебный запрос в списке не появляется; доказательства записываются в verification.
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-23 at af1ba38 (M1-B, [receipt](../evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)); see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-23 (M1-B, frames in ../evidence/fabric-dashboard/raw/m1-wave-b/, [receipt](../evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Обзор
 
 ### SCN-002: Найти запрос
@@ -63,12 +63,12 @@
 - **Preconditions:** Запрос завершён.
 - **Steps:**
   1. Открыть данные, отчёт, шаги и исходный JSON.
-- **Expected result:** Таблица не требует чтения JSON; сырой текст не выполняется как HTML. Запрос с ошибкой сначала говорит, что произошло и какой следующий шаг, словами по коду ошибки (исследование, прерванное или остановленное по времени, называет продолжение через `research.run` с `resumeJobId`, которое не оплачивает готовые шаги повторно); исходное сообщение, код и код завершения прогона лежат под «Подробности» (B-066 принцип 5). Запрос, который получил ответ инструмента с известным ограничением охвата (TikTok Ads Library: только Европа; у исследования его завершённый шаг, у разового вызова завершённый вызов), показывает плашку «Охват источника» по-русски на вкладках «Данные» и «Источники», и для разового вызова, и для исследования, включая запросы, завершённые до этого изменения (B-078).
+- **Expected result:** Таблица не требует чтения JSON; сырой текст не выполняется как HTML. Запрос с ошибкой сначала говорит, что произошло и какой следующий шаг, словами по коду ошибки (у исследования, прерванного или остановленного по времени, добавлено: агент может продолжить этот прогон, готовые шаги повторно не оплачиваются; сам вызов `research.run` с `resumeJobId` назван под «Подробности»); исходное сообщение, код и код завершения прогона лежат под «Подробности» (B-066 принцип 5). Запрос, который получил ответ инструмента с известным ограничением охвата (TikTok Ads Library: только Европа; у исследования его завершённый шаг, у разового вызова завершённый вызов), показывает плашку «Охват источника» по-русски на вкладках «Данные» и «Источники», и для разового вызова, и для исследования, включая запросы, завершённые до этого изменения (B-078).
 - **Acceptance criteria:** Таблица не требует чтения JSON; сырой текст не выполняется как HTML; у ошибки первым видно действие, а не исходный текст провайдера; плашка охвата есть у исследования с `tiktok_ads_library` и у разового вызова этого инструмента; доказательства записываются в verification.
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-23 at af1ba38 (M1-B, [receipt](../evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)); see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-23 (M1-B, frames in ../evidence/fabric-dashboard/raw/m1-wave-b/, [receipt](../evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Детали
 
 ### SCN-004: Решение человека
@@ -123,7 +123,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-23 at af1ba38 (M1-B, [receipt](../evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)); see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-23 (M1-B, frames in ../evidence/fabric-dashboard/raw/m1-wave-b/, [receipt](../evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Расходы
 
 ### SCN-007: Настройки

@@ -1360,6 +1360,19 @@
       "evidence": "app.js spendSince; store.py:249",
       "wave": 4,
       "release": "this"
+    },
+    {
+      "id": "B-084",
+      "title": "Nav and detail tabs half-cut at 360 to 390 px",
+      "source": "visual verification of M1-B, 2026-10-23",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "m1-wave-b frames",
+      "wave": 4,
+      "release": "this"
     }
   ]
 }

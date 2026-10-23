@@ -51,6 +51,7 @@ try{
  await page.getByRole('button',{name:'Проверить изменения'}).click();
  await page.getByRole('button',{name:'Применить',exact:true}).click();
  await page.getByText('Версия 2',{exact:true}).waitFor();
+ await page.locator('#toast').waitFor({state:'hidden',timeout:8000});
  await page.locator('[data-nav="requests"]').click();
  await page.locator('#search').fill('not-a-request');
  await page.getByRole('heading',{name:'Ничего не найдено'}).waitFor();
@@ -103,18 +104,21 @@ async function readability(browser){
   await page.goto(base+login.url);await page.getByRole('heading',{name:'Исследования, на виду.'}).waitFor();
   // Spend: three windows and the cost of one report, a lower bound because one call is unpriced.
   const spend=page.locator('[aria-label="Расходы"]');
-  await spend.getByText('Расходы · Сегодня (UTC)').waitFor();
+  await spend.getByText('Расходы · Сегодня').waitFor();
+  await page.getByText('Расходы по дням UTC',{exact:false}).waitFor();
   assert.equal(await spend.locator('.metric').nth(0).locator('strong').textContent(),'≥ $0.1500');
   assert.match(await spend.locator('.metric').nth(0).locator('small').textContent(),/3 вызова, 1 без цены/);
-  assert.equal(await spend.locator('.metric').nth(3).locator('strong').textContent(),'≥ $0.1500');
-  await spend.getByText('расходы за 30 дней на 1 готовый отчёт').waitFor();
+  assert.equal(await spend.locator('.metric').nth(1).locator('strong').textContent(),'≥ $0.6500');
+  assert.equal(await spend.locator('.metric').nth(2).locator('strong').textContent(),'≥ $2.6500');
+  assert.equal(await spend.locator('.metric').nth(3).locator('strong').textContent(),'≥ $1.3250');
+  await spend.getByText('расходы за 30 дней на 2 готовых отчёта').waitFor();
   // Attention: the pending decision and the recent failure; the tutorial failure is not there; older ones fold.
   const panel=page.locator('section.panel',{has:page.getByRole('heading',{name:'Требуют внимания'})});
   assert.equal(await panel.locator('.row a').count(),2);
-  await panel.getByRole('button',{name:'Ещё 3 ошибки старше 3 дней'}).waitFor();
+  await panel.getByRole('button',{name:'Ещё 3 ошибки старше 3 дней ↗'}).waitFor();
   await panel.getByText('чаще всего: прервано').waitFor();
   await page.screenshot({path:evidence+'/overview-readability-desktop.png',fullPage:true});
-  await panel.getByRole('button',{name:'Ещё 3 ошибки старше 3 дней'}).click();
+  await panel.getByRole('button',{name:'Ещё 3 ошибки старше 3 дней ↗'}).click();
   await page.getByRole('heading',{name:'Запросы'}).waitFor();
   assert.equal(await page.locator('#filter').inputValue(),'failed');
   // A failure says what happened and the next step first; the raw text is under «Подробности».
@@ -123,18 +127,29 @@ async function readability(browser){
   await open(j=>j.request.inputs?.brand==='Recent');
   await page.getByRole('heading',{name:'Истекло время запроса.'}).waitFor();
   assert(!(await page.getByText('Wall-clock timeout reached.').isVisible()),'raw text shown before the toggle');
+  await page.screenshot({path:evidence+'/failure-closed-desktop.png',fullPage:true});
   await page.getByText('Подробности',{exact:true}).click();
   await page.getByText('прогон: cancelled').waitFor();
-  await page.getByText('продолжение через research.run с resumeJobId',{exact:false}).waitFor();
+  await page.getByText('Агент может продолжить этот прогон',{exact:false}).waitFor();
+  await page.screenshot({path:evidence+'/failure-open-desktop.png',fullPage:true});
   // Coverage, in Russian, on a research job and on a tool job.
   for(const kind of ['research','tool']){
-   await open(j=>j.request.kind===kind&&j.status==='completed');
+   await open(j=>j.request.kind===kind&&j.status==='completed'&&(kind==='tool'||j.request.inputs?.brand==='Example'));
    await page.getByRole('tab',{name:'Данные',exact:true}).click();
    await page.getByText('Охват источника.',{exact:false}).waitFor();
    await page.getByText('только реклама, показанная в Европе',{exact:false}).waitFor();
+   await page.screenshot({path:evidence+`/coverage-${kind}-desktop.png`,fullPage:true});
   }
-  await page.screenshot({path:evidence+'/coverage-desktop.png',fullPage:true});
-  await page.setViewportSize({width:360,height:740});await page.goto(base+'/dashboard#/overview');
+  // The same states at 360 px, dark.
+  await page.setViewportSize({width:360,height:740});await page.emulateMedia({colorScheme:'dark'});
+  await open(j=>j.request.inputs?.brand==='Recent');await page.getByText('Подробности',{exact:true}).click();
+  await page.screenshot({path:evidence+'/failure-open-360-dark.png',fullPage:true});
+  await open(j=>j.request.inputs?.brand==='Example'&&j.status==='completed');await page.getByRole('tab',{name:'Данные',exact:true}).click();
+  await page.getByText('Охват источника.',{exact:false}).waitFor();
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'coverage 360 overflow');
+  await page.screenshot({path:evidence+'/coverage-research-360-dark.png',fullPage:true});
+  await page.emulateMedia({colorScheme:'light'});
+    await page.goto(base+'/dashboard#/overview');
   await page.getByRole('heading',{name:'Исследования, на виду.'}).waitFor();
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'readability 360 overflow');
   await page.screenshot({path:evidence+'/overview-readability-360.png',fullPage:true});
