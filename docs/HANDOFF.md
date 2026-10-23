@@ -14,7 +14,11 @@ events in `events.log`) and PR #33 (smoke key per build; test servers log to the
 New row B-082 (v1 `legacy_key` resend). Note: `events.log` holds four lines from a dashboard test run of 12:59 UTC
 (job `pr-7050c37886149a656b99`, before PR #33); they are not the installed service's jobs.
 
-**Exact next task:** wave B (B-066, B-078, B-076) through `super-ux`, scenarios first.
+Wave B closed 2026-10-23: PR #34 (B-066 spend windows, attention only for now, failures in words first; B-078
+coverage derived in Russian; B-076 seeded browser check). Installed release `2a9d470d0173`, smoke PASS. Rows filed:
+B-083, B-084. Wave C (B-074 `{{output:<step>}}`) is on `feat/m1-wave-c`, seam round 1 fixed in `d4aecb3`.
+
+**Exact next task:** finish wave C (seam round 2, PR, install), then the Close wave of the milestone.
 
 ## Current entry, 2026-10-22 (supersedes every "Exact next task" below)
 

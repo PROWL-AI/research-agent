@@ -56,6 +56,6 @@ A finding that blocks nothing becomes a row, not more work.
 | Wave | State | Commits |
 |---|---|---|
 | A | **closed** | PR #32 (`6e7da40`) and #33 (`04d9df4`); installed release `6e7da4031bc9`, smoke PASS (`pr-01cfe46d5b2d46dd0508`); seam pass, product fail on docs then fixed and rechecked; B-082 filed |
-| B | closed (merge pending) | PR #34: `0058e3f` scenarios, `0987ae5` build, `af1ba38` fix round; product fail then fixed; seam by the orchestrator (pass, one risk: the checkpoint is parsed on each detail poll) |
+| B | **closed** | PR #34 (`2a9d470`): scenarios first, build, product round, visual rounds 1 (fail on evidence) and 2 (pass); installed release `2a9d470d0173`, smoke PASS; B-083, B-084 filed |
 | C | not started | |
 | Close | not started | |
