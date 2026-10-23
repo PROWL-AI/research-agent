@@ -7,10 +7,13 @@ The kit owner fixed the nav fold (fabric-agent-adapter PR #171, thread `288afbce
 release `1b747787c767` (`ready`, `degraded: []`), smoke PASS (`pr-57cc070fc37013c2cdbe`); suite 737, mutation 76 of 76.
 The kit's new `fabric-button.js` is not loaded: B-088 (needs the operator's decision and a scenario first).
 
-Open and ours: B-087 (reserve yields when the calls left cannot cover it), taken next. B-081 still waits for the
-operator to be at the dashboard (see the entry below).
+B-087 closed in PR #38 (`db1343c`): a step yields to the reserve only when the calls left cover every pending producer
+that will be sent plus one consumer; `_send_judgement` is shared by the reserve check and the dispatch. Two seam
+readings, the second without a finding of its own; installed `db1343cf8c50` (`ready`, `degraded: []`), smoke PASS
+(`pr-01bf48dc1ecb161ea0b1`); suite 743, mutation 79 of 79. Rows filed from round 2: B-089, B-090 (not blocking).
 
-**Exact next task:** B-087 in `research_agent/agent/subagent.py`, then record B-081's outcome when the operator runs it.
+**Exact next task:** B-089 and B-090 as one unit (same reserve check, `research_agent/agent/subagent.py`), at most two
+seam readings, new non-blocking findings become rows and the unit stops; B-081 when the operator is at the dashboard.
 
 ## Current entry, 2026-10-23 morning: M1 tail done (supersedes every "Exact next task" below)
 
