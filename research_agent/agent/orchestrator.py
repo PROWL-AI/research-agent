@@ -919,7 +919,7 @@ class Orchestrator:
         # Paid-for evidence first: a data step whose raw is saved finishes its
         # extraction before any budget check — extraction spends no tool money,
         # and a spent budget must not strand it (resume of a crashed run).
-        from research_agent.agent.subagent import extract_step
+        from research_agent.agent.subagent import _set_state, extract_step
 
         for record in checkpoint.steps:
             if record.kind == "data" and record.state == RAW_SAVED:
@@ -976,8 +976,13 @@ class Orchestrator:
                 if yielded and checkpoint.stop_reason is None and \
                         self._budget_stop_reason(budget, checkpoint) is None:
                     for record in yielded:
-                        record.state, record.reason = PENDING, None
-                    summaries += await run_data_segment(yielded, ctx, n_workers)
+                        _set_state(checkpoint, record, PENDING)
+                        record.reason = None
+                    again = await run_data_segment(yielded, ctx, n_workers)
+                    checkpoint.stats.setdefault("worker_segments", []).append(
+                        {"effort": effort, "workers": len(again), "steps": len(yielded),
+                         "done": sum(x.done for x in again), "claims": sum(x.claims_added for x in again),
+                         "pass": "reserve given back"})
                 still = [r for r in yielded if r.state == SKIPPED_BUDGET and r.reason == ctx.deferred_stop]
                 if (still or not yielded) and checkpoint.stop_reason is None:
                     checkpoint.stop_reason = ctx.deferred_stop
