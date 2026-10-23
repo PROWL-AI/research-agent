@@ -8,8 +8,9 @@ earlier output, given back when unused), and the tab half of B-084. Installed re
 `degraded: []`), smoke PASS; suite 737, mutation 76 of 76, WebKit PASS. Brief: `specs/waves/M1-T-tail.md`.
 
 Open: B-081, job `pr-dd318bd6388795ffb26e` (`market-pulse`, LLM cap USD 0.50, tools USD 1.50) waits for the operator's
-approval on the dashboard until 2026-10-23 08:05 UTC; if it expires, create a new one the same way (`research.run`,
-idempotency key with a new suffix) when the operator is at the dashboard, since an approval holds one hour. B-084 nav
+approval on the dashboard until 2026-10-23 08:05 UTC: it expired unapproved like the first and was cancelled (nothing
+spent). Create the next one the same way (`research.run`, idempotency key with a new suffix) only when the operator
+says they are at the dashboard, since an approval holds one hour. B-084 nav
 half: kit owner, board thread `288afbce`. New row B-087 (not blocking). Owned elsewhere: B-001, B-017 person half,
 B-020, B-042, B-067, B-073, KA-G03, FD-13, FD-14.
 
