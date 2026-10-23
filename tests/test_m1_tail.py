@@ -209,3 +209,51 @@ async def test_a_reference_written_twice_shares_the_cap_through_the_dispatch(tmp
     await Orchestrator(prowl, llm, runs_root=tmp_path / "runs").run("tail-twice", {"competitors": ["a.com"]}, run_id="twice")
     sent = prowl.tool_calls[-1]["arguments"]["domain"]
     assert len(sent) < bindings.OUTPUT_CAP + 200
+
+
+# ── B-087: yield only when the calls left can still finish a forward ───────
+
+
+@pytest.mark.parametrize("workers", [1, 3])
+async def test_no_yield_when_the_calls_left_cannot_reach_a_consumer(tmp_path, patched_runbooks, workers):
+    """One call left, a pending producer and its consumer: yielding would buy the producer's data
+    for the unrelated step's (the consumer never runs), so plan order stands."""
+    from test_subagents import _write_runbook
+
+    _write_runbook(patched_runbooks, "tail-cover", 1, effort="lookup")
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "s0", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "c0.com"}},
+        {"step": "scrape page", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "a.com"}},
+        {"step": "analyse", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "A: {{output:scrape_page}}"}},
+    ]}
+    prowl = FakeProwl()
+    result = await Orchestrator(prowl, llm, runs_root=tmp_path / "runs", max_workers=workers).run(
+        "tail-cover", {"competitors": ["a.com"]}, run_id=f"c{workers}")
+    states = {s["step"]: s["state"] for s in json.loads((tmp_path / "runs" / f"c{workers}" / "checkpoint.json").read_text())["steps"]}
+    assert states["s0"] == "completed"
+    assert states["scrape page"] == "skipped_budget" and states["analyse"] != "completed"  # left for a resume
+    assert len(prowl.tool_calls) == 1 and result.terminal_code == "budget_tools"
+
+
+@pytest.mark.parametrize("workers", [1, 3])
+async def test_a_yield_still_buys_one_whole_forward_when_the_reserve_is_short(tmp_path, patched_runbooks, workers):
+    """One producer read by two consumers, two calls left: the reserve (three) is short, but the
+    producer and one consumer still fit, so the unrelated step yields."""
+    from test_subagents import _write_runbook
+
+    _write_runbook(patched_runbooks, "tail-short", 2, effort="lookup")
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "s0", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "c0.com"}},
+        {"step": "scrape page", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "a.com"}},
+        {"step": "analyse", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "A: {{output:scrape_page}}"}},
+        {"step": "compare", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "B: {{output:scrape_page}}"}},
+    ]}
+    prowl = FakeProwl()
+    await Orchestrator(prowl, llm, runs_root=tmp_path / "runs", max_workers=workers).run(
+        "tail-short", {"competitors": ["a.com"]}, run_id=f"s{workers}")
+    states = {s["step"]: s["state"] for s in json.loads((tmp_path / "runs" / f"s{workers}" / "checkpoint.json").read_text())["steps"]}
+    assert states["scrape page"] == "completed"
+    assert "completed" in (states["analyse"], states["compare"])
+    assert states["s0"] == "skipped_budget" and len(prowl.tool_calls) == 2

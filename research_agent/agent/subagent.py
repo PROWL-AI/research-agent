@@ -426,12 +426,17 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             continue
 
         # An outcome_unknown step reuses its attempt (no new call) and must keep its key; a
-        # producer is what the reserved steps read: neither yields.
+        # producer is what the reserved steps read: neither yields. A yield buys a forward only
+        # when the calls left still reach a consumer after every pending producer (B-087);
+        # short of that the producer's data would replace this step's, so plan order stands.
         if ctx.reserved_calls and ctx.budget is not None and record.state != OUTCOME_UNKNOWN and \
-                slug(record.step) not in ctx.reserved_for and \
-                len(checkpoint.tool_attempts()) + ctx.reserved_calls + sum(
-                    1 for p in ctx.segment if p.state == PENDING and slug(p.step) in ctx.reserved_for
-                ) >= ctx.budget.max_tool_calls:
+                slug(record.step) not in ctx.reserved_for:
+            producers = sum(1 for p in ctx.segment if p.state == PENDING and slug(p.step) in ctx.reserved_for)
+            left = ctx.budget.max_tool_calls - len(checkpoint.tool_attempts())
+            yields = producers + 1 <= left <= ctx.reserved_calls + producers
+        else:
+            yields = False
+        if yields:
             # The calls left belong to the later levels (B-086): this step yields, the run goes on.
             reason = terminal.budget_stop_text(terminal.BUDGET_TOOLS, ctx.budget.max_tool_calls) + \
                 "; the last calls are kept for steps that read an earlier output"

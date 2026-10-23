@@ -250,7 +250,8 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   `stats.cost_source` says `server`, `mixed`, `estimate`, or `null` before any tool attempt.
   A step that reads an earlier step's whole output keeps one tool call: unrelated steps of its block yield it first
   (`skipped_budget`, the reason says so), never its producer or a step whose outcome is unknown, and the
-  `budget_tools` stop lands after the block (B-086).
+  `budget_tools` stop lands after the block (B-086). They yield only while the calls left still reach one such
+  step after its pending producers; with fewer, plan order stands (B-087).
   The runbook budget caps **Prowl tool calls**; the agent's own LLM spend
   (planning, claim extraction, transforms, writing, repair, citation checks) is
   capped separately by **`max_llm_usd`**: `--max-llm-usd` / MCP `max_llm_usd`,
