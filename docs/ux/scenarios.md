@@ -118,7 +118,7 @@
 - **Steps:**
   1. Прочитать расходы на обзоре.
   2. Открыть дневной график и таблицу.
-- **Expected result:** Учебные данные исключены; неизвестные цены не превращаются в ноль. Обзор показывает расходы за сегодня, 7 и 30 дней рядом и стоимость одного готового отчёта (расходы за 30 дней на число исследований, завершённых за 30 дней); если у части вызовов нет цены, сумма помечена «≥» (известная часть), а при отсутствии цен вовсе стоит «неизвестно»; окна считаются по дням UTC (B-066 принцип 2).
+- **Expected result:** Учебные данные исключены; неизвестные цены не превращаются в ноль. Обзор показывает расходы за сегодня, 7 и 30 дней рядом и стоимость одного готового отчёта (расходы за 30 дней на число исследований, завершённых за 30 дней); если у части вызовов нет цены, сумма помечена «≥» (известная часть), а при отсутствии цен вовсе стоит «неизвестно»; окна считаются по дням UTC, и вкладка «Расходы» показывает те же 30 дней (B-083) (B-066 принцип 2).
 - **Acceptance criteria:** Учебные данные исключены; неизвестные цены не превращаются в ноль; три окна и стоимость отчёта видны без перехода на другую вкладку; без готовых отчётов стоимость отчёта названа словами, а не делением на ноль; доказательства записываются в verification.
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
@@ -197,7 +197,7 @@
 | CORE-03 | Второй процесс не меняет живой прогон | 1 | PASS@583f1d1 |
 | CORE-04 | Осиротевший прогон → `interrupted` → продолжение | 1, 2 | PASS@0b0347b |
 | CORE-05 | Продолжение после сбоя не платит дважды | 2 | PASS@2bbf566 |
-| CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | PASS@2bbf566 |
+| CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | UNVERIFIED |
 | CORE-07 | Остановка по бюджету LLM | 4 | UNVERIFIED |
 | CORE-08 | Оплаченный сбой входит в бюджет и после продолжения | 2 | PASS@0b0347b |
 | CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | PASS@5fcf2f4 |
@@ -276,16 +276,17 @@
 - **Coverage:** `tests/test_durability.py::test_every_durable_boundary_is_resumable_without_paying_twice`, `test_ka10_resume_finishes_extraction_from_saved_raw_without_paying`, `test_outcome_unknown_attempt_is_resent_with_the_same_key`, `test_read_timeout_is_outcome_unknown_and_resent_with_the_same_key`, `test_budget_stop_keeps_an_outcome_unknown_step_and_its_key`, `test_raw_saved_step_is_extracted_even_after_the_tool_budget_is_spent`, `test_v1_crash_between_save_and_completion_is_finished_without_paying`, `test_a_run_that_needs_attention_stays_readable_and_is_never_resumed`, `test_migration_refuses_*`
 
 ### CORE-06: Остановка по бюджету: вызовы, USD, минуты
-- **Status:** PASS@2bbf566
+- **Status:** UNVERIFIED
 - **Actor:** оператор (P-01); вызывающий агент
 - **Trigger:** прогон достигает лимита runbook `Budget` по вызовам инструментов, USD или минутам
 - **Preconditions:** лимит меньше, чем требует план.
 - **Steps:**
   1. Запустить прогон; дождаться остановки.
 - **Expected result:** следующая отправка не происходит; прогон `partial` с `terminal_code` `budget_tools` / `budget_usd` / `budget_minutes`; невыполненные шаги — `skipped_budget`, их список передаётся writer'у с указанием пометить отчёт как partial; расход считается по журналу попыток (`actual`, иначе `estimate`, неизвестная цена — по оценке, не ноль).
+- **Expected result (шаги, читающие ранний вывод, B-086):** пока в блоке есть шаги, которым нужен весь ответ более раннего шага (`{{output:...}}`), шаги без такой зависимости оставляют им по одному вызову: несвязанный шаг, которому пришлось бы взять такой вызов, становится `skipped_budget` с причиной «the last calls are kept for steps that read an earlier output», а остановка `budget_tools` применяется после последнего уровня блока; резервируются только вызовы, лимиты USD и минут работают как раньше.
 - **Failure outcome:** продолжение с поднятым бюджетом выполняет `skipped_budget` шаги; без поднятия — не выполняет.
 - **Wave:** 2 (N-COST)
-- **Coverage:** `test_budget_stop_maps_to_budget_code`, `test_usd_budget_stop_maps_to_budget_usd_end_to_end`, `test_minutes_budget_stop_maps_to_budget_minutes_end_to_end`, `test_ka11_known_cost_does_not_discard_previous_estimates`, `test_writer_is_told_which_steps_are_missing`, `test_skipped_budget_steps_run_only_once_the_budget_allows`
+- **Coverage:** `test_budget_stop_maps_to_budget_code`, `test_usd_budget_stop_maps_to_budget_usd_end_to_end`, `test_minutes_budget_stop_maps_to_budget_minutes_end_to_end`, `test_ka11_known_cost_does_not_discard_previous_estimates`, `test_writer_is_told_which_steps_are_missing`, `test_skipped_budget_steps_run_only_once_the_budget_allows`, `tests/test_m1_tail.py::test_a_forwarding_step_keeps_its_call_under_a_tool_budget`
 
 ### CORE-07: Остановка по бюджету LLM
 - **Status:** UNVERIFIED

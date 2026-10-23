@@ -34,9 +34,10 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 from pydantic import BaseModel, Field
 
 from research_agent.agent import tool_limits
-from research_agent.agent.bindings import output_refs, output_text, slug, substitute, template_text
+from research_agent.agent.bindings import OUTPUT_CAP, output_refs, output_text, slug, substitute, template_text
 from research_agent.agent.orchestrator import PlanItem
 from research_agent.events import emit
+from research_agent.evidence import terminal
 from research_agent.evidence.store import CheckpointWriteError  # noqa: F401 — re-exported
 from research_agent.llm import LLMBudgetExceeded
 from research_agent.evidence.ledger import Ledger
@@ -70,7 +71,11 @@ def _earlier_outputs(ctx: Any, checkpoint: Checkpoint, record: StepRecord) -> tu
 
     found: dict[str, str] = {}
     ambiguous: dict[str, list[str]] = {}
-    for name in output_refs(record.arguments):
+    refs = output_refs(record.arguments)
+    # One cap per step, shared by its references (B-085): the text lands in bound_arguments,
+    # the checkpoint and the service's call journal.
+    share = OUTPUT_CAP // max(1, len(refs))
+    for name in refs:
         # A data step only (a transform note is the writer's), and one name only: two
         # different steps that read as the same reference leave it unresolved.
         earlier = [s for s in checkpoint.steps if s.raw_index < record.raw_index and s.state == COMPLETED
@@ -88,7 +93,7 @@ def _earlier_outputs(ctx: Any, checkpoint: Checkpoint, record: StepRecord) -> tu
                 text = json.dumps(_strip_envelope_meta(json.loads(text)), ensure_ascii=False, separators=(",", ":"))
         except (OSError, ValueError):
             continue
-        found["output:" + name] = output_text(text)
+        found["output:" + name] = output_text(text, share)
     return found, ambiguous
 
 
@@ -174,6 +179,12 @@ class WorkerContext:
     )
     #: Refusals of required steps in a row, shared by every worker of the run.
     refusals_in_row: int = 0
+    #: Tool calls this segment leaves for the later levels of its block: the steps that
+    #: read an earlier output (B-086). Set by the lead per data segment.
+    reserved_calls: int = 0
+    #: A tool-budget stop the reserve brought forward: applied by the lead once the
+    #: block's last level ran, so the reserved steps still get their calls.
+    deferred_stop: str | None = None
 
 
 # CheckpointWriteError lives in evidence.store (the LLM meter raises it too).
@@ -408,6 +419,19 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
                                                 claims=claims))
             continue
 
+        if ctx.reserved_calls and ctx.budget is not None and \
+                len(checkpoint.tool_attempts()) + ctx.reserved_calls >= ctx.budget.max_tool_calls:
+            # The calls left belong to the later levels (B-086): this step yields, the run goes on.
+            reason = terminal.budget_stop_text(terminal.BUDGET_TOOLS, ctx.budget.max_tool_calls) + \
+                "; the last calls are kept for steps that read an earlier output"
+            _set_state(checkpoint, record, SKIPPED_BUDGET, reason)
+            summary.outcomes.append(StepOutcome(step_id=record.step_id, step=record.step,
+                                                tool=record.tool, status="skipped", note=reason))
+            ctx.deferred_stop = ctx.deferred_stop or reason
+            checkpoint.partial = True
+            save_state(checkpoint, ctx.store)
+            continue
+
         stop_reason = ctx.orch._budget_stop_reason(ctx.budget, checkpoint)
         if stop_reason is not None:
             for rest in items[position:]:
@@ -430,7 +454,10 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
         arguments, _ = substitute(record.arguments, {**checkpoint.bindings, **outputs})
         # A step whose earlier attempt was sent (outcome unknown) is re-sent as it was, never
         # judged again: a rule learned since would call a dispatched step "not sent".
-        resend = record.state == OUTCOME_UNKNOWN and bool(record.attempt_ids)
+        # A v1 step whose next attempt reuses its v1 key may already have reached the server
+        # with exactly the planned arguments: it is a re-send too (B-082).
+        resend = (record.state == OUTCOME_UNKNOWN and bool(record.attempt_ids)) or \
+            (bool(record.legacy_key) and not any(a.step_id == record.step_id for a in checkpoint.attempts))
         reason = None if resend else _not_sent_reason(record.tool, judged, missing, ambiguous)
         if reason is not None:
             # Never sent: the provider would refuse the literal text and bill the

@@ -68,3 +68,10 @@ the last reading of each wave found nothing blocking. Rows filed during the mile
 B-083, B-084, B-085, B-086. Open and owned elsewhere: B-001, B-017 (person half), B-020, B-042, B-067, B-073,
 KA-G03, FD-13, FD-14. The next step is the operator's priority for M2, chosen from those rows; this file grants no
 work past it.
+
+## 6. Tail (operator «доделай», 2026-10-23)
+
+The operator asked to finish: the rows M1 filed and this agent owns (B-082, B-083, B-085, B-086, the tab half of
+B-084) are closed in PR #36 ([brief](waves/M1-T-tail.md)). The nav half of B-084 waits on the kit owner (board thread
+`288afbce`); B-081 waits on the operator's approval. Nothing else in this repository's backlog is ours to do without
+an outside owner or a person's act.

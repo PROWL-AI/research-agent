@@ -949,7 +949,19 @@ class Orchestrator:
                 await self._execute_transform(items[0], checkpoint, store, ledger)
                 continue
 
+            # The later levels of this block (steps that read an earlier output) keep one tool
+            # call each; an unrelated step yields first under a tool budget (B-086).
+            later = 0
+            for later_kind, later_items in segments[seg_index + 1:]:
+                if later_kind != "data":
+                    break
+                later += len(later_items)
+            ctx.reserved_calls = later
             summaries = await run_data_segment(items, ctx, n_workers)
+            if later == 0 and ctx.deferred_stop and checkpoint.stop_reason is None:
+                checkpoint.stop_reason = ctx.deferred_stop
+            if later == 0:
+                ctx.deferred_stop = None
             checkpoint.stats.setdefault("worker_segments", []).append(
                 {
                     "effort": effort,

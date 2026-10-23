@@ -417,3 +417,18 @@ async def test_dashboard_coverage_is_derived_for_a_research_job_from_its_complet
     body = await _job_detail(app, job["id"])
     assert len(body["display"]["coverage"]) == 1 and body["display"]["coverage"][0].startswith("TikTok Ads Library")
     await app.state.runtime.close()
+
+
+async def test_usage_covers_the_same_30_utc_days_as_the_overview(tmp_path):
+    """B-083: the costs tab covered 31 calendar days while the overview's «30 дней» counted 30."""
+    from datetime import datetime, timedelta, timezone
+    s = Store(tmp_path)
+    job = s.create({"kind": "tool", "tool": "x", "params": {}}, "window")[0]
+    now = datetime.now(timezone.utc)
+    for days_ago in (0, 29, 30):
+        call = s.start_call(job["id"], "tool", "x", {})
+        s.finish_call(call, status="completed", costUsd=1.0, costBasis="provider",
+                      startedAt=(now - timedelta(days=days_ago)).isoformat().replace("+00:00", "Z"))
+    dates = [d["date"] for d in s.usage()["days"]]
+    assert dates == sorted({(now - timedelta(days=n)).date().isoformat() for n in (0, 29)})
+    s.db.close()
