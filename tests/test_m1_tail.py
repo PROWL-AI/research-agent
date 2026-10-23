@@ -257,3 +257,28 @@ async def test_a_yield_still_buys_one_whole_forward_when_the_reserve_is_short(tm
     assert states["scrape page"] == "completed"
     assert "completed" in (states["analyse"], states["compare"])
     assert states["s0"] == "skipped_budget" and len(prowl.tool_calls) == 2
+
+
+@pytest.mark.parametrize("workers", [1, 3])
+async def test_a_producer_that_will_not_be_sent_takes_no_call_from_the_reserve(tmp_path, patched_runbooks, workers):
+    """Seam reading of B-087: p2 holds an unresolved name, so it is never sent; counting it would
+    deny x's yield and lose the forward p1 -> c1 that B-086 delivered, and hide p2's real cause."""
+    from test_subagents import _write_runbook
+
+    _write_runbook(patched_runbooks, "tail-unsent", 2, effort="lookup")
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "x", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "x.com"}},
+        {"step": "p1", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "p1.com"}},
+        {"step": "p2", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "{{nobody_resolves_this}}"}},
+        {"step": "c1", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "A: {{output:p1}}"}},
+        {"step": "c2", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "B: {{output:p2}}"}},
+    ]}
+    prowl = FakeProwl()
+    await Orchestrator(prowl, llm, runs_root=tmp_path / "runs", max_workers=workers).run(
+        "tail-unsent", {"competitors": ["a.com"]}, run_id=f"u{workers}")
+    steps = {s["step"]: s for s in json.loads((tmp_path / "runs" / f"u{workers}" / "checkpoint.json").read_text())["steps"]}
+    assert steps["p1"]["state"] == "completed" and steps["c1"]["state"] == "completed"
+    assert steps["x"]["state"] == "skipped_budget"
+    assert steps["p2"]["state"] == "failed" and "not sent" in (steps["p2"].get("error") or steps["p2"].get("note") or json.dumps(steps["p2"]))
+    assert len(prowl.tool_calls) == 2

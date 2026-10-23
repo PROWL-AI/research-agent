@@ -120,6 +120,26 @@ def _not_sent_reason(tool: str, arguments: Any, missing: set[str],
         return f"not sent: {tool} does not take {', '.join(limits)} (a known provider limit)"
     return None
 
+def _send_judgement(ctx: WorkerContext, checkpoint: Checkpoint, record: StepRecord
+                    ) -> tuple[Any, set[str], bool, str | None]:
+    """(arguments to send, unresolved names, re-send, why not sent or None) for one data step.
+
+    Pure: the reserve check asks it of pending producers too (B-087)."""
+    # An {{output:<step>}} is judged as the plan wrote it and filled only after: the
+    # earlier result is provider text, which may hold any shape the B-070 check refuses.
+    outputs, ambiguous = _earlier_outputs(ctx, checkpoint, record)
+    judged, missing = substitute(record.arguments, {**checkpoint.bindings, **{k: "[output]" for k in outputs}})
+    arguments, _ = substitute(record.arguments, {**checkpoint.bindings, **outputs})
+    # A step whose earlier attempt was sent (outcome unknown) is re-sent as it was, never
+    # judged again: a rule learned since would call a dispatched step "not sent".
+    # A v1 step whose next attempt reuses its v1 key may already have reached the server
+    # with exactly the planned arguments: it is a re-send too (B-082).
+    resend = (record.state == OUTCOME_UNKNOWN and bool(record.attempt_ids)) or \
+        (bool(record.legacy_key) and not any(a.step_id == record.step_id for a in checkpoint.attempts))
+    reason = None if resend else _not_sent_reason(record.tool, judged, missing, ambiguous)
+    return arguments, missing, resend, reason
+
+
 #: Effort classes (plan, decision 2): lookup = one inline agent, comparison =
 #: a few workers, deep = a wide fan-out. Worker counts are deliberately modest:
 #: every worker's data call hits the same billed Prowl account.
@@ -431,7 +451,9 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
         # short of that the producer's data would replace this step's, so plan order stands.
         if ctx.reserved_calls and ctx.budget is not None and record.state != OUTCOME_UNKNOWN and \
                 slug(record.step) not in ctx.reserved_for:
-            producers = sum(1 for p in ctx.segment if p.state == PENDING and slug(p.step) in ctx.reserved_for)
+            # A producer that will not be sent (a known limit, an unresolved name) spends no call.
+            producers = sum(1 for p in ctx.segment if p.state == PENDING and slug(p.step) in ctx.reserved_for
+                            and _send_judgement(ctx, checkpoint, p)[3] is None)
             left = ctx.budget.max_tool_calls - len(checkpoint.tool_attempts())
             yields = producers + 1 <= left <= ctx.reserved_calls + producers
         else:
@@ -463,18 +485,7 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             save_state(checkpoint, ctx.store)
             return summary
 
-        # An {{output:<step>}} is judged as the plan wrote it and filled only after: the
-        # earlier result is provider text, which may hold any shape the B-070 check refuses.
-        outputs, ambiguous = _earlier_outputs(ctx, checkpoint, record)
-        judged, missing = substitute(record.arguments, {**checkpoint.bindings, **{k: "[output]" for k in outputs}})
-        arguments, _ = substitute(record.arguments, {**checkpoint.bindings, **outputs})
-        # A step whose earlier attempt was sent (outcome unknown) is re-sent as it was, never
-        # judged again: a rule learned since would call a dispatched step "not sent".
-        # A v1 step whose next attempt reuses its v1 key may already have reached the server
-        # with exactly the planned arguments: it is a re-send too (B-082).
-        resend = (record.state == OUTCOME_UNKNOWN and bool(record.attempt_ids)) or \
-            (bool(record.legacy_key) and not any(a.step_id == record.step_id for a in checkpoint.attempts))
-        reason = None if resend else _not_sent_reason(record.tool, judged, missing, ambiguous)
+        arguments, missing, resend, reason = _send_judgement(ctx, checkpoint, record)
         if reason is not None:
             # Never sent: the provider would refuse the literal text and bill the
             # call (B-065, B-070, B-071). Not a refusal, so the cap neither counts

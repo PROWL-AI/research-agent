@@ -156,6 +156,9 @@ MUTANTS = [
     ("yield-not-only-on-a-whole-reserve", "research_agent/agent/subagent.py",
      "yields = producers + 1 <= left <= ctx.reserved_calls + producers",
      "yields = ctx.reserved_calls + producers <= left <= ctx.reserved_calls + producers", ["tests/test_m1_tail.py"]),
+    ("unsent-producer-takes-no-call", "research_agent/agent/subagent.py",
+     "                            and _send_judgement(ctx, checkpoint, p)[3] is None)\n", "                            )\n",
+     ["tests/test_m1_tail.py"]),
     ("service-events-in-file-log", "research_agent/service/store.py",
      "        emit(log, kind, _LOG_LEVELS.get(level, logging.INFO), **fields)\n", "", ["tests/test_service_parity.py"]),
 ]
