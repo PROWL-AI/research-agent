@@ -374,8 +374,9 @@ Rules:
 - To hand a whole earlier result to a later step (a scraped page to an analysis tool),
   write "{{output:<earlier step name in snake_case>}}" in the argument, e.g.
   "Analyse this page: {{output:scrape_clickup_homepage}}". That step's stored response
-  is sent in its place, cut at 16000 characters; a reference to a step that did not
-  complete is not sent. Never describe the output instead of referring to it.
+  is sent in its place, cut at 16000 characters (shared by all references of one step);
+  a reference to a step that did not complete is not sent. Never describe the output
+  instead of referring to it.
 - Prefer one batched tool call over per-item fan-out when the tool supports bulk
   input (e.g. dataforseo_bl_bulk_ranks takes multiple domains in one call).
 - Keep the total number of tool-call steps within the tool-call budget.
@@ -918,13 +919,14 @@ class Orchestrator:
         # Paid-for evidence first: a data step whose raw is saved finishes its
         # extraction before any budget check — extraction spends no tool money,
         # and a spent budget must not strand it (resume of a crashed run).
-        from research_agent.agent.subagent import extract_step
+        from research_agent.agent.subagent import _set_state, extract_step
 
         for record in checkpoint.steps:
             if record.kind == "data" and record.state == RAW_SAVED:
                 await extract_step(ctx, record, None)
 
         segments = split_segments(checkpoint.steps)
+        block_start: int | None = None  # first data segment of a block with later levels (B-086)
         for seg_index, (kind, items) in enumerate(segments):
             if checkpoint.stop_reason is not None:
                 # A hard failure in an earlier segment: the steps never reached
@@ -949,7 +951,45 @@ class Orchestrator:
                 await self._execute_transform(items[0], checkpoint, store, ledger)
                 continue
 
+            # The later levels of this block (steps that read an earlier output) keep one tool
+            # call each; an unrelated step yields first under a tool budget (B-086).
+            later, reserved_for, last_level = 0, set(), True
+            for later_kind, later_items in segments[seg_index + 1:]:
+                if later_kind != "data":
+                    break
+                last_level = False
+                # Only a step that will take a new call needs one kept: a re-send of an
+                # unknown outcome reuses its attempt, saved raw needs none.
+                later += sum(r.state not in (RAW_SAVED, OUTCOME_UNKNOWN) for r in later_items)
+                reserved_for |= {name for r in later_items for name in plan_bindings.output_refs(r.arguments)}
+            ctx.reserved_calls, ctx.reserved_for, ctx.segment = later, frozenset(reserved_for), items
+            if not last_level and block_start is None:
+                block_start = seg_index
             summaries = await run_data_segment(items, ctx, n_workers)
+            if last_level and ctx.deferred_stop:
+                # The block ran all its levels. Calls a reserve kept but nobody used (a producer
+                # refused or not sent) go back to the steps that yielded them, through the
+                # ordinary budget check, so the run ends on what actually limited it.
+                yielded = [r for _, block in segments[block_start:seg_index + 1] for r in block
+                           if r.state == SKIPPED_BUDGET and r.reason == ctx.deferred_stop]
+                ctx.reserved_calls, ctx.reserved_for, ctx.segment = 0, frozenset(), []
+                if yielded and checkpoint.stop_reason is None and \
+                        self._budget_stop_reason(budget, checkpoint) is None:
+                    for record in yielded:
+                        _set_state(checkpoint, record, PENDING)
+                        record.reason = None
+                    again = await run_data_segment(yielded, ctx, n_workers)
+                    checkpoint.stats.setdefault("worker_segments", []).append(
+                        {"effort": effort, "workers": len(again), "steps": len(yielded),
+                         "done": sum(x.done for x in again), "claims": sum(x.claims_added for x in again),
+                         "pass": "reserve given back"})
+                still = [r for r in yielded if r.state == SKIPPED_BUDGET and r.reason == ctx.deferred_stop]
+                if (still or not yielded) and checkpoint.stop_reason is None:
+                    checkpoint.stop_reason = ctx.deferred_stop
+                    emit(log, "budget.stop", logging.WARNING, run_id=checkpoint.run_id,
+                         reason=ctx.deferred_stop, spend_usd=checkpoint.spend_usd("tool"))
+            if last_level:
+                ctx.deferred_stop, block_start = None, None
             checkpoint.stats.setdefault("worker_segments", []).append(
                 {
                     "effort": effort,

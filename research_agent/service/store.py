@@ -246,7 +246,8 @@ class Store:
     def usage(self):
         jobs = {j["id"]: j for j in self.jobs()}
         days = {}
-        since = (datetime.now(timezone.utc) - timedelta(days=30)).date().isoformat()
+        # 30 UTC days with today, the window the overview calls «30 дней» (B-083).
+        since = (datetime.now(timezone.utc) - timedelta(days=29)).date().isoformat()
         for call in self.calls():
             if jobs[call["job"]]["request"]["kind"] == "tutorial" or call["startedAt"][:10] < since:
                 continue
