@@ -1425,6 +1425,32 @@
       "evidence": "needs the operator's decision and a scenario before loading fabric-button.js",
       "wave": 4,
       "release": "this"
+    },
+    {
+      "id": "B-089",
+      "title": "Reserve check re-judges producers outside its window",
+      "source": "seam reading round 2 of B-087, 2026-10-23",
+      "status": "open",
+      "area": "core",
+      "node": "N-STATE",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "subagent.py reserve check",
+      "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "B-090",
+      "title": "Reserve yields after another worker's hard stop",
+      "source": "seam reading round 2 of B-087, 2026-10-23",
+      "status": "open",
+      "area": "core",
+      "node": "N-STATE",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "subagent.py reserve check",
+      "wave": 2,
+      "release": "this"
     }
   ]
 }
