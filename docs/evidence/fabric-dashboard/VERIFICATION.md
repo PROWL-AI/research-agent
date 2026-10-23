@@ -48,7 +48,8 @@ Code commit **198a227** (fix round after the three blind certifications of `77a0
 | Gate | Result | Evidence |
 |---|---|---|
 | WebKit, 1440/390/360, empty-state walk plus a seeded second service (`scripts/dashboard-fixtures.py`) | PASS, 25 checks, no page errors | [receipt](raw/webkit-m1-wave-b.json): spend today/7/30 days (UTC) and per report with the `≥` lower bound, attention holds only current items, three older failures folded into one counted line that opens the filtered list, a failure reads class and next step before «Подробности», «Охват источника» in Russian on a research job and on a tool job |
-| Product reading | fail (5 blocking: copy claiming an internal cause, SCN-006, CORE-19, this receipt, the open rows), fixed in `5023b06` | `docs/specs/waves/M1-B-dashboard-readability.md` |
+| Product reading | fail (5 blocking: copy claiming an internal cause, SCN-006, CORE-19, this receipt, the open rows), fixed in `af1ba38` | `docs/specs/waves/M1-B-dashboard-readability.md` |
+| Visual reading | fail on evidence only (no surface class, no frames of the failure and research-coverage states), fixed in `5023b06`; frames in [m1-wave-b/](raw/m1-wave-b/) | `docs/specs/waves/M1-B-dashboard-readability.md` D9 |
 
 ## Corrections discovered during verification
 
