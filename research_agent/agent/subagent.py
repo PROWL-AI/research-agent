@@ -140,6 +140,17 @@ def _send_judgement(ctx: WorkerContext, checkpoint: Checkpoint, record: StepReco
     return arguments, missing, resend, reason
 
 
+def _will_be_sent(ctx: WorkerContext, checkpoint: Checkpoint, record: StepRecord) -> bool:
+    """Whether a pending producer will spend a call, for the reserve check only.
+
+    A judgement that fails is the producer's own failure at its dispatch, never an
+    unrelated step's: here it counts as sent (B-089)."""
+    try:
+        return _send_judgement(ctx, checkpoint, record)[3] is None
+    except Exception:  # noqa: BLE001 — surfaced by the producer's own dispatch
+        return True
+
+
 #: Effort classes (plan, decision 2): lookup = one inline agent, comparison =
 #: a few workers, deep = a wide fan-out. Worker counts are deliberately modest:
 #: every worker's data call hits the same billed Prowl account.
@@ -449,15 +460,18 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
         # producer is what the reserved steps read: neither yields. A yield buys a forward only
         # when the calls left still reach a consumer after every pending producer (B-087);
         # short of that the producer's data would replace this step's, so plan order stands.
+        # A run another worker stopped runs no later level, so nothing is kept for one (B-090).
+        yields = False
         if ctx.reserved_calls and ctx.budget is not None and record.state != OUTCOME_UNKNOWN and \
-                slug(record.step) not in ctx.reserved_for:
-            # A producer that will not be sent (a known limit, an unresolved name) spends no call.
-            producers = sum(1 for p in ctx.segment if p.state == PENDING and slug(p.step) in ctx.reserved_for
-                            and _send_judgement(ctx, checkpoint, p)[3] is None)
+                checkpoint.stop_reason is None and slug(record.step) not in ctx.reserved_for:
+            pending = [p for p in ctx.segment if p.state == PENDING and slug(p.step) in ctx.reserved_for]
             left = ctx.budget.max_tool_calls - len(checkpoint.tool_attempts())
-            yields = producers + 1 <= left <= ctx.reserved_calls + producers
-        else:
-            yields = False
+            # Judge the producers only inside the window they can change (B-089): each judgement
+            # reads the artifacts a producer forwards.
+            if 1 <= left <= ctx.reserved_calls + len(pending):
+                # A producer that will not be sent (a known limit, an unresolved name) spends no call.
+                producers = sum(1 for p in pending if _will_be_sent(ctx, checkpoint, p))
+                yields = producers + 1 <= left <= ctx.reserved_calls + producers
         if yields:
             # The calls left belong to the later levels (B-086): this step yields, the run goes on.
             reason = terminal.budget_stop_text(terminal.BUDGET_TOOLS, ctx.budget.max_tool_calls) + \
