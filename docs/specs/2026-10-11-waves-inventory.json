@@ -1451,6 +1451,32 @@
       "evidence": "closed: reserve check window and stop_reason guard, 2026-10-23",
       "wave": 2,
       "release": "this"
+    },
+    {
+      "id": "B-091",
+      "title": "Peers do not see a worker crash before the segment ends",
+      "source": "seam reading of B-089/B-090, 2026-10-23",
+      "status": "open",
+      "area": "core",
+      "node": "N-STATE",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "subagent.py run_data_segment / dispatch path",
+      "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "B-092",
+      "title": "Peers dispatch after a stops_run refusal",
+      "source": "seam reading of B-089/B-090, 2026-10-23",
+      "status": "open",
+      "area": "core",
+      "node": "N-STATE",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "subagent.py run_data_segment / dispatch path",
+      "wave": 2,
+      "release": "this"
     }
   ]
 }
