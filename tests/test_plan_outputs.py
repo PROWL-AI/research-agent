@@ -242,3 +242,29 @@ def test_the_extractor_sees_bound_values_but_not_the_forwarded_page():
                         arguments={"url": "{{site_url}}", "q": "{{output:scrape_page}}"},
                         bound_arguments={"url": "https://example.org", "q": "page text naming g2.com"})
     assert plan_item(record, {"site_url": "https://example.org"}).arguments == {"url": "https://example.org", "q": "{{output:scrape_page}}"}
+
+
+class EchoProwl(FakeProwl):
+    async def call_tool(self, name, arguments, idempotency_key=None):
+        import asyncio
+        await asyncio.sleep(0.01)
+        self.tool_calls.append({"name": name, "arguments": arguments, "idempotency_key": idempotency_key})
+        self.call_log.append(object())
+        return {"echo": arguments.get("domain")}
+
+
+@pytest.mark.parametrize("workers", [1, 3])
+async def test_a_reused_name_is_read_after_its_last_step_at_any_worker_count(lookup_runbook, tmp_path, workers):
+    """Seam round 3: the first step of a reused name set the level, so the text sent depended on timing."""
+    runs = tmp_path / "runs"
+    prowl = EchoProwl()
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "page", "tool": TOOL, "arguments": {"domain": "p.com"}},
+        {"step": "x", "tool": TOOL, "arguments": {"domain": "r.com"}},
+        {"step": "x", "tool": TOOL, "arguments": {"domain": "Q: {{output:page}}"}},
+        {"step": "s", "tool": TOOL, "arguments": {"domain": "S: {{output:x}}"}},
+    ]}
+    await Orchestrator(prowl, llm, runs_root=runs, max_workers=workers).run("bind-lookup", BRIEF, run_id=f"reuse{workers}")
+    sent = next(c["arguments"]["domain"] for c in prowl.tool_calls if c["arguments"]["domain"].startswith("S: "))
+    assert "Q: " in sent  # the second x, the last one of that name

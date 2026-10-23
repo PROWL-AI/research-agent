@@ -217,7 +217,7 @@ def split_segments(steps: list[StepRecord]) -> list[tuple[str, list[StepRecord]]
         levels: list[list[StepRecord]] = []
         for record in pending:
             depth = 1 + max((level[n] for n in output_refs(record.arguments) if n in level), default=-1)
-            level.setdefault(slug(record.step), depth)
+            level[slug(record.step)] = max(level.get(slug(record.step), -1), depth)
             while len(levels) <= depth:
                 levels.append([])
             levels[depth].append(record)

@@ -40,6 +40,11 @@ Contradictions: none.
   failure in a later level strands nothing. An ambiguous name gets its own reason (`names two steps (...)`). The
   extractor sees a forwarding step's plan with the bound `{{name}}` values filled and the output references left as
   written.
+- **D8 (seam round 3).** A reused step name takes the deepest level of its steps, so a reference to it waits for the
+  last one at any worker count. Accepted trade-off: a forwarding step runs after the unrelated steps of its group,
+  so under a runtime budget stop it is the one left unsent, and it ends such a run `pending` rather than
+  `skipped_budget` (the report, the disclosures and the resume read both the same). Reserving budget for planned
+  forwarding steps is filed as B-086.
 - **D5.** Out of scope: picking a field out of the artifact (the whole raw is sent) and a per-tool cap.
 
 ## REQ
