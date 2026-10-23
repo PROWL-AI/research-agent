@@ -46,6 +46,30 @@ _WHOLE_TEMPLATE_RES = (
 )
 
 
+#: ``{{output:<step>}}`` hands a whole earlier result to a later step (B-074): the
+#: stored raw artifact of the last completed step of that name, cut at this many
+#: characters. An LLM-analysis tool needs the page, not a description of it.
+OUTPUT_CAP = 16_000
+_OUTPUT_RE = re.compile(r"^output:([a-z][a-z0-9_]{0,63})$")
+
+
+def slug(step: str) -> str:
+    """A step name as an ``{{output:...}}`` reference writes it: "Scrape page!" -> "scrape_page"."""
+    return re.sub(r"[^a-z0-9]+", "_", step.lower()).strip("_")[:64]
+
+
+def output_refs(value: Any) -> set[str]:
+    """The step names a value's ``{{output:<step>}}`` placeholders refer to."""
+    return {m.group(1) for name in placeholders(value) if (m := _OUTPUT_RE.match(name))}
+
+
+def output_text(text: str, cap: int = OUTPUT_CAP) -> str:
+    """An earlier step's raw artifact as sent: whole, or cut with the count it left out."""
+    if len(text) <= cap:
+        return text
+    return text[:cap] + f"\n[cut: {len(text) - cap} more characters]"
+
+
 def placeholders(value: Any) -> set[str]:
     """Every placeholder name inside a JSON-like value (strings only)."""
     found: set[str] = set()

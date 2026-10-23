@@ -221,6 +221,11 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   (`bound_arguments`; `arguments` keeps the plan as written). A placeholder nobody resolved is never sent: the step
   is `skipped_on_error` (or `failed`, when required) with `not sent: no earlier step resolved {{name}}`, and it does
   not count toward the refusals in a row (B-065).
+- **A whole earlier result is a reference.** A step that needs an earlier step's whole output (a scraped page for an
+  analysis tool) writes `{{output:<step name in snake_case>}}`; the stored raw artifact of the last completed step of
+  that name (sha256-checked) is sent in its place, cut at 16 000 characters with a `[cut: N more characters]` marker
+  (`bindings.OUTPUT_CAP`). The reference is judged as the plan wrote it, so provider text inside the output is never
+  taken for template text; a reference to a step that did not complete is not sent (B-074).
 - **Template text and known-refused values are not sent either.** Live runs showed the planner writing other shapes
   than `{{name}}` (`[substitute landing_page_url of ...]`, `<video_id from youtube_search ...>`,
   `{youtube_search.latest_video_id}`, `PLACEHOLDER_FROM_STEP_22`); providers billed each one, and an LLM-answer tool

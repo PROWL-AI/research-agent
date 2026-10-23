@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 from pydantic import BaseModel, Field
 
 from research_agent.agent import tool_limits
-from research_agent.agent.bindings import substitute, template_text
+from research_agent.agent.bindings import output_refs, output_text, slug, substitute, template_text
 from research_agent.agent.orchestrator import PlanItem
 from research_agent.events import emit
 from research_agent.evidence.store import CheckpointWriteError  # noqa: F401 — re-exported
@@ -60,6 +60,24 @@ if TYPE_CHECKING:
     from research_agent.agent.orchestrator import Orchestrator
 
 log = logging.getLogger(__name__)
+
+
+def _earlier_outputs(ctx: Any, checkpoint: Checkpoint, record: StepRecord) -> dict[str, str]:
+    """``{"output:<step>": text}`` for each output reference of `record` that an earlier
+    completed step of that name can fill from its stored, sha256-checked raw artifact (B-074).
+    A reference nothing fills stays a missing placeholder, so the step is not sent."""
+    found: dict[str, str] = {}
+    for name in output_refs(record.arguments):
+        earlier = [s for s in checkpoint.steps if s.raw_index < record.raw_index and s.state == COMPLETED
+                   and s.raw_ref and slug(s.step) == name]
+        if not earlier:
+            continue
+        try:
+            text = ctx.store.read_artifact(earlier[-1].raw_ref, earlier[-1].raw_sha256)
+        except (OSError, ValueError):
+            continue
+        found["output:" + name] = output_text(text)
+    return found
 
 
 def _not_sent_reason(tool: str, arguments: Any, missing: set[str]) -> str | None:
@@ -370,11 +388,15 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             save_state(checkpoint, ctx.store)
             return summary
 
-        arguments, missing = substitute(record.arguments, checkpoint.bindings)
+        # An {{output:<step>}} is judged as the plan wrote it and filled only after: the
+        # earlier result is provider text, which may hold any shape the B-070 check refuses.
+        outputs = _earlier_outputs(ctx, checkpoint, record)
+        judged, missing = substitute(record.arguments, {**checkpoint.bindings, **{k: "[output]" for k in outputs}})
+        arguments, _ = substitute(record.arguments, {**checkpoint.bindings, **outputs})
         # A step whose earlier attempt was sent (outcome unknown) is re-sent as it was, never
         # judged again: a rule learned since would call a dispatched step "not sent".
         resend = record.state == OUTCOME_UNKNOWN and bool(record.attempt_ids)
-        reason = None if resend else _not_sent_reason(record.tool, arguments, missing)
+        reason = None if resend else _not_sent_reason(record.tool, judged, missing)
         if reason is not None:
             # Never sent: the provider would refuse the literal text and bill the
             # call (B-065, B-070, B-071). Not a refusal, so the cap neither counts

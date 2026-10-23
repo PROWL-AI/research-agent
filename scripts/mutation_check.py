@@ -124,6 +124,11 @@ MUTANTS = [
      'view["error"] = interop_error(job["error"])', 'view["error"] = job["error"]', ["tests/test_service.py"]),
     ("dashboard-coverage-derived", "research_agent/service/app.py",
      'return {"coverage": tool_limits.statements_ru(tools)}', 'return {"coverage": []}', ["tests/test_service.py"]),
+    ("output-judged-as-planned", "research_agent/agent/subagent.py",
+     "reason = None if resend else _not_sent_reason(record.tool, judged, missing)",
+     "reason = None if resend else _not_sent_reason(record.tool, arguments, missing)", ["tests/test_plan_outputs.py"]),
+    ("output-filled-from-raw", "research_agent/agent/subagent.py",
+     'found["output:" + name] = output_text(text)', 'found["output:" + name] = name', ["tests/test_plan_outputs.py"]),
     ("service-events-in-file-log", "research_agent/service/store.py",
      "        emit(log, kind, _LOG_LEVELS.get(level, logging.INFO), **fields)\n", "", ["tests/test_service_parity.py"]),
 ]

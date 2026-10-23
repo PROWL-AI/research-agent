@@ -95,7 +95,10 @@ Follow the flagship (`saas-competitor-teardown/SKILL.md`):
    that a Transform hands it on: the planner writes the argument as
    `{{name}}` and the transform returns it; an unresolved placeholder is
    not sent (B-065), and neither is any other template text in an
-   argument (B-070). When a provider refuses a value its schema does not
+   argument (B-070). When a step analyses a whole earlier result (a page
+   for an LLM-analysis tool), name the earlier step: the planner writes
+   `{{output:<step name>}}` and the step's stored response is sent, cut at
+   16 000 characters (B-074). When a provider refuses a value its schema does not
    rule out, add the limit, with its source, to
    `research_agent/agent/tool_limits.py` rather than to one runbook: every
    planner that may call the tool is told it (B-071). When the limit also
