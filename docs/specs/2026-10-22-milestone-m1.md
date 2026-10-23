@@ -72,6 +72,8 @@ work past it.
 ## 6. Tail (operator «доделай», 2026-10-23)
 
 The operator asked to finish: the rows M1 filed and this agent owns (B-082, B-083, B-085, B-086, the tab half of
-B-084) are closed in PR #36 ([brief](waves/M1-T-tail.md)). The nav half of B-084 waits on the kit owner (board thread
-`288afbce`); B-081 waits on the operator's approval. Nothing else in this repository's backlog is ours to do without
+B-084) are closed in PR #36 ([brief](waves/M1-T-tail.md)). Merged as PR #36 (`843fdb8`), installed release `843fdb8e5157`, smoke PASS; three seam readings, the last two without a
+blocker; B-087 filed. The nav half of B-084 waits on the kit owner (board thread `288afbce`). B-081: the first job
+expired unapproved (an approval is valid one hour) and was cancelled; the second, `pr-dd318bd6388795ffb26e`, waits for
+the operator's approval until 2026-10-23 08:05 UTC. Nothing else in this repository's backlog is ours to do without
 an outside owner or a person's act.
