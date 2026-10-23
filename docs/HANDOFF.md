@@ -1,5 +1,25 @@
 # Research-agent handoff
 
+## Current entry, 2026-10-23: milestone M1 reached (supersedes every "Exact next task" below)
+
+Plan, stop line and result: [`specs/2026-10-22-milestone-m1.md`](specs/2026-10-22-milestone-m1.md) section 5.
+`main` = `93bb2a7`; the service `prowl-research.default` runs release `93bb2a78fd2a` (`ready`, `degraded: []`),
+smoke PASS. Checks on `main`: suite 722 passed, ruff clean, `validate` all runbooks valid, mutation check 70 of 70
+killed, contract check with a failed job PASS at `7a14a48`, dashboard WebKit PASS (25 checks).
+
+Done in M1 (PR #32 to #35): B-075 job error in `error.data.terminalCode`; B-077 dispatch follow-ups; B-079 kit 1.1.2;
+B-080 service events in `events.log`; smoke key per build and test servers off the installed log; B-066 dashboard
+readability (spend windows, attention only for now, failures in words first), B-078 coverage derived in Russian,
+B-076 seeded browser check; B-074 `{{output:<step>}}`. Briefs: `specs/waves/M1-A-*.md`, `M1-B-*.md`, `M1-C-*.md`.
+
+Open: B-081 job `pr-1125eff8d82f08e4895f` (`market-pulse`, LLM cap USD 0.50, tools USD 1.50 of the recorded
+wave-6 USD 15) waits for the operator's approval on the dashboard; when it ends, record its outcome on B-081.
+Rows filed in M1, none blocking a user: B-082, B-083, B-084, B-085, B-086. Owned elsewhere: B-001, B-017 person
+half, B-020, B-042, B-067, B-073, KA-G03, FD-13, FD-14.
+
+**Exact next task:** record B-081's outcome once the operator approves it; then stop: M2 starts from the
+operator's priority among the open rows (the milestone grants no work past M1).
+
 ## Current entry, 2026-10-22 midday: milestone M1 (supersedes every "Exact next task" below)
 
 Plan and stop line: [`specs/2026-10-22-milestone-m1.md`](specs/2026-10-22-milestone-m1.md). Review found `main` clean

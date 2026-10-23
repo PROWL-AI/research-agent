@@ -57,5 +57,14 @@ A finding that blocks nothing becomes a row, not more work.
 |---|---|---|
 | A | **closed** | PR #32 (`6e7da40`) and #33 (`04d9df4`); installed release `6e7da4031bc9`, smoke PASS (`pr-01cfe46d5b2d46dd0508`); seam pass, product fail on docs then fixed and rechecked; B-082 filed |
 | B | **closed** | PR #34 (`2a9d470`): scenarios first, build, product round, visual rounds 1 (fail on evidence) and 2 (pass); installed release `2a9d470d0173`, smoke PASS; B-083, B-084 filed |
-| C | closed (merge pending) | PR #35: `93b4c71` build, `760f32c` and `8c72d98` seam rounds 1 and 2, round 3 without a blocker; B-085, B-086 filed |
-| Close | not started | |
+| C | **closed** | PR #35 (`93bb2a7`): build, seam rounds 1 to 3 (the last without a blocker); B-085, B-086 filed |
+| Close | **reached, one human gate open** | installed release `93bb2a78fd2a` (`ready`, `degraded: []`), smoke PASS; suite 722, mutation 70 of 70; B-081 job `pr-1125eff8d82f08e4895f` (`market-pulse`, LLM cap USD 0.50, tools USD 1.50) waits for the operator's approval on the dashboard |
+
+## 5. Result (2026-10-23)
+
+M1 is reached by its stop criteria: every row of section 1 is closed with its PR (B-074, B-075, B-076, B-077, B-078,
+B-079, B-080, B-066) or carries a named human gate (B-081: the paid run's approval); `main` = `93bb2a7` is installed;
+the last reading of each wave found nothing blocking. Rows filed during the milestone, none blocking a user: B-082,
+B-083, B-084, B-085, B-086. Open and owned elsewhere: B-001, B-017 (person half), B-020, B-042, B-067, B-073,
+KA-G03, FD-13, FD-14. The next step is the operator's priority for M2, chosen from those rows; this file grants no
+work past it.
