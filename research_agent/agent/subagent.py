@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 from pydantic import BaseModel, Field
 
 from research_agent.agent import tool_limits
-from research_agent.agent.bindings import OUTPUT_CAP, output_refs, output_text, slug, substitute, template_text
+from research_agent.agent.bindings import OUTPUT_CAP, output_ref_count, output_refs, output_text, slug, substitute, template_text
 from research_agent.agent.orchestrator import PlanItem
 from research_agent.events import emit
 from research_agent.evidence import terminal
@@ -46,6 +46,7 @@ from research_agent.evidence.store import (
     DISPATCHING,
     FAILED,
     OUTCOME_UNKNOWN,
+    PENDING,
     RAW_SAVED,
     SETTLED_STATES,
     SKIPPED_BUDGET,
@@ -74,7 +75,7 @@ def _earlier_outputs(ctx: Any, checkpoint: Checkpoint, record: StepRecord) -> tu
     refs = output_refs(record.arguments)
     # One cap per step, shared by its references (B-085): the text lands in bound_arguments,
     # the checkpoint and the service's call journal.
-    share = OUTPUT_CAP // max(1, len(refs))
+    share = OUTPUT_CAP // max(1, output_ref_count(record.arguments))
     for name in refs:
         # A data step only (a transform note is the writer's), and one name only: two
         # different steps that read as the same reference leave it unresolved.
@@ -182,6 +183,11 @@ class WorkerContext:
     #: Tool calls this segment leaves for the later levels of its block: the steps that
     #: read an earlier output (B-086). Set by the lead per data segment.
     reserved_calls: int = 0
+    #: Step names the later levels read: their producers never yield to the reserve, and the
+    #: ones not yet sent are kept a call too.
+    reserved_for: frozenset[str] = frozenset()
+    #: The data segment now running (its producers are counted while still pending).
+    segment: list[StepRecord] = field(default_factory=list)
     #: A tool-budget stop the reserve brought forward: applied by the lead once the
     #: block's last level ran, so the reserved steps still get their calls.
     deferred_stop: str | None = None
@@ -419,8 +425,13 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
                                                 claims=claims))
             continue
 
-        if ctx.reserved_calls and ctx.budget is not None and \
-                len(checkpoint.tool_attempts()) + ctx.reserved_calls >= ctx.budget.max_tool_calls:
+        # An outcome_unknown step reuses its attempt (no new call) and must keep its key; a
+        # producer is what the reserved steps read: neither yields.
+        if ctx.reserved_calls and ctx.budget is not None and record.state != OUTCOME_UNKNOWN and \
+                slug(record.step) not in ctx.reserved_for and \
+                len(checkpoint.tool_attempts()) + ctx.reserved_calls + sum(
+                    1 for p in ctx.segment if p.state == PENDING and slug(p.step) in ctx.reserved_for
+                ) >= ctx.budget.max_tool_calls:
             # The calls left belong to the later levels (B-086): this step yields, the run goes on.
             reason = terminal.budget_stop_text(terminal.BUDGET_TOOLS, ctx.budget.max_tool_calls) + \
                 "; the last calls are kept for steps that read an earlier output"

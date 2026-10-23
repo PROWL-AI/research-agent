@@ -374,8 +374,9 @@ Rules:
 - To hand a whole earlier result to a later step (a scraped page to an analysis tool),
   write "{{output:<earlier step name in snake_case>}}" in the argument, e.g.
   "Analyse this page: {{output:scrape_clickup_homepage}}". That step's stored response
-  is sent in its place, cut at 16000 characters; a reference to a step that did not
-  complete is not sent. Never describe the output instead of referring to it.
+  is sent in its place, cut at 16000 characters (shared by all references of one step);
+  a reference to a step that did not complete is not sent. Never describe the output
+  instead of referring to it.
 - Prefer one batched tool call over per-item fan-out when the tool supports bulk
   input (e.g. dataforseo_bl_bulk_ranks takes multiple domains in one call).
 - Keep the total number of tool-call steps within the tool-call budget.
@@ -951,15 +952,20 @@ class Orchestrator:
 
             # The later levels of this block (steps that read an earlier output) keep one tool
             # call each; an unrelated step yields first under a tool budget (B-086).
-            later = 0
+            later, reserved_for = 0, set()
             for later_kind, later_items in segments[seg_index + 1:]:
                 if later_kind != "data":
                     break
-                later += len(later_items)
-            ctx.reserved_calls = later
+                # Only a step that will take a new call needs one kept: a re-send of an
+                # unknown outcome reuses its attempt, saved raw needs none.
+                later += sum(r.state not in (RAW_SAVED, OUTCOME_UNKNOWN) for r in later_items)
+                reserved_for |= {name for r in later_items for name in plan_bindings.output_refs(r.arguments)}
+            ctx.reserved_calls, ctx.reserved_for, ctx.segment = later, frozenset(reserved_for), items
             summaries = await run_data_segment(items, ctx, n_workers)
             if later == 0 and ctx.deferred_stop and checkpoint.stop_reason is None:
                 checkpoint.stop_reason = ctx.deferred_stop
+                emit(log, "budget.stop", logging.WARNING, run_id=checkpoint.run_id,
+                     reason=ctx.deferred_stop, spend_usd=checkpoint.spend_usd("tool"))
             if later == 0:
                 ctx.deferred_stop = None
             checkpoint.stats.setdefault("worker_segments", []).append(

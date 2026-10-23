@@ -224,7 +224,7 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
 - **A whole earlier result is a reference.** A step that needs an earlier step's whole output (a scraped page for an
   analysis tool) writes `{{output:<step name in snake_case>}}`; the stored raw artifact of the completed data step of
   that name (sha256-checked; JSON compact and without the server's billing and timing) is sent in its place, cut at
-  16 000 characters with a `[cut: N more characters]` marker (`bindings.OUTPUT_CAP`). The referencing step runs one level
+  16 000 characters per step, shared by its references, with a `[cut: N more characters]` marker (`bindings.OUTPUT_CAP`). The referencing step runs one level
   after the step it names while the other steps keep running beside the producer, and a name two steps share leaves
   it unresolved (`names two steps`). The reference is judged as the plan wrote it, so provider text inside the output is never
   taken for template text; a reference to a step that did not complete is not sent (B-074).
@@ -249,7 +249,8 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   (the catalog price, else the runbook's per-call share of `max_usd`, never zero);
   `stats.cost_source` says `server`, `mixed`, `estimate`, or `null` before any tool attempt.
   A step that reads an earlier step's whole output keeps one tool call: unrelated steps of its block yield it first
-  (`skipped_budget`, the reason says so), and the `budget_tools` stop lands after the block (B-086).
+  (`skipped_budget`, the reason says so), never its producer or a step whose outcome is unknown, and the
+  `budget_tools` stop lands after the block (B-086).
   The runbook budget caps **Prowl tool calls**; the agent's own LLM spend
   (planning, claim extraction, transforms, writing, repair, citation checks) is
   capped separately by **`max_llm_usd`**: `--max-llm-usd` / MCP `max_llm_usd`,

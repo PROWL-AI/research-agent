@@ -88,3 +88,58 @@ async def test_a_forwarding_step_keeps_its_call_under_a_tool_budget(tmp_path, pa
     assert len(prowl.tool_calls) <= 4
     assert (result.status, result.terminal_code) == ("partial", "budget_tools")
     assert "skipped_budget" in states.values()
+
+
+# ── seam round 1 on the tail ───────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("workers", [1, 3])
+async def test_the_reserve_never_skips_the_producer_of_a_later_level(tmp_path, patched_runbooks, workers, caplog):
+    from test_subagents import _write_runbook
+
+    _write_runbook(patched_runbooks, "tail-producer", 4, effort="lookup")
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "s0", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "c0.com"}},
+        {"step": "s3", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "c3.com"}},
+        {"step": "s4", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "c4.com"}},
+        {"step": "scrape page", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "a.com"}},
+        {"step": "analyse", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "A: {{output:scrape_page}}"}},
+    ]}
+    prowl = FakeProwl()
+    with caplog.at_level("WARNING"):
+        result = await Orchestrator(prowl, llm, runs_root=tmp_path / "runs", max_workers=workers).run(
+            "tail-producer", {"competitors": ["a.com"]}, run_id=f"p{workers}")
+    states = {s["step"]: s["state"] for s in json.loads((tmp_path / "runs" / f"p{workers}" / "checkpoint.json").read_text())["steps"]}
+    assert states["scrape page"] == "completed" and states["analyse"] == "completed"
+    assert len(prowl.tool_calls) == 4 and result.terminal_code == "budget_tools"
+    assert "event=budget.stop" in caplog.text
+
+
+async def test_the_reserve_never_skips_a_step_whose_outcome_is_unknown(tmp_path, patched_runbooks):
+    """Its next send must reuse its key: skipping it would mint a new one and could bill twice."""
+    from research_agent.evidence.store import AttemptRecord, Checkpoint, StepRecord, make_step_id
+    from test_subagents import _write_runbook
+
+    _write_runbook(patched_runbooks, "tail-unknown", 2, effort="lookup")
+    tool = "spyfu_get_domain_stats"
+    steps = [StepRecord(step_id=make_step_id(i, tool, a), raw_index=i, tool=tool, step=n, arguments=a)
+             for i, (n, a) in enumerate([("u", {"domain": "u.com"}), ("p", {"domain": "p.com"}),
+                                         ("f", {"domain": "F: {{output:p}}"})])]
+    steps[0].state = "outcome_unknown"
+    attempt = AttemptRecord(attempt_id=steps[0].step_id + "#1", step_id=steps[0].step_id, kind="tool", attempt_no=1,
+                            idempotency_key=f"r:{steps[0].step_id}:1", outcome="unknown")
+    steps[0].attempt_ids = [attempt.attempt_id]
+    store = ArtifactStore(tmp_path / "runs" / "r")
+    store.save_checkpoint(Checkpoint(run_id="r", runbook="tail-unknown", status="interrupted",
+                                     brief={"competitors": ["a.com"]}, steps=steps, attempts=[attempt]))
+    prowl = FakeProwl()
+    await Orchestrator(prowl, FakeLLM(), runs_root=tmp_path / "runs", max_workers=1).run("tail-unknown", {}, run_id="r")
+    keys = [c["idempotency_key"] for c in prowl.tool_calls]
+    assert f"r:{steps[0].step_id}:1" in keys
+    assert not any(k == f"r:{steps[0].step_id}:2" for k in keys)
+
+
+def test_one_reference_written_twice_still_shares_one_cap():
+    from research_agent.agent import bindings
+    assert bindings.output_ref_count({"q": "{{output:p}} vs {{output:p}}", "r": ["{{output:q}}"]}) == 3

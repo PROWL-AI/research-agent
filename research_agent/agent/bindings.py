@@ -63,6 +63,17 @@ def output_refs(value: Any) -> set[str]:
     return {m.group(1) for name in placeholders(value) if (m := _OUTPUT_RE.match(name))}
 
 
+def output_ref_count(value: Any) -> int:
+    """How many ``{{output:...}}`` occurrences a value holds: each one is filled, so each takes its share."""
+    if isinstance(value, str):
+        return sum(1 for m in _PLACEHOLDER_RE.finditer(value) if _OUTPUT_RE.match(m.group(1)))
+    if isinstance(value, dict):
+        return sum(output_ref_count(v) for v in value.values())
+    if isinstance(value, (list, tuple)):
+        return sum(output_ref_count(v) for v in value)
+    return 0
+
+
 def output_text(text: str, cap: int = OUTPUT_CAP) -> str:
     """An earlier step's raw artifact as sent: whole, or cut with the count it left out."""
     if len(text) <= cap:

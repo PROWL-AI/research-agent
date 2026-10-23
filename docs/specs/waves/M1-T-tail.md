@@ -18,6 +18,11 @@ filed, then stop again. Rows owned elsewhere and human acts stay out (milestone 
   tool call per such step: an unrelated step that would take one of them is `skipped_budget` with a reason saying so,
   and the run's `budget_tools` stop is applied after the block's last level, so the forwarding steps still run.
   Only `max_tool_calls` is reserved; `max_usd` and `max_minutes` stop as before.
+- **D6 (seam round 1 on the tail).** The reserve counts only later steps that take a new call (not a re-send of an
+  unknown outcome, not saved raw) plus the producers of the current segment still pending; a producer never yields,
+  and a step whose outcome is unknown never yields either (its next send must reuse its key). The deferred stop emits
+  `budget.stop` like every other budget stop. The 16 000-character cap is shared by every occurrence of a reference
+  in a step, and the planner is told so.
 
 ## REQ
 
@@ -27,4 +32,5 @@ filed, then stop again. Rows owned elsewhere and human acts stay out (milestone 
 | T-2 | usage covers 30 UTC days | `tests/test_service.py::test_usage_covers_the_same_30_utc_days_as_the_overview` |
 | T-3 | detail tabs wrap at 360 px | WebKit frame `failure-open-360-dark.png` |
 | T-4 | one cap per step | `test_several_output_references_share_one_cap_per_step` |
+| T-6 | the reserve skips neither a producer (placed last) nor an unknown-outcome step; `budget.stop` is emitted | `test_the_reserve_never_skips_the_producer_of_a_later_level`, `test_the_reserve_never_skips_a_step_whose_outcome_is_unknown`, `test_one_reference_written_twice_still_shares_one_cap` |
 | T-5 | a forwarding step keeps its call under a tool budget, at 1 and 3 workers, and the run still ends `budget_tools` | `test_a_forwarding_step_keeps_its_call_under_a_tool_budget` |
