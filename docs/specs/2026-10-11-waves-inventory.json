@@ -1365,12 +1365,12 @@
       "id": "B-084",
       "title": "Nav and detail tabs half-cut at 360 to 390 px",
       "source": "visual verification of M1-B, 2026-10-23",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-SVC",
       "blocked_by": [],
       "closable_in_one_pass": true,
-      "evidence": "nav half waits on the kit owner (board thread 288afbce); tabs wrap since PR #36",
+      "evidence": "closed: kit 1.1.3 (fabric-agent-adapter PR #171), check nav-no-cut-360-390, 2026-10-23",
       "wave": 4,
       "release": "this"
     },
@@ -1411,6 +1411,19 @@
       "closable_in_one_pass": true,
       "evidence": "subagent.py reserve check",
       "wave": 2,
+      "release": "this"
+    },
+    {
+      "id": "B-088",
+      "title": "Kit 1.1.3 Fabric button not loaded on the dashboard",
+      "source": "kit upgrade for B-084, 2026-10-23",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "needs the operator's decision and a scenario before loading fabric-button.js",
+      "wave": 4,
       "release": "this"
     }
   ]

@@ -52,6 +52,13 @@ Code commit **198a227** (fix round after the three blind certifications of `77a0
 | Visual reading | fail on evidence only (no surface class, no frames of the failure and research-coverage states), fixed in `5023b06`; frames in [m1-wave-b/](raw/m1-wave-b/) | `docs/specs/waves/M1-B-dashboard-readability.md` D9 |
 | Visual reading, round 2 | pass (both blocking findings closed; the `≥` note now shows only when a window carries it, the tool-coverage frame committed) | frames in [m1-wave-b/](raw/m1-wave-b/) |
 
+### Kit 1.1.3: section nav at narrow widths (2026-10-23, B-084)
+
+| Gate | Result | Evidence |
+|---|---|---|
+| WebKit, 1440/390/360, plus every section current at 360 and 390 px | PASS, 26 checks, no page errors | [receipt](raw/webkit-kit-1.1.3.json); frames [nav-360](raw/b084-kit-1.1.3/nav-360.png), [nav-390](raw/b084-kit-1.1.3/nav-390.png) |
+| Same check on kit 1.1.2 files | FAIL, `nav cut at 390px on overview` (the defect the row names) | run with the 1.1.2 copies restored, before this change |
+
 ## Corrections discovered during verification
 
 - Browser navigation initially rendered a form before its pending refresh completed, which erased a typed model. Navigation now presents a loading state until that refresh finishes; the WebKit dirty-settings regression passes.
