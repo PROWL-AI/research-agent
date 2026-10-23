@@ -12,8 +12,17 @@ that will be sent plus one consumer; `_send_judgement` is shared by the reserve 
 readings, the second without a finding of its own; installed `db1343cf8c50` (`ready`, `degraded: []`), smoke PASS
 (`pr-01bf48dc1ecb161ea0b1`); suite 743, mutation 79 of 79. Rows filed from round 2: B-089, B-090 (not blocking).
 
-**Exact next task:** B-089 and B-090 as one unit (same reserve check, `research_agent/agent/subagent.py`), at most two
-seam readings, new non-blocking findings become rows and the unit stops; B-081 when the operator is at the dashboard.
+B-089 and B-090 closed in PR #39 (`1873b12`): producers are judged only inside the reserve window, a judgement that
+raises counts as sent, and nothing yields once `stop_reason` is set. Seam reading pass, no regression; installed
+`1873b1206287` (`ready`, `degraded: []`), smoke PASS (`pr-94ff3068c084d6a8526d`); suite 746, mutation 82 of 82. Rows
+filed: B-091 (a worker crash unseen by peers until the segment ends), B-092 (peers dispatch after a `stops_run`
+refusal, older than B-090); neither blocks, both have resume as recovery.
+
+Decision (2026-10-23): this path stops here. Each reading of the reserve check now finds narrower edge cases with
+diminishing value, and the operator asked for an energy-saving mode with a stop line.
+
+**Exact next task:** B-081 when the operator says they are at the dashboard; B-091, B-092 and B-088 when the operator
+gives them priority.
 
 ## Current entry, 2026-10-23 morning: M1 tail done (supersedes every "Exact next task" below)
 
