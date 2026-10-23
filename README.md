@@ -252,7 +252,7 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   (`skipped_budget`, the reason says so), never its producer or a step whose outcome is unknown, and the
   `budget_tools` stop lands after the block (B-086). They yield only while the calls left still reach one such
   step after its pending producers (a producer that will not be sent is not counted); with fewer, plan order
-  stands (B-087).
+  stands (B-087), and nothing yields once another worker has stopped the run (B-090).
   The runbook budget caps **Prowl tool calls**; the agent's own LLM spend
   (planning, claim extraction, transforms, writing, repair, citation checks) is
   capped separately by **`max_llm_usd`**: `--max-llm-usd` / MCP `max_llm_usd`,

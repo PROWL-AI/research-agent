@@ -282,3 +282,61 @@ async def test_a_producer_that_will_not_be_sent_takes_no_call_from_the_reserve(t
     assert steps["x"]["state"] == "skipped_budget"
     assert steps["p2"]["state"] == "failed" and "not sent" in (steps["p2"].get("error") or steps["p2"].get("note") or json.dumps(steps["p2"]))
     assert len(prowl.tool_calls) == 2
+
+
+# ── B-089 and B-090: the reserve check's cost, reach and stop ──────────────
+
+
+async def test_the_reserve_check_judges_no_producer_above_its_window(tmp_path, patched_runbooks, monkeypatch):
+    """B-089: with calls to spare, no yield is possible, so no producer is judged (each judgement
+    reads the artifacts the producer forwards): one judgement per dispatch, no more."""
+    from research_agent.agent import subagent
+    from test_subagents import _write_runbook
+
+    calls = []
+    real = subagent._send_judgement
+    monkeypatch.setattr(subagent, "_send_judgement", lambda ctx, cp, rec: calls.append(rec.step) or real(ctx, cp, rec))
+    _write_runbook(patched_runbooks, "tail-window", 10, effort="lookup")
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "x1", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "x1.com"}},
+        {"step": "x2", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "x2.com"}},
+        {"step": "p", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "p.com"}},
+        {"step": "c", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "C: {{output:p}}"}},
+    ]}
+    prowl = FakeProwl()
+    await Orchestrator(prowl, llm, runs_root=tmp_path / "runs").run("tail-window", {"competitors": ["a.com"]}, run_id="w")
+    assert len(prowl.tool_calls) == 4 and sorted(calls) == ["c", "p", "x1", "x2"]
+
+
+def test_a_failing_producer_judgement_counts_as_sent(monkeypatch):
+    """B-089: one producer's unreadable artifact stays its own failure, never an unrelated step's."""
+    from research_agent.agent import subagent
+
+    def boom(*_):
+        raise RuntimeError("unreadable raw")
+
+    monkeypatch.setattr(subagent, "_send_judgement", boom)
+    assert subagent._will_be_sent(None, None, None) is True
+
+
+async def test_no_step_yields_once_another_worker_stopped_the_run(tmp_path, patched_runbooks):
+    """B-090: after a hard failure the lead runs no later level, so a call kept for one is lost data."""
+    from test_subagents import _write_runbook
+
+    _write_runbook(patched_runbooks, "tail-stopped", 3, effort="lookup")
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "h", "tool": "dataforseo_bl_summary", "arguments": {"target": "h.com"}},
+        {"step": "p", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "p.com"}},
+        {"step": "x1", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "x1.com"}},
+        {"step": "x2", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "x2.com"}},
+        {"step": "c", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "C: {{output:p}}"}},
+    ]}
+    prowl = FakeProwl()
+    prowl.fail_on = {"dataforseo_bl_summary"}
+    prowl.fail_stops_run = True
+    await Orchestrator(prowl, llm, runs_root=tmp_path / "runs", max_workers=2).run(
+        "tail-stopped", {"competitors": ["a.com"]}, run_id="hs")
+    steps = json.loads((tmp_path / "runs" / "hs" / "checkpoint.json").read_text())["steps"]
+    assert not [s["step"] for s in steps if "kept for steps that read" in json.dumps(s)]
