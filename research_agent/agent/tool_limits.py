@@ -26,8 +26,10 @@ class ArgumentLimit:
     source: str
     #: What a result of this tool covers, as an instruction to the writer (it never sees step arguments).
     coverage: str = ""
-    #: The same fact for a person or a caller: the dashboard and a direct result's envelope.
+    #: The same fact for a person or a caller: a direct result's envelope and the reports.
     statement: str = ""
+    #: The statement in the dashboard's language (B-078); the API keeps `statement`.
+    statement_ru: str = ""
 
 
 #: SearchApi "TikTok Ads Library Countries" (docs/parameters/tiktok-ads-library/country,
@@ -52,6 +54,8 @@ LIMITS: dict[str, dict[str, ArgumentLimit]] = {
                       "TikTok\" for any other market."),
             statement=("TikTok Ads Library: ads shown in European markets only (EU/EEA, UK, CH, TR); "
                        "an empty result says nothing about any other market."),
+            statement_ru=("TikTok Ads Library: только реклама, показанная в Европе (ЕС/ЕЭЗ, Великобритания, "
+                          "Швейцария, Турция); пустой результат ничего не говорит о других рынках."),
         ),
     },
 }
@@ -92,6 +96,14 @@ def statements(tools: Iterable[str]) -> list[str]:
     out: list[str] = []
     for tool in dict.fromkeys(tools):
         out.extend(limit.statement for limit in LIMITS.get(tool, {}).values() if limit.statement)
+    return out
+
+
+def statements_ru(tools: Iterable[str]) -> list[str]:
+    """The same facts as `statements`, in the dashboard's language."""
+    out: list[str] = []
+    for tool in dict.fromkeys(tools):
+        out.extend(limit.statement_ru for limit in LIMITS.get(tool, {}).values() if limit.statement_ru)
     return out
 
 

@@ -1,12 +1,14 @@
 # Prowl Research — dashboard specification
 
+surface_class: internal (a signed-in operator console of a loopback service, opened through Fabric Dashboards; no logged-out reader, no public route).
+
 Design route: super-ux → sheleg-design / copywriting → task-pipeline. Product register, Editorial Luxury inherited from Prowl. Dials: variance 4 (recognisable brand), motion 2 (only paint transitions), density 7 (operator journal). No decorative motion, gradients or fabricated counters.
 
 ## Information architecture
 
 | Surface | Question | Primary content/action |
 |---|---|---|
-| Обзор | Что требует внимания сейчас? | Waiting/working/failed, latest requests, health and last refresh |
+| Обзор | Что требует внимания сейчас? | Waiting/working/failed counts; spend today, 7 and 30 days and per delivered report (M1-B); «Требуют внимания» holds pending decisions and failures of the last 3 days only, tutorials excluded, older failures folded into one counted line to the filtered list; latest requests, health and last refresh |
 | Запросы | Что агенту поручили? | Search + state filter + real/tutorial filter; runbook/tool, requester, chain, date, price |
 | Детали | Что произошло и чему доверять? | Input and config snapshot, ordered calls with duration/status/cost, readable data table, report text, sources/ledger, raw JSON, cancellation/decision |
 | Цепочки | Где используется результат? | Group by caller-declared chain; project/node/parent/trace. Explicit no verified binding claim |
@@ -22,7 +24,7 @@ Signature: a readable research dossier: compact request rows followed by an orde
 
 ## State contract
 
-Loading: heading and explicit loading line; no invented metrics. Empty: explain how a request arrives and offer tutorial/new request. Failed panel: keep other sections and retry. Offline: retain last successful snapshot, timestamp and error. Unknown price: “неизвестно”, partial subtotal “≥”. Approval: input, models, timeout, exact proposal digest/expiry; reject does not dispatch. Cancel: state clearly that completed upstream charges are not undone. Expired/stale: refuse, keep evidence, request a new job. Tutorial: persistent label, explicit filter, never real spend. Settings: dirty edits survive polling; diff before save; stale revision refuses save. Long/raw results bounded with artifact retrieval, never injected as HTML.
+Loading: heading and explicit loading line; no invented metrics. Empty: explain how a request arrives and offer tutorial/new request. Failed panel: keep other sections and retry. Offline: retain last successful snapshot, timestamp and error. Unknown price: “неизвестно”, partial subtotal “≥”. A failed request leads with what happened and the next step by error code; the raw message, code and run terminal code sit under «Подробности» (M1-B). Source coverage («Охват источника») is derived from the tools a job used, in Russian, on the data and sources tabs of tool and research jobs (B-078). Approval: input, models, timeout, exact proposal digest/expiry; reject does not dispatch. Cancel: state clearly that completed upstream charges are not undone. Expired/stale: refuse, keep evidence, request a new job. Tutorial: persistent label, explicit filter, never real spend. Settings: dirty edits survive polling; diff before save; stale revision refuses save. Long/raw results bounded with artifact retrieval, never injected as HTML.
 
 ## Trust and limits
 
