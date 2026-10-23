@@ -144,6 +144,12 @@ MUTANTS = [
      "share = OUTPUT_CAP", ["tests/test_m1_tail.py"]),
     ("forwarding-step-keeps-its-call", "research_agent/agent/orchestrator.py", "            ctx.reserved_calls, ctx.reserved_for, ctx.segment = later, frozenset(reserved_for), items\n",
      "            ctx.reserved_calls, ctx.reserved_for, ctx.segment = 0, frozenset(reserved_for), items\n", ["tests/test_m1_tail.py"]),
+    ("reserve-gives-back", "research_agent/agent/orchestrator.py",
+     "                    summaries += await run_data_segment(yielded, ctx, n_workers)\n", "                    pass\n",
+     ["tests/test_m1_tail.py"]),
+    ("output-cap-counts-occurrences", "research_agent/agent/subagent.py",
+     "share = OUTPUT_CAP // max(1, output_ref_count(record.arguments))", "share = OUTPUT_CAP // max(1, len(refs))",
+     ["tests/test_m1_tail.py"]),
     ("service-events-in-file-log", "research_agent/service/store.py",
      "        emit(log, kind, _LOG_LEVELS.get(level, logging.INFO), **fields)\n", "", ["tests/test_service_parity.py"]),
 ]

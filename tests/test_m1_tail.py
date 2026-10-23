@@ -143,3 +143,69 @@ async def test_the_reserve_never_skips_a_step_whose_outcome_is_unknown(tmp_path,
 def test_one_reference_written_twice_still_shares_one_cap():
     from research_agent.agent import bindings
     assert bindings.output_ref_count({"q": "{{output:p}} vs {{output:p}}", "r": ["{{output:q}}"]}) == 3
+
+
+# ── seam round 2 on the tail: calls a reserve kept but nobody used go back ─
+
+
+def _producer_plan():
+    return {"plan": [
+        {"step": "s0", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "c0.com"}},
+        {"step": "s3", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "c3.com"}},
+        {"step": "s4", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "c4.com"}},
+        {"step": "scrape page", "tool": "dataforseo_bl_summary", "arguments": {"target": "a.com"}},
+        {"step": "analyse", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "A: {{output:scrape_page}}"}},
+    ]}
+
+
+async def _run_producer_case(tmp_path, patched_runbooks, prowl, run_id, workers):
+    from test_subagents import _write_runbook
+
+    _write_runbook(patched_runbooks, "tail-give-back", 4, effort="lookup")
+    llm = FakeLLM()
+    llm.plan_payload = _producer_plan()
+    result = await Orchestrator(prowl, llm, runs_root=tmp_path / "runs", max_workers=workers).run(
+        "tail-give-back", {"competitors": ["a.com"]}, run_id=run_id)
+    states = {s["step"]: s["state"] for s in json.loads((tmp_path / "runs" / run_id / "checkpoint.json").read_text())["steps"]}
+    return result, states
+
+
+@pytest.mark.parametrize("workers", [1, 3])
+async def test_a_call_kept_for_a_refused_producer_goes_back(tmp_path, patched_runbooks, workers):
+    prowl = FakeProwl()
+    prowl.fail_on.add("dataforseo_bl_summary")
+    result, states = await _run_producer_case(tmp_path, patched_runbooks, prowl, f"refused{workers}", workers)
+    assert states["s4"] == "completed" and len(prowl.tool_calls) == 4
+
+
+@pytest.mark.parametrize("workers", [1, 3])
+async def test_a_call_kept_for_an_unsent_producer_goes_back_and_the_run_names_the_real_cause(
+        tmp_path, patched_runbooks, workers, monkeypatch):
+    limit = tool_limits.ArgumentLimit(allowed=frozenset({"x.com"}), note="test", source="test")
+    monkeypatch.setitem(tool_limits.LIMITS, "dataforseo_bl_summary", {"target": limit})
+    prowl = FakeProwl()
+    result, states = await _run_producer_case(tmp_path, patched_runbooks, prowl, f"unsent{workers}", workers)
+    assert states["s4"] == "completed" and states["scrape page"] == "failed"
+    assert result.terminal_code != "budget_tools"
+
+
+async def test_a_reference_written_twice_shares_the_cap_through_the_dispatch(tmp_path, patched_runbooks):
+    from research_agent.agent import bindings
+    from test_subagents import _write_runbook
+
+    class BigProwl(FakeProwl):
+        async def call_tool(self, name, arguments, idempotency_key=None):
+            self.tool_calls.append({"name": name, "arguments": arguments, "idempotency_key": idempotency_key})
+            self.call_log.append(object())
+            return {"markdown": "x" * 20_000}
+
+    _write_runbook(patched_runbooks, "tail-twice", 60, effort="lookup")
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "p1", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "a.com"}},
+        {"step": "twice", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "{{output:p1}} vs {{output:p1}}"}},
+    ]}
+    prowl = BigProwl()
+    await Orchestrator(prowl, llm, runs_root=tmp_path / "runs").run("tail-twice", {"competitors": ["a.com"]}, run_id="twice")
+    sent = prowl.tool_calls[-1]["arguments"]["domain"]
+    assert len(sent) < bindings.OUTPUT_CAP + 200

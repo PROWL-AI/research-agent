@@ -24,6 +24,11 @@ filed, then stop again. Rows owned elsewhere and human acts stay out (milestone 
   `budget.stop` like every other budget stop. The 16 000-character cap is shared by every occurrence of a reference
   in a step, and the planner is told so.
 
+- **D7 (seam round 2 on the tail).** After the block's last level, calls a reserve kept but nobody used (a producer
+  refused or not sent) go back: the steps that yielded run through the ordinary budget check, and the deferred
+  `budget_tools` stop is applied only when one of them still could not run, so the run ends on what actually limited
+  it. The deferred stop keys on the block's last level, not on the count of calls kept.
+
 ## REQ
 
 | REQ | Requirement | Verified by |
@@ -33,4 +38,5 @@ filed, then stop again. Rows owned elsewhere and human acts stay out (milestone 
 | T-3 | detail tabs wrap at 360 px | WebKit frame `failure-open-360-dark.png` |
 | T-4 | one cap per step | `test_several_output_references_share_one_cap_per_step` |
 | T-6 | the reserve skips neither a producer (placed last) nor an unknown-outcome step; `budget.stop` is emitted | `test_the_reserve_never_skips_the_producer_of_a_later_level`, `test_the_reserve_never_skips_a_step_whose_outcome_is_unknown`, `test_one_reference_written_twice_still_shares_one_cap` |
+| T-7 | a call kept for a refused or unsent producer goes back; the terminal code names the real cause; one reference written twice shares the cap | `test_a_call_kept_for_a_refused_producer_goes_back`, `test_a_call_kept_for_an_unsent_producer_goes_back_and_the_run_names_the_real_cause`, `test_a_reference_written_twice_shares_the_cap_through_the_dispatch`; mutants `reserve-gives-back`, `output-cap-counts-occurrences` |
 | T-5 | a forwarding step keeps its call under a tool budget, at 1 and 3 workers, and the run still ends `budget_tools` | `test_a_forwarding_step_keeps_its_call_under_a_tool_budget` |
