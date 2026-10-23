@@ -79,7 +79,7 @@ try{
  assert(await page.getByRole('heading',{name:'Исследования, на виду.'}).isVisible());
  assert.deepEqual(errors,[]);
  await readability(browser);
- console.log(JSON.stringify({browser:'Playwright WebKit',viewports:['1440x1000','390x844','360x740'],evidence,checks:['empty','status-chip','russian-kit-labels','verified-initiator','scroll-box-prepared','requests-360-no-overflow','approval','tutorial','steps','table','report','fixture-spend-exclusion','chains','dirty-settings','settings-diff','search-empty','mobile-no-overflow','offline-keeps-snapshot','spend-windows','per-report','attention-now-only','older-failures-folded','failure-words-first','coverage-research','coverage-tool'],pageErrors:errors,status:'PASS'}));
+ console.log(JSON.stringify({browser:'Playwright WebKit',viewports:['1440x1000','390x844','360x740'],evidence,checks:['empty','status-chip','russian-kit-labels','verified-initiator','scroll-box-prepared','requests-360-no-overflow','approval','tutorial','steps','table','report','fixture-spend-exclusion','chains','dirty-settings','settings-diff','search-empty','mobile-no-overflow','offline-keeps-snapshot','spend-windows','per-report','attention-now-only','older-failures-folded','failure-words-first','coverage-research','coverage-tool','nav-no-cut-360-390'],pageErrors:errors,status:'PASS'}));
 }catch(e){console.error(e);throw e;}finally{
  if(browser)await browser.close();
  child.kill('SIGTERM');
@@ -153,6 +153,18 @@ async function readability(browser){
   await page.getByRole('heading',{name:'Исследования, на виду.'}).waitFor();
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'readability 360 overflow');
   await page.screenshot({path:evidence+'/overview-readability-360.png',fullPage:true});
+  // B-084: at 360 and 390 px, whatever section is current, no visible nav link sticks out of the list
+  // (kit 1.1.2 left a half-cut «Цепо» beside «Ещё»; 1.1.3 folds it).
+  for(const width of [360,390]){
+   await page.setViewportSize({width,height:740});
+   for(const section of ['overview','requests','chains','costs','learn','settings']){
+    await page.goto(base+'/dashboard#/'+section);await page.waitForTimeout(200);
+    const cut=await page.evaluate(()=>{const list=document.querySelector('.fd-nav-list');if(!list)return['no nav list'];const edge=list.getBoundingClientRect().right+0.5;
+     return [...list.querySelectorAll('a')].filter(a=>{const r=a.getBoundingClientRect();return r.width>0&&getComputedStyle(a).visibility!=='hidden'&&r.right>edge;}).map(a=>a.textContent.trim());});
+    assert.deepEqual(cut,[],`nav cut at ${width}px on ${section}`);
+   }
+   await page.screenshot({path:evidence+`/nav-${width}.png`});
+  }
   assert.deepEqual(errors,[]);
  }finally{
   server.kill('SIGTERM');await new Promise(r=>{server.once('exit',r);setTimeout(r,11000).unref();});

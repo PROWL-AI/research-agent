@@ -172,12 +172,12 @@
 - **Preconditions:** Панель открыта; ширина окна от 360 px.
 - **Steps:**
   1. Прочитать состояние сервиса в шапке; сменить тему и цветовую схему; открыть разделы, в том числе через «Ещё» на узком экране; пролистать широкую таблицу.
-- **Expected result:** Чип в шапке называет состояние сервиса («Работает», «Работает с ограничениями», «Останавливается»), подсказка — причины ограничений. Тема и схема выбираются по-русски и запоминаются набором Fabric Dashboards; внутри хоста Fabric Dashboards их задаёт хост. На 360 px страница не прокручивается вбок; не поместившиеся разделы уходят в «Ещё»; широкая таблица прокручивается внутри своей рамки и помечена, когда не помещается.
+- **Expected result:** Чип в шапке называет состояние сервиса («Работает», «Работает с ограничениями», «Останавливается»), подсказка — причины ограничений. Тема и схема выбираются по-русски и запоминаются набором Fabric Dashboards; внутри хоста Fabric Dashboards их задаёт хост. На 360 px страница не прокручивается вбок; не поместившиеся разделы уходят в «Ещё», и на 360 и 390 px ни одна видимая ссылка навигации не обрезана, какой бы раздел ни был текущим; широкая таблица прокручивается внутри своей рамки и помечена, когда не помещается.
 - **Acceptance criteria:** Состояние, подписи и прокрутка как выше; без ошибок страницы; доказательства записываются в verification.
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Нет связи — чип и снимок остаются, свежесть говорит «Нет свежих данных».
 - **UI elements:** Чип состояния, выбор темы и схемы, навигация с «Ещё», рамка прокрутки таблицы.
-- **Coverage:** scripts/test-dashboard.mjs (checks status-chip, russian-kit-labels, scroll-box-prepared, requests-360-no-overflow) — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs (checks status-chip, russian-kit-labels, scroll-box-prepared, requests-360-no-overflow) — observed at 198a227; nav-no-cut-360-390 on kit 1.1.3 (B-084); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Все
 
 ## Core agent scenarios (CORE)

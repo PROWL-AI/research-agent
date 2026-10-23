@@ -36,7 +36,7 @@ def code_digest():
 #: The dashboard's declaration (ED-9, DEC-0036): the kit it ships and the
 #: estate themes the host may apply.
 DASHBOARD_EXTENSION = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
-DASHBOARD_KIT = "fabric-dashboard-kit@1.1.2"
+DASHBOARD_KIT = "fabric-dashboard-kit@1.1.3"
 DASHBOARD_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
 
 
