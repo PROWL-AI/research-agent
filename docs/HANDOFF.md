@@ -1,5 +1,17 @@
 # Research-agent handoff
 
+## Current entry, 2026-10-23 afternoon: B-084 closed on kit 1.1.3 (supersedes every "Exact next task" below)
+
+The kit owner fixed the nav fold (fabric-agent-adapter PR #171, thread `288afbce`). PR #37 (`1b74778`) re-vendors
+`fabric-dashboard-kit@1.1.3` and adds the WebKit check `nav-no-cut-360-390` (red on 1.1.2, green on 1.1.3). Installed
+release `1b747787c767` (`ready`, `degraded: []`), smoke PASS (`pr-57cc070fc37013c2cdbe`); suite 737, mutation 76 of 76.
+The kit's new `fabric-button.js` is not loaded: B-088 (needs the operator's decision and a scenario first).
+
+Open and ours: B-087 (reserve yields when the calls left cannot cover it), taken next. B-081 still waits for the
+operator to be at the dashboard (see the entry below).
+
+**Exact next task:** B-087 in `research_agent/agent/subagent.py`, then record B-081's outcome when the operator runs it.
+
 ## Current entry, 2026-10-23 morning: M1 tail done (supersedes every "Exact next task" below)
 
 After «доделай» the rows M1 filed and this agent owns were closed in PR #36 (`843fdb8`): B-082 (v1 legacy-key resend

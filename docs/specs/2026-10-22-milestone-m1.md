@@ -77,3 +77,5 @@ blocker; B-087 filed. The nav half of B-084 waits on the kit owner (board thread
 expired unapproved (an approval is valid one hour) and was cancelled; the second, `pr-dd318bd6388795ffb26e`, waits for
 the operator's approval until 2026-10-23 08:05 UTC. Nothing else in this repository's backlog is ours to do without
 an outside owner or a person's act.
+
+B-084's nav half closed on kit 1.1.3 in PR #37 (`1b74778`), installed `1b747787c767`, smoke PASS; B-088 filed.
