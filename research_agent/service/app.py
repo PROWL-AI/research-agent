@@ -44,13 +44,15 @@ DASHBOARD_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "
 def display(store, job):
     """What the dashboard shows that the stored job does not carry in its language:
     the coverage of every limited tool the job used, derived now so a job stored
-    before B-078 shows it too (a tool job: its tool; research: its completed steps)."""
+    before B-078 shows it too (a tool job: its completed calls; research: its
+    completed steps). It follows today's limits table, not the one of the call."""
     if job is None:
         return {"coverage": []}
     request = job.get("request") or {}
     tools = []
     if request.get("kind") == "tool":
-        tools = [request.get("tool", "")]
+        # Only a call that ran: a pending, rejected or refused job sent nothing.
+        tools = [c["name"] for c in store.calls(job["id"]) if c["kind"] == "tool" and c["status"] == "completed"]
     elif request.get("kind") == "research":
         try:
             checkpoint = ArtifactStore(store.root / "runs" / run_dir_name(job)).load_checkpoint()

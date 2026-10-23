@@ -394,6 +394,9 @@ async def test_dashboard_coverage_is_derived_for_a_tool_job_in_russian(app):
     """B-078: the callout comes from the tools a job used, in the dashboard's language."""
     store = app.state.runtime.store
     job = store.create({"kind": "tool", "tool": "tiktok_ads_library", "params": {"country": "all"}}, "cov-tool")[0]
+    # Nothing sent yet: no coverage claim.
+    assert (await _job_detail(app, job["id"]))["display"]["coverage"] == []
+    store.finish_call(store.start_call(job["id"], "tool", "tiktok_ads_library", {"country": "all"}), status="completed")
     body = await _job_detail(app, job["id"])
     assert body["display"]["coverage"] == [
         "TikTok Ads Library: только реклама, показанная в Европе (ЕС/ЕЭЗ, Великобритания, Швейцария, Турция); "

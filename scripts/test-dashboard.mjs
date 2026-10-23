@@ -103,7 +103,7 @@ async function readability(browser){
   await page.goto(base+login.url);await page.getByRole('heading',{name:'Исследования, на виду.'}).waitFor();
   // Spend: three windows and the cost of one report, a lower bound because one call is unpriced.
   const spend=page.locator('[aria-label="Расходы"]');
-  await spend.getByText('Расходы · Сегодня').waitFor();
+  await spend.getByText('Расходы · Сегодня (UTC)').waitFor();
   assert.equal(await spend.locator('.metric').nth(0).locator('strong').textContent(),'≥ $0.1500');
   assert.match(await spend.locator('.metric').nth(0).locator('small').textContent(),/3 вызова, 1 без цены/);
   assert.equal(await spend.locator('.metric').nth(3).locator('strong').textContent(),'≥ $0.1500');
@@ -125,6 +125,7 @@ async function readability(browser){
   assert(!(await page.getByText('Wall-clock timeout reached.').isVisible()),'raw text shown before the toggle');
   await page.getByText('Подробности',{exact:true}).click();
   await page.getByText('прогон: cancelled').waitFor();
+  await page.getByText('продолжение через research.run с resumeJobId',{exact:false}).waitFor();
   // Coverage, in Russian, on a research job and on a tool job.
   for(const kind of ['research','tool']){
    await open(j=>j.request.kind===kind&&j.status==='completed');
