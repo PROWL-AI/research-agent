@@ -35,6 +35,11 @@ Contradictions: none.
   step can be referenced, and two different steps whose names read as the same reference leave it unresolved. The
   extractor reads a forwarding step's planned arguments, so a URL inside the forwarded page is not request
   provenance. Filed: B-085 (the cap is per reference, not per step).
+- **D7 (seam round 2).** The wait is per dependency, not per segment: between two transforms, a step runs one level
+  after the steps it references and every other step stays at level 0 beside the producer, so an unrelated hard
+  failure in a later level strands nothing. An ambiguous name gets its own reason (`names two steps (...)`). The
+  extractor sees a forwarding step's plan with the bound `{{name}}` values filled and the output references left as
+  written.
 - **D5.** Out of scope: picking a field out of the artifact (the whole raw is sent) and a per-tool cap.
 
 ## REQ
@@ -47,4 +52,5 @@ Contradictions: none.
 | C-4 | A reference to a step that did not complete is never sent | `test_a_reference_to_no_completed_step_is_never_sent` |
 | C-5 | The planner is told the syntax and the cap | `test_the_planner_is_told_how_to_hand_over_an_output` |
 | C-7 | The referencing step waits at 1, 3 and 5 workers; no billing or timing is forwarded; ambiguous and transform references are not sent | `test_a_referencing_step_waits_for_the_step_it_names`, `test_the_forwarded_output_carries_no_billing_or_timing`, `test_an_ambiguous_or_transform_reference_is_not_sent`; mutants `output-waits-for-its-step`, `output-strips-billing` |
+| C-8 | Only referencing steps wait; an unrelated failure strands nothing; the ambiguity reason names the steps; the extractor keeps bound values | `test_only_the_referencing_steps_wait_and_unrelated_steps_stay_with_the_producer`, `test_an_unrelated_hard_failure_does_not_strand_the_other_steps`, `test_an_ambiguous_reference_names_the_steps_it_could_mean`, `test_the_extractor_sees_bound_values_but_not_the_forwarded_page` |
 | C-6 | Docs true | README, `docs/runbook-authoring.md`, CORE-18 |

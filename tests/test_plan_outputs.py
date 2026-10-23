@@ -66,15 +66,16 @@ async def test_an_earlier_output_is_sent_in_place_of_the_reference(lookup_runboo
     await Orchestrator(prowl, llm, runs_root=runs).run("bind-lookup", BRIEF, run_id="out")
 
     sent = [c["arguments"]["domain"] for c in prowl.tool_calls]
-    assert sent[0] == "a.com" and sent[2] == "b.com"
+    assert sent[0] == "a.com" and "b.com" in sent
+    analysis = next(d for d in sent if d.startswith("Analyse this page: "))
     checkpoint = _checkpoint(runs, "out")
     scrape = _step(checkpoint, "scrape page")
     raw = json.loads((runs / "out" / scrape["raw_ref"]).read_text())
-    assert sent[1] == "Analyse this page: " + json.dumps(raw, ensure_ascii=False, separators=(",", ":"))
+    assert analysis == "Analyse this page: " + json.dumps(raw, ensure_ascii=False, separators=(",", ":"))
     analyse = _step(checkpoint, "analyse")
     assert analyse["state"] == "completed"
     assert analyse["arguments"]["domain"].endswith("{{output:scrape_page}}")  # the plan as written
-    assert analyse["bound_arguments"] == {"domain": sent[1]}  # the arguments as sent
+    assert analyse["bound_arguments"] == {"domain": analysis}  # the arguments as sent
 
 
 @pytest.mark.parametrize("optional, state", [(True, "skipped_on_error"), (False, "failed")])
@@ -113,7 +114,7 @@ async def test_provider_text_inside_an_output_is_not_judged_as_template_text(loo
     llm.plan_payload = _plan()
     await Orchestrator(prowl, llm, runs_root=runs).run("bind-lookup", BRIEF, run_id="page")
 
-    sent = prowl.tool_calls[1]["arguments"]["domain"]
+    sent = next(c["arguments"]["domain"] for c in prowl.tool_calls if c["arguments"]["domain"].startswith("Analyse"))
     assert "[insert your team size here]" in sent  # sent, not refused as template text
     assert sent.endswith("more characters]") and len(sent) < bindings.OUTPUT_CAP + 100
     assert _step(_checkpoint(runs, "page"), "analyse")["state"] == "completed"
@@ -186,3 +187,58 @@ async def test_an_ambiguous_or_transform_reference_is_not_sent(lookup_runbook, t
     for name in ("analyse", "analyse notes"):
         record = _step(checkpoint, name)
         assert record["state"] == "skipped_on_error" and record["attempt_ids"] == []
+
+
+# ── seam round 2 ───────────────────────────────────────────────────────────
+
+
+def test_only_the_referencing_steps_wait_and_unrelated_steps_stay_with_the_producer():
+    from research_agent.agent.subagent import split_segments
+    from research_agent.evidence.store import StepRecord
+
+    def rec(i, name, arg="x.com"):
+        return StepRecord(step_id=f"s-{i}", raw_index=i, tool=TOOL, step=name, arguments={"domain": arg})
+    steps = [rec(0, "s0"), rec(1, "scrape page"), rec(2, "analyse", "{{output:scrape_page}}"),
+             rec(3, "s3"), rec(4, "deeper", "{{output:analyse}}"), rec(5, "s5")]
+    assert [[r.step for r in seg] for _, seg in split_segments(steps)] == [
+        ["s0", "scrape page", "s3", "s5"], ["analyse"], ["deeper"]]
+
+
+class FailFirstProwl(SlowProwl):
+    async def call_tool(self, name, arguments, idempotency_key=None):
+        if arguments.get("domain") == "c0.com":
+            from research_agent.prowl_client import DispatchOutcomeUnknown
+            raise DispatchOutcomeUnknown("transport reset")
+        return await super().call_tool(name, arguments, idempotency_key)
+
+
+async def test_an_unrelated_hard_failure_does_not_strand_the_other_steps(lookup_runbook, tmp_path):
+    runs = tmp_path / "runs"
+    llm = FakeLLM()
+    llm.plan_payload = _wide_plan()
+    await Orchestrator(FailFirstProwl(), llm, runs_root=runs, max_workers=3).run("bind-lookup", BRIEF, run_id="strand")
+    checkpoint = _checkpoint(runs, "strand")
+    for name in ("s3", "s4", "s5"):
+        assert _step(checkpoint, name)["state"] == "completed"
+
+
+async def test_an_ambiguous_reference_names_the_steps_it_could_mean(lookup_runbook, tmp_path):
+    runs = tmp_path / "runs"
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "Scrape page", "tool": TOOL, "arguments": {"domain": "a.com"}},
+        {"step": "scrape-page", "tool": TOOL, "arguments": {"domain": "a2.com"}},
+        {"step": "analyse", "tool": TOOL, "arguments": {"domain": "{{output:scrape_page}}"}, "on_error_skip": True},
+    ]}
+    await Orchestrator(FakeProwl(), llm, runs_root=runs, max_workers=1).run("bind-lookup", BRIEF, run_id="names")
+    reason = _step(_checkpoint(runs, "names"), "analyse")["reason"]
+    assert "names two steps" in reason and "Scrape page" in reason and "scrape-page" in reason
+
+
+def test_the_extractor_sees_bound_values_but_not_the_forwarded_page():
+    from research_agent.agent.subagent import plan_item
+    from research_agent.evidence.store import StepRecord
+    record = StepRecord(step_id="s-1", raw_index=1, tool=TOOL, step="analyse",
+                        arguments={"url": "{{site_url}}", "q": "{{output:scrape_page}}"},
+                        bound_arguments={"url": "https://example.org", "q": "page text naming g2.com"})
+    assert plan_item(record, {"site_url": "https://example.org"}).arguments == {"url": "https://example.org", "q": "{{output:scrape_page}}"}
