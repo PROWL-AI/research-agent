@@ -66,14 +66,22 @@ def _earlier_outputs(ctx: Any, checkpoint: Checkpoint, record: StepRecord) -> di
     """``{"output:<step>": text}`` for each output reference of `record` that an earlier
     completed step of that name can fill from its stored, sha256-checked raw artifact (B-074).
     A reference nothing fills stays a missing placeholder, so the step is not sent."""
+    from research_agent.agent.orchestrator import _strip_envelope_meta
+
     found: dict[str, str] = {}
     for name in output_refs(record.arguments):
+        # A data step only (a transform note is the writer's), and one name only: two
+        # different steps that read as the same reference leave it unresolved.
         earlier = [s for s in checkpoint.steps if s.raw_index < record.raw_index and s.state == COMPLETED
-                   and s.raw_ref and slug(s.step) == name]
-        if not earlier:
+                   and s.kind == "data" and s.raw_ref and slug(s.step) == name]
+        if not earlier or len({s.step for s in earlier}) > 1:
             continue
         try:
             text = ctx.store.read_artifact(earlier[-1].raw_ref, earlier[-1].raw_sha256)
+            if earlier[-1].raw_ref.endswith(".json"):
+                # The server's billing and timing and the provider's request metadata are not
+                # the result: our cost and markup never travel to the next provider.
+                text = json.dumps(_strip_envelope_meta(json.loads(text)), ensure_ascii=False, separators=(",", ":"))
         except (OSError, ValueError):
             continue
         found["output:" + name] = output_text(text)
@@ -201,6 +209,11 @@ def split_segments(steps: list[StepRecord]) -> list[tuple[str, list[StepRecord]]
                 pending = []
             segments.append(("transform", [record]))
         else:
+            # A step that hands on a pending step's whole output (B-074) starts a new
+            # segment: chunks of one segment run at once, so it could not wait otherwise.
+            if pending and output_refs(record.arguments) & {slug(p.step) for p in pending}:
+                segments.append(("data", pending))
+                pending = []
             pending.append(record)
     if pending:
         segments.append(("data", pending))
@@ -228,8 +241,11 @@ def _set_state(checkpoint: Checkpoint, record: StepRecord, state: str, reason: s
 
 
 def plan_item(record: StepRecord) -> PlanItem:
+    # A step that forwarded an earlier output keeps its planned arguments here: the forwarded
+    # page is provider text, and a URL inside it is not one the request named.
+    sent = record.arguments if output_refs(record.arguments) else record.bound_arguments
     return PlanItem(step=record.step, tool=record.tool,
-                    arguments=record.bound_arguments or record.arguments,
+                    arguments=sent or record.arguments,
                     instruction=record.instruction, on_error_skip=record.on_error_skip)
 
 

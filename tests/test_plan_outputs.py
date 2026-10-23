@@ -69,8 +69,8 @@ async def test_an_earlier_output_is_sent_in_place_of_the_reference(lookup_runboo
     assert sent[0] == "a.com" and sent[2] == "b.com"
     checkpoint = _checkpoint(runs, "out")
     scrape = _step(checkpoint, "scrape page")
-    raw = (runs / "out" / scrape["raw_ref"]).read_text()
-    assert sent[1] == "Analyse this page: " + raw
+    raw = json.loads((runs / "out" / scrape["raw_ref"]).read_text())
+    assert sent[1] == "Analyse this page: " + json.dumps(raw, ensure_ascii=False, separators=(",", ":"))
     analyse = _step(checkpoint, "analyse")
     assert analyse["state"] == "completed"
     assert analyse["arguments"]["domain"].endswith("{{output:scrape_page}}")  # the plan as written
@@ -117,3 +117,72 @@ async def test_provider_text_inside_an_output_is_not_judged_as_template_text(loo
     assert "[insert your team size here]" in sent  # sent, not refused as template text
     assert sent.endswith("more characters]") and len(sent) < bindings.OUTPUT_CAP + 100
     assert _step(_checkpoint(runs, "page"), "analyse")["state"] == "completed"
+
+
+# ── seam round 1 ───────────────────────────────────────────────────────────
+
+
+class SlowProwl(FakeProwl):
+    """Yields to the event loop like a real network call, and bills like the server."""
+
+    async def call_tool(self, name, arguments, idempotency_key=None):
+        import asyncio
+        await asyncio.sleep(0.01)
+        if arguments.get("domain") == "a.com":
+            self.tool_calls.append({"name": name, "arguments": arguments, "idempotency_key": idempotency_key})
+            self.call_log.append(object())
+            return {"data": {"page": "ClickUp pricing"}, "execution_time_ms": 812,
+                    "billing": {"provider_cost_usd": 0.003, "markup_usd": 0.0012, "debited": 0.0042}}
+        return await super().call_tool(name, arguments, idempotency_key)
+
+
+def _wide_plan() -> dict:
+    return {"plan": [
+        {"step": "s0", "tool": TOOL, "arguments": {"domain": "c0.com"}},
+        {"step": "scrape page", "tool": TOOL, "arguments": {"domain": "a.com"}},
+        {"step": "analyse", "tool": TOOL, "arguments": {"domain": "Analyse: {{output:scrape_page}}"}},
+        {"step": "s3", "tool": TOOL, "arguments": {"domain": "c3.com"}},
+        {"step": "s4", "tool": TOOL, "arguments": {"domain": "c4.com"}},
+        {"step": "s5", "tool": TOOL, "arguments": {"domain": "c5.com"}},
+    ]}
+
+
+@pytest.mark.parametrize("workers", [1, 3, 5])
+async def test_a_referencing_step_waits_for_the_step_it_names(lookup_runbook, tmp_path, workers):
+    """Seam reading: contiguous chunks ran at once, so the analysis started before the scrape."""
+    runs = tmp_path / "runs"
+    prowl = SlowProwl()
+    llm = FakeLLM()
+    llm.plan_payload = _wide_plan()
+    await Orchestrator(prowl, llm, runs_root=runs, max_workers=workers).run("bind-lookup", BRIEF, run_id=f"w{workers}")
+    assert _step(_checkpoint(runs, f"w{workers}"), "analyse")["state"] == "completed"
+
+
+async def test_the_forwarded_output_carries_no_billing_or_timing(lookup_runbook, tmp_path):
+    runs = tmp_path / "runs"
+    prowl = SlowProwl()
+    llm = FakeLLM()
+    llm.plan_payload = _wide_plan()
+    await Orchestrator(prowl, llm, runs_root=runs, max_workers=1).run("bind-lookup", BRIEF, run_id="nobill")
+    sent = next(c["arguments"]["domain"] for c in prowl.tool_calls if c["arguments"]["domain"].startswith("Analyse"))
+    assert "ClickUp pricing" in sent
+    for secret in ("billing", "markup_usd", "provider_cost_usd", "execution_time_ms"):
+        assert secret not in sent
+
+
+async def test_an_ambiguous_or_transform_reference_is_not_sent(lookup_runbook, tmp_path):
+    runs = tmp_path / "runs"
+    prowl = FakeProwl()
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "Scrape page", "tool": TOOL, "arguments": {"domain": "a.com"}},
+        {"step": "scrape-page", "tool": TOOL, "arguments": {"domain": "a2.com"}},
+        {"step": "notes", "tool": "transform", "arguments": {}, "instruction": "Summarise"},
+        {"step": "analyse", "tool": TOOL, "arguments": {"domain": "{{output:scrape_page}}"}, "on_error_skip": True},
+        {"step": "analyse notes", "tool": TOOL, "arguments": {"domain": "{{output:notes}}"}, "on_error_skip": True},
+    ]}
+    await Orchestrator(prowl, llm, runs_root=runs, max_workers=1).run("bind-lookup", BRIEF, run_id="ambig")
+    checkpoint = _checkpoint(runs, "ambig")
+    for name in ("analyse", "analyse notes"):
+        record = _step(checkpoint, name)
+        assert record["state"] == "skipped_on_error" and record["attempt_ids"] == []

@@ -129,6 +129,12 @@ MUTANTS = [
      "reason = None if resend else _not_sent_reason(record.tool, arguments, missing)", ["tests/test_plan_outputs.py"]),
     ("output-filled-from-raw", "research_agent/agent/subagent.py",
      'found["output:" + name] = output_text(text)', 'found["output:" + name] = name', ["tests/test_plan_outputs.py"]),
+    ("output-waits-for-its-step", "research_agent/agent/subagent.py",
+     "if pending and output_refs(record.arguments) & {slug(p.step) for p in pending}:", "if False:",
+     ["tests/test_plan_outputs.py"]),
+    ("output-strips-billing", "research_agent/agent/subagent.py",
+     "text = json.dumps(_strip_envelope_meta(json.loads(text)), ensure_ascii=False, separators=(\",\", \":\"))",
+     "text = text", ["tests/test_plan_outputs.py"]),
     ("service-events-in-file-log", "research_agent/service/store.py",
      "        emit(log, kind, _LOG_LEVELS.get(level, logging.INFO), **fields)\n", "", ["tests/test_service_parity.py"]),
 ]

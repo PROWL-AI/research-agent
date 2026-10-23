@@ -1373,6 +1373,19 @@
       "evidence": "m1-wave-b frames",
       "wave": 4,
       "release": "this"
+    },
+    {
+      "id": "B-085",
+      "title": "Output references capped per reference, not per step",
+      "source": "seam verification of M1-C, 2026-10-23",
+      "status": "open",
+      "area": "core",
+      "node": "N-STATE",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "subagent.py _earlier_outputs",
+      "wave": 2,
+      "release": "this"
     }
   ]
 }

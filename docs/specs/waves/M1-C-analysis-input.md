@@ -28,6 +28,13 @@ Contradictions: none.
 - **D4.** A reference nothing fills is a missing placeholder: the step is not sent (`not sent: no earlier step
   resolved {{output:<name>}}`), with no attempt and no bill. The sent text is recorded as `bound_arguments`, so a
   re-send after an unknown outcome sends the same text.
+- **D6 (seam round 1).** A step that refers to a pending step's output starts a new data segment, so it waits for it
+  (chunks of one segment run at once: at 3 and 5 workers, which every shipped runbook gets, the reference was never
+  filled). A `.json` raw is sent compact and without the server's `billing`/`execution_time_ms` and the provider's
+  request metadata (the extractor's own strip), so our cost and markup never reach the next provider. Only a data
+  step can be referenced, and two different steps whose names read as the same reference leave it unresolved. The
+  extractor reads a forwarding step's planned arguments, so a URL inside the forwarded page is not request
+  provenance. Filed: B-085 (the cap is per reference, not per step).
 - **D5.** Out of scope: picking a field out of the artifact (the whole raw is sent) and a per-tool cap.
 
 ## REQ
@@ -39,4 +46,5 @@ Contradictions: none.
 | C-3 | Provider text inside the output is not judged as template text | `test_provider_text_inside_an_output_is_not_judged_as_template_text`; mutant `output-judged-as-planned` |
 | C-4 | A reference to a step that did not complete is never sent | `test_a_reference_to_no_completed_step_is_never_sent` |
 | C-5 | The planner is told the syntax and the cap | `test_the_planner_is_told_how_to_hand_over_an_output` |
+| C-7 | The referencing step waits at 1, 3 and 5 workers; no billing or timing is forwarded; ambiguous and transform references are not sent | `test_a_referencing_step_waits_for_the_step_it_names`, `test_the_forwarded_output_carries_no_billing_or_timing`, `test_an_ambiguous_or_transform_reference_is_not_sent`; mutants `output-waits-for-its-step`, `output-strips-billing` |
 | C-6 | Docs true | README, `docs/runbook-authoring.md`, CORE-18 |
