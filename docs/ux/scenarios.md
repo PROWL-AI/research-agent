@@ -32,7 +32,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-22 (M1-B); see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-23 at af1ba38 (M1-B, [receipt](../evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Обзор
 
 ### SCN-002: Найти запрос
@@ -68,7 +68,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-22 (M1-B); see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-23 at af1ba38 (M1-B, [receipt](../evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Детали
 
 ### SCN-004: Решение человека
@@ -123,7 +123,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-22 (M1-B); see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-23 at af1ba38 (M1-B, [receipt](../evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Расходы
 
 ### SCN-007: Настройки

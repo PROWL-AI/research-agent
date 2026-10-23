@@ -38,6 +38,15 @@ Contradictions: none.
 - **D5 (B-076).** `scripts/test-dashboard.mjs` gains a fixture job that used `tiktok_ads_library` and checks the
   callout text on a research job and a tool job.
 
+## Decisions after the product reading (round 1)
+
+- **D6.** «На один отчёт» stays as the subtitle states it: all priced spend of 30 days over research jobs completed
+  in 30 days (a run-level spend split would need a per-job report count the store does not keep). The subtitle names
+  the formula, so the number never reads as something else.
+- **D7.** Tool coverage is claimed only for a call that completed; it follows today's limits table, not the one of
+  the call (the API `coverage` keeps what the call returned).
+- **D8.** Filed, not fixed here: B-083 (the overview's 30 UTC days and the costs tab's 31-day chart differ).
+
 ## REQ
 
 | REQ | Requirement | Verified by |
