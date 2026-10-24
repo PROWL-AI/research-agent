@@ -9,7 +9,7 @@ The product's original `orchestrator_agent/` lives in the parent prowl-app repos
 ```mermaid
 flowchart LR
  A[Operator / Fabric Dashboards] --> D[Service-owned dashboard]
- C[Calling agent, with a delegation token from the Fabric hub] --> M[Authenticated MCP]
+ C[Calling agent: own agent token from loopback today, a hub delegation token once the hub publishes keys] --> M[Authenticated MCP]
  H[Fabric hub: issues delegation tokens] -.-> C
  D --> S[SQLite jobs / decisions / receipts]
  M --> S

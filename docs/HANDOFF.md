@@ -4,7 +4,7 @@
 
 Operator: «доделай до конца что осталось за тобой и обнови документацию и исправь ошибки». A blind product reading of
 the docs against the code, the live service and the board found 8 blocking and 14 cosmetic findings; all are fixed in
-PR #45 and release 0.3.4:
+this change (branch `docs/truth-pass-20261025`, released as 0.3.4):
 - FD-13 closed (both keys since 2026-10-18; it was still shown blocked by the closed B-043); B-027 closed as decided
   (USD 15); B-020 closed: the adoption-plan row exists (`passioncode-ai/fabric`
   `docs/evidence/plans/2026-10-11-delegation-model/README.md:98`, commit `9ff570b4`) under a neutral name, which is
@@ -14,15 +14,19 @@ PR #45 and release 0.3.4:
 - Scenarios CORE-06 (B-087, B-090), CORE-17 (B-091, B-092, the first stop names the run), SCN-004 (the Fabric
   Dashboards approval link), CORE-07 and CORE-16 updated; VERIFICATION (nightly CI green since 2026-10-20, keys,
   host 0.8.0), runbook authoring (B-085, B-086, B-087, workers under the service) and the design record.
-- Four dashboard strings and the login title lost their em dashes.
+- Three dashboard strings and the login title lost their em dashes; the learn tab says how agents call the service
+  today (gateway and agent token, not a hub delegation token).
 
 Open and not this agent's alone: B-081 (paid run; the operator approves it on the dashboard within an hour of its
 creation), B-017 and KA-G02 (the operator labels one report), FD-14 (a dashboard-tab capture while the operator's host
-shows this service), B-088 (waits for the kit's overridable button labels), B-001, B-042, B-067, B-073, KA-01, KA-02,
+shows this service), B-095 (DEC-0121 action parity, pinned only after the adapter kits and Fabric's hub land), B-001, B-042, B-067, B-073, KA-01, KA-02,
 KA-G03, KA-G04 (other owners). Left as is: the `max_llm_usd` description in the published `research.run` schema omits
 the resumed run's cap; it changes with the next provider revision because the content hash binds the schema.
 
-**Exact next task:** B-081 when the operator says they are at the dashboard; nothing else is this agent's own.
+B-088 is closed as decided; it reopens as a new row when the kit takes overridable button labels (thread `288afbce`).
+
+**Exact next task:** merge this branch, tag `v0.3.4`, reinstall and smoke; then B-081 when the operator says they are
+at the dashboard, and B-095 once CT-124 and CT-125 land.
 
 ## Current entry, 2026-10-24: release 0.3.0 (supersedes every "Exact next task" below)
 
