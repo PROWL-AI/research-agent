@@ -126,6 +126,17 @@ def held_slots(project, p):
     return held, missing
 
 
+def strip_build_output(source: Path) -> list[str]:
+    """Remove build output the archive may carry: setuptools installs a stale ``build/lib`` in place of the
+    sources it sits beside (0.3.0 and 0.3.1 shipped one). Returns what was removed."""
+    removed = []
+    for path in [source / "build", *source.glob("*.egg-info")]:
+        if path.is_dir():
+            shutil.rmtree(path)
+            removed.append(path.name)
+    return removed
+
+
 #: A wall-clock deadline, not a count of tries: under a load average near 1000 (2026-10-24) a good
 #: install answered after the old 480 tries of 0.25 s had run out (B-093).
 READY_TIMEOUT_S = 600.0
@@ -213,6 +224,7 @@ def main():
                     archive.seek(0)
                     with tarfile.open(fileobj=archive) as tar:
                         tar.extractall(release / "source", filter="data")
+                strip_build_output(release / "source")
                 uv = shutil.which("uv")
                 if not uv:
                     raise RuntimeError("uv is required; install it explicitly before running this installer")

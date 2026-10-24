@@ -127,3 +127,22 @@ def test_readiness_gives_up_at_the_deadline(monkeypatch):
     monkeypatch.setattr(inst.urllib.request, "urlopen", urlopen)
     assert inst.wait_ready("http://127.0.0.1:1", "abc", 5, clock=lambda: now[0], sleep=lambda _: None) is False
     assert now[0] <= 7
+
+
+def test_build_output_in_the_archive_never_reaches_the_install(tmp_path):
+    """0.3.0 and 0.3.1 carried a committed build/lib, which setuptools installed in place of the sources."""
+    inst = _installer()
+    source = tmp_path / "source"
+    (source / "build" / "lib" / "research_agent").mkdir(parents=True)
+    (source / "prowl_research_agent.egg-info").mkdir()
+    (source / "research_agent").mkdir()
+    assert sorted(inst.strip_build_output(source)) == ["build", "prowl_research_agent.egg-info"]
+    assert not (source / "build").exists() and (source / "research_agent").is_dir()
+
+
+def test_no_build_output_is_tracked():
+    import subprocess
+
+    root = SCRIPT.parent.parent
+    tracked = subprocess.run(["git", "ls-files", "build", "*.egg-info"], cwd=root, capture_output=True, text=True, check=True)
+    assert tracked.stdout == ""
