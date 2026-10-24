@@ -6,6 +6,7 @@ from jsonschema import Draft202012Validator
 from .delegation import Refused, recorded, refusal_tool_result, require_owner
 from .runtime import child_trace, run_dir_name, runbooks
 from .store import Conflict
+from research_agent import __version__
 
 VERSION = "2026-07-28"
 SUPPORTED = [VERSION, "2025-11-25", "2025-06-18", "2025-03-26"]
@@ -152,7 +153,7 @@ class Protocol:
             return None, 202
         try:
             trace = child_trace(meta.get("traceparent"))
-            info = {"name": "prowl-research", "version": "0.2.0", "title": "Prowl Research"}
+            info = {"name": "prowl-research", "version": __version__, "title": "Prowl Research"}
             if method == "initialize":
                 result = {"protocolVersion": params.get("protocolVersion") if params.get("protocolVersion") in SUPPORTED else "2025-11-25", "capabilities": {"tools": {}}, "serverInfo": info, "instructions": "Start with research.list_runbooks. Jobs require operator review. Never retry paid failures blindly. Degraded reasons are at the service well-known endpoint."}
             elif method == "server/discover":
