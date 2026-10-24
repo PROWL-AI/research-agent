@@ -40,7 +40,7 @@ Fabric owns ordering between agents. Prowl owns one bounded job. The journal kee
 
 Exact schemas: `fabric/schemas/research.*.json`, generated from `service/protocol.py` by `PYTHONPATH=. python scripts/build-fabric-manifest.py`. The schemas are resolved locally by `$id`; their URI identifiers are not a promise of hosted schema publication. Contract revision is pinned in `fabric-contract.lock.json`. The service supports modern per-request MCP metadata and legacy initialization; this does not upgrade the separate legacy stdio server's protocol claim.
 
-Every paid request initially requires the operator's authenticated dashboard session. Agent credentials cannot approve their own requests; `fabric.job.get` with `inputResponses` is refused. The job uses URL elicitation to reach operator authentication. Delegated Fabric form approvals and unattended grants remain a separate gate; do not claim that this adapter already supports them.
+Every paid request initially requires the operator's authenticated dashboard session. Agent credentials cannot approve their own requests; `fabric.job.get` with `inputResponses` is refused. The job uses URL elicitation to reach operator authentication; its URL is the Fabric Dashboards link to the request (`fabric-dashboards://service/prowl-research.default?path=%2Fdashboard%23%2Frequests%2F<job id>`), because the service's pages open only in Fabric Dashboards, never in a browser (operator rule 2026-10-24, [AGENTS.md](../AGENTS.md)). Delegated Fabric form approvals and unattended grants remain a separate gate; do not claim that this adapter already supports them.
 
 ```json
 {

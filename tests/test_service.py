@@ -432,3 +432,15 @@ async def test_usage_covers_the_same_30_utc_days_as_the_overview(tmp_path):
     dates = [d["date"] for d in s.usage()["days"]]
     assert dates == sorted({(now - timedelta(days=n)).date().isoformat() for n in (0, 29)})
     s.db.close()
+
+
+def test_an_approval_link_opens_in_fabric_dashboards_not_a_browser():
+    """Operator rule 2026-10-24: agent pages open only in Fabric Dashboards; the link carries no token."""
+    from research_agent.service.protocol import dashboard_open_link, job_view
+
+    job = {"id": "pr-abc", "status": "input_required", "updatedAt": "2026-10-24T00:00:00Z", "phase": "approval",
+           "proposal": {"digest": "sha256:d"}}
+    request = job_view(job)["job"]["inputRequests"]["sha256:d"]["params"]
+    assert request["url"] == "fabric-dashboards://service/prowl-research.default?path=%2Fdashboard%23%2Frequests%2Fpr-abc"
+    assert request["url"] == dashboard_open_link("/dashboard#/requests/pr-abc")
+    assert "http" not in request["url"] and "token" not in request["url"]
