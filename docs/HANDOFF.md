@@ -14,7 +14,15 @@ Not this agent's alone: B-081 (paid run, the operator approves it on the dashboa
 B-017 and KA-G02 (the operator labels one report), B-027 and FD-14 (operator), B-001, B-020, B-042, B-067, B-073,
 KA-01, KA-02, KA-G03, KA-G04, FD-13 (other owners).
 
-**Exact next task:** B-093 (installer readiness wait); B-081 when the operator says they are at the dashboard.
+Later the same day: B-093 closed in 0.3.1 (PR #42: the installer waits on a 600 s wall-clock deadline). Verifying the
+0.3.1 install found my own mistake (B-094): the 0.3.0 release commit tracked a local `build/` directory and setuptools
+installed that stale `build/lib`, so 0.3.0 and 0.3.1 ran the 0.3.0 snapshot (no behaviour difference reached users).
+Fixed in **0.3.2** (PR #43, tag `v0.3.2`): build output untracked, ignored and stripped by the installer, guarded by a
+test. Installed `492247996745`, version 0.3.2, `ready`, `degraded: []`, smoke PASS (`pr-3638c188369e5c9113c2`),
+installed code equal to its sources (`diff -rq` exit 0); suite 754, mutation 87 of 87.
+
+**Exact next task:** none of this agent's own is open. B-081 when the operator says they are at the dashboard; B-088
+reopens as a new row when the kit takes overridable button labels (asked on thread `288afbce`).
 
 ## Current entry, 2026-10-23 afternoon: B-084 closed on kit 1.1.3 (supersedes every "Exact next task" below)
 
