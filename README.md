@@ -214,6 +214,8 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
   whose outcome is unknown, five refusals of required steps in a row across the run (optional steps neither count
   nor reset it), and every budget. A budget stop keeps its own `terminal_code`; its `stop_reason` also names the
   refused steps. A resume asks every `failed` step again (a new attempt, which the provider may bill again).
+  After an empty wallet or the service's own limit, the other workers send no further step (B-092), and a
+  worker crash is recorded when it happens, so the others see the stop at once (B-091).
 - **A value only an earlier step returns is a placeholder.** The plan is written before any tool runs, so an
   argument such as an app's numeric store id is planned as `{{headspace_apple_id}}`, with a transform before the
   step that names it. That transform ends its note with a fenced `bindings` block; a value is kept only when a raw
