@@ -1,10 +1,11 @@
 # Research-agent handoff
 
-## Current entry, 2026-10-25: documentation truth pass, release 0.3.4 pending (supersedes every "Exact next task" below)
+## Current entry, 2026-10-25: documentation truth pass, release 0.3.4 (supersedes every "Exact next task" below)
 
 Operator: «доделай до конца что осталось за тобой и обнови документацию и исправь ошибки». A blind product reading of
 the docs against the code, the live service and the board found 8 blocking and 14 cosmetic findings; all are fixed in
-this change (branch `docs/truth-pass-20261025`, to be released as 0.3.4, see the exact next task):
+PR #45 (`64a4ed2`), released as 0.3.4 (tag `v0.3.4`), installed `64a4ed2000ff`: `ready`, `degraded: []`, smoke PASS
+(`pr-e15bdca9e191290618ef`), installed code equal to its sources; suite 755, WebKit 27 checks. Three blind readings:
 - FD-13 closed (both keys since 2026-10-18; it was still shown blocked by the closed B-043); B-027 closed as decided
   (USD 15); B-020 closed: the adoption-plan row exists (`passioncode-ai/fabric`
   `docs/evidence/plans/2026-10-11-delegation-model/README.md:98`, commit `9ff570b4`) under a neutral name, which is
@@ -25,8 +26,7 @@ the resumed run's cap; it changes with the next provider revision because the co
 
 B-088 is closed as decided; it reopens as a new row when the kit takes overridable button labels (thread `288afbce`).
 
-**Exact next task:** merge this branch, tag `v0.3.4`, reinstall and smoke; then B-081 when the operator says they are
-at the dashboard, and B-095 once CT-124 and CT-125 land.
+**Exact next task:** B-081 when the operator says they are at the dashboard; B-095 once CT-124 and CT-125 land.
 
 ## Current entry, 2026-10-24: release 0.3.0 (supersedes every "Exact next task" below)
 
