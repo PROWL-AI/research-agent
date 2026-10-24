@@ -65,6 +65,9 @@ try{
  await page.setViewportSize({width:1440,height:1000});
  await page.locator('[data-nav="learn"]').click();
  await page.getByRole('heading',{name:'От запроса к данным.'}).waitFor();
+ // How agents call the service today: the gateway and the agent token, never a hub token or agent.call (KA-G03).
+ const route=await page.locator('#learn-call-route').textContent();
+ assert(route.includes('шлюз prowl')&&route.includes('пока hub не опубликует ключи')&&!/agent\.call/.test(await page.locator('main').textContent()),'learn call route');
  await page.setViewportSize({width:390,height:844});
  await page.screenshot({path:evidence+'/learn-mobile.png',fullPage:true});
  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile overflow');
@@ -79,7 +82,7 @@ try{
  assert(await page.getByRole('heading',{name:'Исследования, на виду.'}).isVisible());
  assert.deepEqual(errors,[]);
  await readability(browser);
- console.log(JSON.stringify({browser:'Playwright WebKit',viewports:['1440x1000','390x844','360x740'],evidence,checks:['empty','status-chip','russian-kit-labels','verified-initiator','scroll-box-prepared','requests-360-no-overflow','approval','tutorial','steps','table','report','fixture-spend-exclusion','chains','dirty-settings','settings-diff','search-empty','mobile-no-overflow','offline-keeps-snapshot','spend-windows','per-report','attention-now-only','older-failures-folded','failure-words-first','coverage-research','coverage-tool','nav-no-cut-360-390'],pageErrors:errors,status:'PASS'}));
+ console.log(JSON.stringify({browser:'Playwright WebKit',viewports:['1440x1000','390x844','360x740'],evidence,checks:['empty','status-chip','russian-kit-labels','verified-initiator','scroll-box-prepared','requests-360-no-overflow','approval','tutorial','steps','table','report','fixture-spend-exclusion','chains','dirty-settings','settings-diff','search-empty','mobile-no-overflow','offline-keeps-snapshot','spend-windows','per-report','attention-now-only','older-failures-folded','failure-words-first','coverage-research','coverage-tool','nav-no-cut-360-390','learn-call-route'],pageErrors:errors,status:'PASS'}));
 }catch(e){console.error(e);throw e;}finally{
  if(browser)await browser.close();
  child.kill('SIGTERM');

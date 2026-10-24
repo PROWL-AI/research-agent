@@ -13,7 +13,7 @@ Design route: super-ux → sheleg-design / copywriting → task-pipeline. Produc
 | Детали | Что произошло и чему доверять? | Input and config snapshot, ordered calls with duration/status/cost, readable data table, report text, sources/ledger, raw JSON, cancellation/decision |
 | Цепочки | Где используется результат? | Group by caller-declared chain; project/node/parent/trace. Explicit no verified binding claim |
 | Расходы | За что платим и что не посчитано? | UTC daily chart and accessible table; by model/tool, priced/unpriced calls, actual subtotal, no fixture inclusion |
-| Настройки | Чем и как выполняем? | Cheap/strong model ids, max parallel jobs, max job duration; revision diff before save; all paid requests require operator decision |
+| Настройки | Чем и как выполняем? | Cheap/strong model ids, max parallel jobs, workers per job (1 to 5), max job duration; revision diff before save; all paid requests require operator decision |
 | Обучение | Как безопасно проверить? | Zero-provider sample showing approval → steps → table/report, API examples, runbook inputs and tool-chain guide |
 
 ## Layout and visual decisions

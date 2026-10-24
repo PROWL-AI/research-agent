@@ -76,7 +76,7 @@
 - **Product:** unobserved
 - **Feature:** Fabric dashboard
 - **Traces:** ST-001, FLW-01 (JTBD-01, JRN-01)
-- **Entry point:** Fabric Dashboards → Prowl Research
+- **Entry point:** Fabric Dashboards → Prowl Research; ссылка из задания агента (`fabric-dashboards://service/prowl-research.default?path=…/requests/<id>`) открывает этот запрос в Fabric Dashboards, не в браузере
 - **Persona:** P-01
 - **Preconditions:** Запрос ожидает решение.
 - **Steps:**
@@ -86,7 +86,7 @@
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py — observed at 198a227; see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs and tests/test_service.py (`test_an_approval_link_opens_in_fabric_dashboards_not_a_browser`), observed at 198a227 (the link at 0.3.3); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Детали
 
 ### SCN-005: Отмена
@@ -154,7 +154,7 @@
 - **Preconditions:** Ключи отсутствуют.
 - **Steps:**
   1. Создать учебный запрос; разрешить его; посмотреть данные.
-- **Expected result:** Ни одного внешнего вызова; всё помечено учебным.
+- **Expected result:** Ни одного внешнего вызова; всё помечено учебным. Раздел «Собрать цепочку» говорит, как другой агент вызывает сервис сегодня: напрямую, на этом компьютере через шлюз prowl с агентским токеном сервиса; токен делегирования от Fabric hub отклоняется, пока hub не опубликует ключи (KA-G03). Проверка `learn-call-route` в scripts/test-dashboard.mjs.
 - **Acceptance criteria:** Ни одного внешнего вызова; всё помечено учебным; доказательства записываются в verification.
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
@@ -172,12 +172,12 @@
 - **Preconditions:** Панель открыта; ширина окна от 360 px.
 - **Steps:**
   1. Прочитать состояние сервиса в шапке; сменить тему и цветовую схему; открыть разделы, в том числе через «Ещё» на узком экране; пролистать широкую таблицу.
-- **Expected result:** Чип в шапке называет состояние сервиса («Работает», «Работает с ограничениями», «Останавливается»), подсказка — причины ограничений. Тема и схема выбираются по-русски и запоминаются набором Fabric Dashboards; внутри хоста Fabric Dashboards их задаёт хост. На 360 px страница не прокручивается вбок; не поместившиеся разделы уходят в «Ещё», и на 360 и 390 px ни одна видимая ссылка навигации не обрезана, какой бы раздел ни был текущим; широкая таблица прокручивается внутри своей рамки и помечена, когда не помещается.
+- **Expected result:** Чип в шапке называет состояние сервиса («Работает», «Работает с ограничениями», «Останавливается»), в подсказке названы причины ограничений. Тема и схема выбираются по-русски и запоминаются набором Fabric Dashboards; внутри хоста Fabric Dashboards их задаёт хост. На 360 px страница не прокручивается вбок; не поместившиеся разделы уходят в «Ещё», и на 360 и 390 px ни одна видимая ссылка навигации не обрезана, какой бы раздел ни был текущим; широкая таблица прокручивается внутри своей рамки и помечена, когда не помещается.
 - **Acceptance criteria:** Состояние, подписи и прокрутка как выше; без ошибок страницы; доказательства записываются в verification.
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Нет связи — чип и снимок остаются, свежесть говорит «Нет свежих данных».
 - **UI elements:** Чип состояния, выбор темы и схемы, навигация с «Ещё», рамка прокрутки таблицы.
-- **Coverage:** scripts/test-dashboard.mjs (checks status-chip, russian-kit-labels, scroll-box-prepared, requests-360-no-overflow) — observed at 198a227; nav-no-cut-360-390 on kit 1.1.3 (B-084); see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs (checks status-chip, russian-kit-labels, scroll-box-prepared, requests-360-no-overflow), observed at 198a227; nav-no-cut-360-390 on kit 1.1.3 (B-084); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Все
 
 ## Core agent scenarios (CORE)
@@ -283,15 +283,15 @@
 - **Steps:**
   1. Запустить прогон; дождаться остановки.
 - **Expected result:** следующая отправка не происходит; прогон `partial` с `terminal_code` `budget_tools` / `budget_usd` / `budget_minutes`; невыполненные шаги — `skipped_budget`, их список передаётся writer'у с указанием пометить отчёт как partial; расход считается по журналу попыток (`actual`, иначе `estimate`, неизвестная цена — по оценке, не ноль).
-- **Expected result (шаги, читающие ранний вывод, B-086):** пока в блоке есть шаги, которым нужен весь ответ более раннего шага (`{{output:...}}`), шаги без такой зависимости оставляют им по одному вызову: несвязанный шаг, которому пришлось бы взять такой вызов, становится `skipped_budget` с причиной «the last calls are kept for steps that read an earlier output», а остановка `budget_tools` применяется после последнего уровня блока; резервируются только вызовы, лимиты USD и минут работают как раньше.
+- **Expected result (шаги, читающие ранний вывод, B-086):** пока в блоке есть шаги, которым нужен весь ответ более раннего шага (`{{output:...}}`), шаги без такой зависимости оставляют им по одному вызову: несвязанный шаг, которому пришлось бы взять такой вызов, становится `skipped_budget` с причиной «the last calls are kept for steps that read an earlier output», а остановка `budget_tools` применяется после последнего уровня блока; резервируются только вызовы, лимиты USD и минут работают как раньше. Шаг уступает вызов, только пока оставшихся вызовов хватает на все ожидающие шаги-источники, которые будут отправлены, и ещё на один читающий шаг (B-087); иначе действует порядок плана. Источник, который не будет отправлен (неразрешённое имя, известный отказ), не считается. После того как прогон остановил другой воркер, никто не уступает (B-090).
 - **Failure outcome:** продолжение с поднятым бюджетом выполняет `skipped_budget` шаги; без поднятия — не выполняет.
 - **Wave:** 2 (N-COST)
-- **Coverage:** `test_budget_stop_maps_to_budget_code`, `test_usd_budget_stop_maps_to_budget_usd_end_to_end`, `test_minutes_budget_stop_maps_to_budget_minutes_end_to_end`, `test_ka11_known_cost_does_not_discard_previous_estimates`, `test_writer_is_told_which_steps_are_missing`, `test_skipped_budget_steps_run_only_once_the_budget_allows`, `tests/test_m1_tail.py::test_a_forwarding_step_keeps_its_call_under_a_tool_budget`
+- **Coverage:** `test_budget_stop_maps_to_budget_code`, `test_usd_budget_stop_maps_to_budget_usd_end_to_end`, `test_minutes_budget_stop_maps_to_budget_minutes_end_to_end`, `test_ka11_known_cost_does_not_discard_previous_estimates`, `test_writer_is_told_which_steps_are_missing`, `test_skipped_budget_steps_run_only_once_the_budget_allows`, `tests/test_m1_tail.py::test_a_forwarding_step_keeps_its_call_under_a_tool_budget`, `::test_no_yield_when_the_calls_left_cannot_reach_a_consumer`, `::test_a_yield_still_buys_one_whole_forward_when_the_reserve_is_short`, `::test_a_producer_that_will_not_be_sent_takes_no_call_from_the_reserve`, `::test_the_reserve_check_judges_no_producer_above_its_window`, `::test_no_step_yields_once_another_worker_stopped_the_run`
 
 ### CORE-07: Остановка по бюджету LLM
 - **Status:** UNVERIFIED
 - **Actor:** оператор (P-01); вызывающий агент
-- **Trigger:** расход LLM приближается к `max_llm_usd` (runbook, `RESEARCH_MAX_LLM_USD`, `--max-llm-usd`, вход stdio MCP `max_llm_usd`; поле входа Fabric `research.run` — волна 5, вместе с пересборкой манифеста; до неё сервис берёт лимит из окружения, runbook или значения по умолчанию)
+- **Trigger:** расход LLM приближается к `max_llm_usd` (runbook, `RESEARCH_MAX_LLM_USD`, `--max-llm-usd`, вход stdio MCP `max_llm_usd`, поле `max_llm_usd` входа Fabric `research.run`)
 - **Preconditions:** лимит задан или действует `config.DEFAULT_MAX_LLM_USD`.
 - **Steps:**
   1. Запустить прогон; дождаться остановки.
@@ -407,7 +407,7 @@
 - **Expected result:** повтор того же вызова (тот же ключ идемпотентности, тот же запрос, тот же вызывающий) возвращает уже созданное задание. Продолжение, созданное оператором для цепочки агента, остаётся действием оператора и видно агенту — владельцу цепочки. Новое задание продолжает прогон исходного: сохранённые ответы только извлекаются, уже оплаченный шаг не отправляется снова, журнал попыток и лимит LLM переходят. Продолжение продолжения пишет в прогон корня цепочки, а не заводит новый; отчёт и артефакты читаются через любое задание цепочки.
 - **Failure outcome:** отказ при создании, с причиной: неизвестный id; чужой runbook или другие входные данные; задание, которое ждёт решения или работает; прогон, который уже закончен; задание, отклонённое оператором; прогон, который уже продолжает другое задание; задание другого принципала — `scope-not-granted`.
 - **Wave:** 5 (N-FAB, B-039)
-- **Coverage:** `tests/test_service_parity.py::test_a_failed_service_job_is_resumed_without_paying_again`, `::test_a_resume_respects_the_principal_and_the_operators_rejection`, `::test_a_resume_replayed_with_the_same_key_returns_the_same_job`
+- **Coverage:** `tests/test_service_parity.py::test_a_failed_service_job_is_resumed_without_paying_again`, `::test_a_resume_respects_the_principal_and_the_operators_rejection`, `::test_a_resume_replayed_with_the_same_key_returns_the_same_job`, `::test_the_chain_owner_can_resume_and_cancel_an_operator_continuation_and_nobody_else_can`
 
 ### CORE-17: Отказ инструмента по одному шагу не останавливает прогон
 - **Status:** UNVERIFIED
@@ -417,9 +417,9 @@
 - **Steps:**
   1. Запустить прогон, в плане которого один обязательный шаг получит такой отказ.
 - **Expected result:** шаг становится `failed` с причиной сервера (необязательный: `skipped_on_error`); воркер берёт следующий шаг, следующие сегменты выполняются, трансформация узнаёт, какие шаги перед ней получили отказ. Прогон с отказом обязательного шага заканчивается `partial` с `terminal_code=step_failed`; `stop_reason` перечисляет такие шаги с причиной сервера, а writer получает их список с причинами до того, как начинает писать, поэтому отчёт говорит, чего нет. Если прогон затем остановил бюджет, код остаётся бюджетным, а `stop_reason` дополнительно называет отказавшие шаги. Продолжение запрашивает упавшие шаги снова (новая попытка) и не платит за выполненные.
-- **Failure outcome:** прогон останавливается, как раньше: пустой кошелёк Prowl (`insufficient_funds`), локальный отказ сервиса (лимит вызовов, журнал недоступен), неизвестный исход отправки (`outcome_unknown`), пять отказов обязательных шагов подряд на весь прогон (необязательные не считаются), любой бюджет. Неначатые шаги остаются `pending`.
+- **Failure outcome:** прогон останавливается, как раньше: пустой кошелёк Prowl (`insufficient_funds`), локальный отказ сервиса (лимит вызовов, журнал недоступен), неизвестный исход отправки (`outcome_unknown`), пять отказов обязательных шагов подряд на весь прогон (необязательные не считаются), любой бюджет. Неначатые шаги остаются `pending`. Сбой воркера записывается сразу, и остальные воркеры видят остановку до следующего шага (B-091); после пустого кошелька или лимита сервиса остальные воркеры больше не отправляют шагов, их шаги остаются `pending` (B-092). Код завершения называет первую остановку: сбой воркера раньше бюджетной остановки соседа даёт `step_failed`.
 - **Wave:** 6 (N-ACC, B-049)
-- **Coverage:** `tests/test_step_failure_policy.py` (18 тестов), `tests/test_orchestrator.py::test_a_refused_step_does_not_stop_the_run_and_reaches_the_writer`
+- **Coverage:** `tests/test_step_failure_policy.py` (18 тестов), `tests/test_orchestrator.py::test_a_refused_step_does_not_stop_the_run_and_reaches_the_writer`, `tests/test_m1_tail.py::test_a_crash_is_seen_by_peers_before_their_next_step`, `::test_peers_stop_before_their_next_dispatch_after_a_run_wide_refusal`
 
 ### CORE-18: Значение из более раннего шага подставляется, неразрешённое не отправляется
 - **Status:** UNVERIFIED
