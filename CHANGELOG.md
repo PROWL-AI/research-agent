@@ -4,6 +4,13 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.3.2 (2026-10-24)
+
+- 0.3.0 and 0.3.1 committed a `build/` directory by mistake, and setuptools installed that `build/lib` in place of
+  the sources (it held the 0.3.0 code, so both installs ran 0.3.0 code and 0.3.1 reported version 0.3.0). The
+  directory is removed and ignored, the installer drops build output from the archive before installing, and a test
+  fails if one is tracked again.
+
 ## 0.3.1 (2026-10-24)
 
 - The installer waits for the service on a 600 s wall-clock deadline (`--ready-timeout`) instead of 120 s of tries, so

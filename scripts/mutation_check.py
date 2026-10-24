@@ -178,6 +178,8 @@ MUTANTS = [
      "        if ctx.refused_run is not None:\n", "        if False:\n", ["tests/test_m1_tail.py"]),
     ("installer-waits-on-a-deadline", "scripts/install-fabric-service.py",
      "    deadline = clock() + timeout_s\n", "    deadline = clock() + 120\n", ["tests/test_installer.py"]),
+    ("installer-drops-build-output", "scripts/install-fabric-service.py",
+     "            shutil.rmtree(path)\n", "            pass\n", ["tests/test_installer.py"]),
     ("service-events-in-file-log", "research_agent/service/store.py",
      "        emit(log, kind, _LOG_LEVELS.get(level, logging.INFO), **fields)\n", "", ["tests/test_service_parity.py"]),
 ]
