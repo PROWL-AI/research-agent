@@ -1510,7 +1510,10 @@
       "status": "open",
       "area": "fabric",
       "node": "N-FAB",
-      "blocked_by": [],
+      "blocked_by": [
+        "CT-124",
+        "CT-125"
+      ],
       "closable_in_one_pass": false,
       "evidence": "pin only after CT-124 (adapter kits) and CT-125 (Fabric hub) land",
       "wave": 5,

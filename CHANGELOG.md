@@ -8,6 +8,8 @@ One version for the package, the service's well-known document and MCP `initiali
 
 - Dashboard copy without em dashes: the spend note, the decision card's budget line, the ledger caption and the login
   page title read the same with ordinary punctuation.
+- The learn tab says how agents call the service today: through the `prowl` gateway with the service's agent token;
+  a hub delegation token is refused until the hub publishes keys (KA-G03). It no longer mentions `agent.call`.
 - Documentation brought in line with the code and the board: the current handoff is linked as current, the service is
   described with both provider keys (FD-13 closed), delegation tokens are described as refused until the hub
   publishes keys (KA-G03), scenarios CORE-06, CORE-17 and SCN-004 describe the 0.3.0 and 0.3.3 behaviour, and B-020

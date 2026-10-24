@@ -10,7 +10,7 @@ The product's original `orchestrator_agent/` lives in the parent prowl-app repos
 flowchart LR
  A[Operator / Fabric Dashboards] --> D[Service-owned dashboard]
  C[Calling agent: own agent token from loopback today, a hub delegation token once the hub publishes keys] --> M[Authenticated MCP]
- H[Fabric hub: issues delegation tokens] -.-> C
+ H[Fabric hub: issues delegation tokens by DEC-0039, no keys published yet] -.-> C
  D --> S[SQLite jobs / decisions / receipts]
  M --> S
  S --> R[Existing Prowl Research Orchestrator]
