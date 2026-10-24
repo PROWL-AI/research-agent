@@ -4,6 +4,11 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.3.1 (2026-10-24)
+
+- The installer waits for the service on a 600 s wall-clock deadline (`--ready-timeout`) instead of 120 s of tries, so
+  a good install on a loaded machine no longer fails; a timeout names the readiness check (B-093).
+
 ## 0.3.0 (2026-10-24)
 
 Everything merged since 0.2.0 (commit `4cb25c2`, 2026-10-10): pull requests #1 to #40.

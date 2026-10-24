@@ -126,11 +126,33 @@ def held_slots(project, p):
     return held, missing
 
 
+#: A wall-clock deadline, not a count of tries: under a load average near 1000 (2026-10-24) a good
+#: install answered after the old 480 tries of 0.25 s had run out (B-093).
+READY_TIMEOUT_S = 600.0
+
+
+def wait_ready(origin: str, sha: str, timeout_s: float, *, clock=time.monotonic, sleep=time.sleep) -> bool:
+    """True once ``origin`` answers its well-known document on commit ``sha``, False at the deadline."""
+    deadline = clock() + timeout_s
+    while True:
+        try:
+            with urllib.request.urlopen(origin + "/.well-known/fabric-service", timeout=3) as r:
+                if json.load(r)["service"]["build"].get("commit") == sha:
+                    return True
+        except Exception:  # noqa: BLE001 — not up yet, or still the previous release
+            pass
+        if clock() >= deadline:
+            return False
+        sleep(0.25)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--port", type=int, default=18764)
     p.add_argument("--vault-project", help="Observatory vault folder holding the service's keys (prod slots %s)" % ", ".join(SLOTS))
     p.add_argument("--dry-run", action="store_true", help="print the launch argv and the slots it needs; install nothing")
+    p.add_argument("--ready-timeout", type=float, default=READY_TIMEOUT_S,
+                   help="seconds to wait for the service to answer on the new commit (default %(default)s)")
     a = p.parse_args()
     if sys.platform != "darwin":
         p.error("This installer supports macOS launchd; manual foreground serve is portable.")
@@ -255,17 +277,12 @@ def main():
         atomic(target, (json.dumps(descriptor, indent=2) + "\n").encode())
         if not disabled:
             subprocess.run(["launchctl", "bootstrap", domain, str(plist)], check=True)
-            for _ in range(480):
-                try:
-                    with urllib.request.urlopen(descriptor["origin"] + "/.well-known/fabric-service", timeout=1) as r:
-                        health = json.load(r)
-                    if health["service"]["build"].get("commit") == sha:
-                        break
-                except Exception:
-                    pass
-                time.sleep(0.25)
-            else:
-                raise RuntimeError("Service did not become ready on expected commit")
+            if not wait_ready(descriptor["origin"], sha, a.ready_timeout):
+                raise RuntimeError(
+                    f"Service did not answer on commit {sha[:12]} within {a.ready_timeout:g} s; the release and its "
+                    f"descriptor are installed and launchd keeps starting it. Check: curl -s "
+                    f"{descriptor['origin']}/.well-known/fabric-service (a loaded machine can take longer; "
+                    f"--ready-timeout raises the wait)")
         print(json.dumps({"descriptor": str(target), "commit": sha, "disabled": disabled, "release": str(release)}))
         # Retain current + previous release. Only directories made by this installer.
         others = sorted(

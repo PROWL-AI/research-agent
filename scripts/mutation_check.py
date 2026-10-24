@@ -176,6 +176,8 @@ MUTANTS = [
      "                ctx.refused_run = ctx.refused_run or reason\n", "                pass\n", ["tests/test_m1_tail.py"]),
     ("peers-stop-on-a-run-wide-refusal", "research_agent/agent/subagent.py",
      "        if ctx.refused_run is not None:\n", "        if False:\n", ["tests/test_m1_tail.py"]),
+    ("installer-waits-on-a-deadline", "scripts/install-fabric-service.py",
+     "    deadline = clock() + timeout_s\n", "    deadline = clock() + 120\n", ["tests/test_installer.py"]),
     ("service-events-in-file-log", "research_agent/service/store.py",
      "        emit(log, kind, _LOG_LEVELS.get(level, logging.INFO), **fields)\n", "", ["tests/test_service_parity.py"]),
 ]
