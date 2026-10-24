@@ -18,6 +18,7 @@ from .protocol import EFFECTS, Protocol, CAPABILITIES, artifact
 from .runtime import Runtime, runbooks
 from .store import Store, Conflict, now
 from .runtime import run_dir_name
+from research_agent import __version__
 from research_agent.agent import tool_limits
 from research_agent.evidence.store import COMPLETED, ArtifactStore
 
@@ -92,7 +93,7 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
 
     def health():
         reasons = degraded()
-        return {"protocol": "fabric-service/0.1", "service": {"id": "prowl-research", "instance": "default", "name": "Prowl Research", "version": "0.2.0", "build": build},
+        return {"protocol": "fabric-service/0.1", "service": {"id": "prowl-research", "instance": "default", "name": "Prowl Research", "version": __version__, "build": build},
                 "process": {"pid": os.getpid(), "startedAt": started}, "status": "stopping" if rt.stopping else "degraded" if reasons else "ready", "degraded": reasons,
                 "surfaces": {"dashboard": {"path": "/dashboard", "login": True}, "mcp": {"path": "/mcp", "transport": "streamable-http", "auth": "own", "capabilities": CAPABILITIES},
                              "events": {"path": "/fabric/v1/events"}, "usage": {"path": "/fabric/v1/usage"}}, "update": {"available": None},
