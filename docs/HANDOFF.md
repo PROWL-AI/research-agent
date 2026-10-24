@@ -21,6 +21,12 @@ Fixed in **0.3.2** (PR #43, tag `v0.3.2`): build output untracked, ignored and s
 test. Installed `492247996745`, version 0.3.2, `ready`, `degraded: []`, smoke PASS (`pr-3638c188369e5c9113c2`),
 installed code equal to its sources (`diff -rq` exit 0); suite 754, mutation 87 of 87.
 
+Then 0.3.3 (PR #44, tag `v0.3.3`): the operator's board rule of 2026-10-24 (agent pages open only in Fabric
+Dashboards) is pinned in the new `AGENTS.md`, and a job waiting for approval now links to the request with
+`fabric-dashboards://service/prowl-research.default?path=...` instead of an HTTP page. Installed `dfde7d18965a`, version
+0.3.3, `ready`, `degraded: []`, smoke PASS (`pr-57dc832ea881513b8c61`), installed code equal to its sources; suite 755,
+mutation 88 of 88.
+
 **Exact next task:** none of this agent's own is open. B-081 when the operator says they are at the dashboard; B-088
 reopens as a new row when the kit takes overridable button labels (asked on thread `288afbce`).
 
