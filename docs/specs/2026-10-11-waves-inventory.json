@@ -1477,6 +1477,19 @@
       "evidence": "closed: ctx.refused_run stops peers before their next dispatch, 2026-10-24",
       "wave": 2,
       "release": "this"
+    },
+    {
+      "id": "B-093",
+      "title": "Installer gives up after 120 s on a loaded machine",
+      "source": "install of 0.3.0, 2026-10-24",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "scripts/install-fabric-service.py readiness loop",
+      "wave": 4,
+      "release": "this"
     }
   ]
 }

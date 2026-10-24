@@ -1,5 +1,21 @@
 # Research-agent handoff
 
+## Current entry, 2026-10-24: release 0.3.0 (supersedes every "Exact next task" below)
+
+Operator: «проверь проблемы и долги … реши и закрой баги и релиз новый делай». Closed: B-091 and B-092 (PR #40: peers
+see a worker crash and a run-wide refusal before their next step), B-088 decided (kit 1.1.3's Fabric button has
+English-only labels; the kit owner is asked for overridable labels on thread `288afbce`). Release **0.3.0** (PR #41,
+tag `v0.3.0`, [GitHub release](https://github.com/PROWL-AI/research-agent/releases/tag/v0.3.0)): one version source
+(`research_agent.__version__`, `tests/test_version.py`) and `CHANGELOG.md`. Installed `2432363b8b7d`, version 0.3.0,
+`ready`, `degraded: []`, smoke PASS (`pr-4d8560dbe74bd5615331`); suite 750, mutation 85 of 85. The installer itself
+timed out at 120 s under a load average near 976 although the install was good: B-093.
+
+Not this agent's alone: B-081 (paid run, the operator approves it on the dashboard within an hour of its creation),
+B-017 and KA-G02 (the operator labels one report), B-027 and FD-14 (operator), B-001, B-020, B-042, B-067, B-073,
+KA-01, KA-02, KA-G03, KA-G04, FD-13 (other owners).
+
+**Exact next task:** B-093 (installer readiness wait); B-081 when the operator says they are at the dashboard.
+
 ## Current entry, 2026-10-23 afternoon: B-084 closed on kit 1.1.3 (supersedes every "Exact next task" below)
 
 The kit owner fixed the nav fold (fabric-agent-adapter PR #171, thread `288afbce`). PR #37 (`1b74778`) re-vendors
