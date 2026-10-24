@@ -1482,12 +1482,12 @@
       "id": "B-093",
       "title": "Installer gives up after 120 s on a loaded machine",
       "source": "install of 0.3.0, 2026-10-24",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-SVC",
       "blocked_by": [],
       "closable_in_one_pass": true,
-      "evidence": "scripts/install-fabric-service.py readiness loop",
+      "evidence": "closed: wall-clock readiness deadline, 2026-10-24",
       "wave": 4,
       "release": "this"
     }

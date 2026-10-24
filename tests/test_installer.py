@@ -82,3 +82,48 @@ def test_a_dry_run_reports_a_folder_problem_instead_of_refusing(tmp_path, monkey
     monkeypatch.setattr(inst, "command", lambda *a, **kw: str(engine) if a[0] == "project-observatory" else "")
     held, missing, problem = inst.slot_check("folder")
     assert held == [] and missing == list(inst.SLOTS) and "holds none" in problem
+
+
+def test_readiness_waits_on_a_wall_clock_deadline_not_a_count_of_tries(monkeypatch):
+    """B-093: a loaded machine answered after the old 480 tries had run out; the wait is a deadline."""
+    inst = _installer()
+    now = [0.0]
+    # More refusals than the old 480 tries, then the previous release, then the new one.
+    answers = iter([OSError("refused")] * 500 + [{"service": {"build": {"commit": "old"}}}, {"service": {"build": {"commit": "abc"}}}])
+
+    class Reply:
+        def __init__(self, body):
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    def urlopen(url, timeout):
+        assert url == "http://127.0.0.1:1/.well-known/fabric-service" and timeout == 3
+        now[0] += 0.5  # every try is slow under load
+        answer = next(answers)
+        if isinstance(answer, Exception):
+            raise answer
+        return Reply(answer)
+
+    monkeypatch.setattr(inst.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(inst.json, "load", lambda reply: reply.body)
+    assert inst.wait_ready("http://127.0.0.1:1", "abc", 600, clock=lambda: now[0], sleep=lambda _: None) is True
+    assert now[0] > 120  # past the old wait
+    assert inst.READY_TIMEOUT_S == 600.0
+
+
+def test_readiness_gives_up_at_the_deadline(monkeypatch):
+    inst = _installer()
+    now = [0.0]
+
+    def urlopen(url, timeout):
+        now[0] += 1.0
+        raise OSError("refused")
+
+    monkeypatch.setattr(inst.urllib.request, "urlopen", urlopen)
+    assert inst.wait_ready("http://127.0.0.1:1", "abc", 5, clock=lambda: now[0], sleep=lambda _: None) is False
+    assert now[0] <= 7
