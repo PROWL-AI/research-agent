@@ -2,6 +2,7 @@
 from __future__ import annotations
 import base64
 import json
+from urllib.parse import quote
 from jsonschema import Draft202012Validator
 from .delegation import Refused, recorded, refusal_tool_result, require_owner
 from .runtime import child_trace, run_dir_name, runbooks
@@ -87,7 +88,17 @@ def interop_error(error):
     return {**rest, "data": {**rest.get("data", {}), "terminalCode": error["terminalCode"]}}
 
 
-def job_view(job, origin="http://127.0.0.1:18764"):
+#: The registered Fabric service key (id.instance) Fabric Dashboards opens this service by.
+DASHBOARD_SERVICE = "prowl-research.default"
+
+
+def dashboard_open_link(page: str) -> str:
+    """The Fabric Dashboards link to a page of this dashboard (operator rule 2026-10-24: agent pages open only
+    in Fabric Dashboards, never in a browser). No token or login code: the host authenticates."""
+    return f"fabric-dashboards://service/{DASHBOARD_SERVICE}?path={quote(page, safe='')}"
+
+
+def job_view(job):
     view = {k: job[k] for k in ["id", "status", "updatedAt"]}
     view["statusMessage"] = job["phase"]
     if job["status"] == "working":
@@ -100,7 +111,7 @@ def job_view(job, origin="http://127.0.0.1:18764"):
         # A URL elicitation prevents an untrusted caller from supplying its own
         # assertion that a human approved. Host login stays outside MCP credentials.
         view["inputRequests"] = {job["proposal"]["digest"]: {"method": "elicitation/create", "params": {"mode": "url", "message": "Operator authentication required. Open this request in Fabric Dashboards and approve or reject the exact proposal.",
-                "url": origin + "/dashboard#/requests/" + job["id"]}}}
+                "url": dashboard_open_link("/dashboard#/requests/" + job["id"])}}}
     return {"job": view}
 
 
@@ -217,7 +228,7 @@ class Protocol:
             # principal (the kit's rule for job tools); refused with the DL-19 code.
             require_owner(rt.store.job(args["id"]), delegation)
             job = rt.cancel(args["id"]) if name.endswith("cancel") else rt.store.job(args["id"])
-            return job_view(job, getattr(rt, "origin", "http://127.0.0.1:18764")), job.get("traceparent")
+            return job_view(job), job.get("traceparent")
         if name == "research.list_runbooks":
             output = {"runbooks": runbooks()}
         else:

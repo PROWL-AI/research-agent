@@ -180,6 +180,9 @@ MUTANTS = [
      "    deadline = clock() + timeout_s\n", "    deadline = clock() + 120\n", ["tests/test_installer.py"]),
     ("installer-drops-build-output", "scripts/install-fabric-service.py",
      "            shutil.rmtree(path)\n", "            pass\n", ["tests/test_installer.py"]),
+    ("approval-link-opens-in-fabric-dashboards", "research_agent/service/protocol.py",
+     "    return f\"fabric-dashboards://service/{DASHBOARD_SERVICE}?path={quote(page, safe='')}\"\n",
+     "    return \"http://127.0.0.1:18764\" + page\n", ["tests/test_service.py"]),
     ("service-events-in-file-log", "research_agent/service/store.py",
      "        emit(log, kind, _LOG_LEVELS.get(level, logging.INFO), **fields)\n", "", ["tests/test_service_parity.py"]),
 ]

@@ -4,6 +4,12 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.3.3 (2026-10-24)
+
+- A job waiting for approval links the operator to the request in Fabric Dashboards
+  (`fabric-dashboards://service/prowl-research.default?path=...`), not to an HTTP page; `AGENTS.md` pins the rule
+  that the service's pages open only in Fabric Dashboards (operator rule 2026-10-24).
+
 ## 0.3.2 (2026-10-24)
 
 - 0.3.0 and 0.3.1 committed a `build/` directory by mistake, and setuptools installed that `build/lib` in place of
