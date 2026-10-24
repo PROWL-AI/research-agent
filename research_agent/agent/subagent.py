@@ -222,6 +222,9 @@ class WorkerContext:
     #: A tool-budget stop the reserve brought forward: applied by the lead once the
     #: block's last level ran, so the reserved steps still get their calls.
     deferred_stop: str | None = None
+    #: A refusal every later call would get too (`stops_run`: no funds, a local limit), set by
+    #: the worker that met it; the other workers stop before their next dispatch (B-092).
+    refused_run: str | None = None
 
 
 # CheckpointWriteError lives in evidence.store (the LLM meter raises it too).
@@ -456,6 +459,16 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
                                                 claims=claims))
             continue
 
+        if ctx.refused_run is not None:
+            # Another worker met a refusal every call would get: sending this step only adds
+            # one more refused attempt. Its steps stay pending, as after this worker's own stop.
+            for rest in items[position:]:
+                if rest.state not in SETTLED_STATES:
+                    summary.outcomes.append(StepOutcome(step_id=rest.step_id, step=rest.step, tool=rest.tool,
+                                                        status="pending", note="never started"))
+            log.warning("worker %d stops: another worker met a refusal every call would get", worker_id)
+            return summary
+
         # An outcome_unknown step reuses its attempt (no new call) and must keep its key; a
         # producer is what the reserved steps read: neither yields. A yield buys a forward only
         # when the calls left still reach a consumer after every pending producer (B-087);
@@ -586,6 +599,8 @@ async def run_worker(worker_id: int, items: list[StepRecord], ctx: WorkerContext
             _set_state(checkpoint, record, FAILED if definite else OUTCOME_UNKNOWN, reason)
             checkpoint.partial = True
             checkpoint.stop_reason = checkpoint.stop_reason or reason
+            if stopping:
+                ctx.refused_run = ctx.refused_run or reason
             save_state(checkpoint, ctx.store)
             summary.outcomes.append(StepOutcome(step_id=record.step_id, step=record.step,
                                                 tool=record.tool, status="failed", note=str(exc)[:120]))
@@ -665,8 +680,19 @@ async def run_data_segment(items: list[StepRecord], ctx: WorkerContext, n_worker
         except Exception as exc:  # noqa: BLE001 — same crash boundary as fan-out
             return [_crash_summary(0, chunks[0], exc, ctx)]
     log.info("data segment: %d steps across %d workers", len(items), len(chunks))
+
+    async def guarded(worker_id: int, chunk: list[StepRecord]) -> WorkerSummary:
+        # A crash is recorded the moment it happens, so the workers still running see the
+        # run's stop before their next step (B-091), not only once the segment ends.
+        try:
+            return await run_worker(worker_id, chunk, ctx)
+        except CheckpointWriteError:
+            raise
+        except Exception as exc:  # noqa: BLE001 — the crash boundary of one worker
+            return _crash_summary(worker_id, chunk, exc, ctx)
+
     results = await asyncio.gather(
-        *(run_worker(worker_id, chunk, ctx) for worker_id, chunk in enumerate(chunks)),
+        *(guarded(worker_id, chunk) for worker_id, chunk in enumerate(chunks)),
         return_exceptions=True,
     )
     summaries: list[WorkerSummary] = []

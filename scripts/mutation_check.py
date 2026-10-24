@@ -169,6 +169,13 @@ MUTANTS = [
     ("no-yield-after-a-stop", "research_agent/agent/subagent.py",
      "                checkpoint.stop_reason is None and slug(record.step) not in ctx.reserved_for:\n",
      "                slug(record.step) not in ctx.reserved_for:\n", ["tests/test_m1_tail.py"]),
+    ("crash-seen-when-it-happens", "research_agent/agent/subagent.py",
+     "        *(guarded(worker_id, chunk) for worker_id, chunk in enumerate(chunks)),\n",
+     "        *(run_worker(worker_id, chunk, ctx) for worker_id, chunk in enumerate(chunks)),\n", ["tests/test_m1_tail.py"]),
+    ("run-wide-refusal-shared", "research_agent/agent/subagent.py",
+     "                ctx.refused_run = ctx.refused_run or reason\n", "                pass\n", ["tests/test_m1_tail.py"]),
+    ("peers-stop-on-a-run-wide-refusal", "research_agent/agent/subagent.py",
+     "        if ctx.refused_run is not None:\n", "        if False:\n", ["tests/test_m1_tail.py"]),
     ("service-events-in-file-log", "research_agent/service/store.py",
      "        emit(log, kind, _LOG_LEVELS.get(level, logging.INFO), **fields)\n", "", ["tests/test_service_parity.py"]),
 ]

@@ -340,3 +340,58 @@ async def test_no_step_yields_once_another_worker_stopped_the_run(tmp_path, patc
         "tail-stopped", {"competitors": ["a.com"]}, run_id="hs")
     steps = json.loads((tmp_path / "runs" / "hs" / "checkpoint.json").read_text())["steps"]
     assert not [s["step"] for s in steps if "kept for steps that read" in json.dumps(s)]
+
+
+# ── B-091 and B-092: a peer's stop is seen before the next step ────────────
+
+
+async def test_a_crash_is_seen_by_peers_before_their_next_step(tmp_path, patched_runbooks, monkeypatch):
+    """B-091: the crash is recorded when it happens, so a peer inside the reserve window does not
+    yield its call to a level the lead will never run."""
+    from research_agent.agent import subagent
+    from test_subagents import _write_runbook
+
+    real = subagent._send_judgement
+
+    def judged(ctx, cp, rec):
+        if rec.step == "p":
+            raise RecursionError("deep raw")
+        return real(ctx, cp, rec)
+
+    monkeypatch.setattr(subagent, "_send_judgement", judged)
+    _write_runbook(patched_runbooks, "tail-crash", 2, effort="lookup")
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "p", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "p.com"}},
+        {"step": "x1", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "x1.com"}},
+        {"step": "x2", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "x2.com"}},
+        {"step": "c", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "C: {{output:p}}"}},
+    ]}
+    prowl = FakeProwl()
+    await Orchestrator(prowl, llm, runs_root=tmp_path / "runs", max_workers=2).run(
+        "tail-crash", {"competitors": ["a.com"]}, run_id="cr")
+    checkpoint = json.loads((tmp_path / "runs" / "cr" / "checkpoint.json").read_text())
+    assert "crashed" in checkpoint["stop_reason"]
+    assert not [s["step"] for s in checkpoint["steps"] if "kept for steps that read" in json.dumps(s)]
+
+
+async def test_peers_stop_before_their_next_dispatch_after_a_run_wide_refusal(tmp_path, patched_runbooks):
+    """B-092: after a refusal every later call would get too, a peer sends no further step."""
+    from test_subagents import _write_runbook
+
+    _write_runbook(patched_runbooks, "tail-refused", 10, effort="lookup")
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "h", "tool": "dataforseo_bl_summary", "arguments": {"target": "h.com"}},
+        {"step": "x1", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "x1.com"}},
+        {"step": "x2", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "x2.com"}},
+        {"step": "x3", "tool": "spyfu_get_domain_stats", "arguments": {"domain": "x3.com"}},
+    ]}
+    prowl = FakeProwl()
+    prowl.fail_on = {"dataforseo_bl_summary"}
+    prowl.fail_stops_run = True
+    await Orchestrator(prowl, llm, runs_root=tmp_path / "runs", max_workers=2).run(
+        "tail-refused", {"competitors": ["a.com"]}, run_id="rf")
+    states = {s["step"]: s["state"] for s in json.loads((tmp_path / "runs" / "rf" / "checkpoint.json").read_text())["steps"]}
+    assert states["h"] == "failed" and states["x1"] == "pending" and states["x3"] == "pending"
+    assert len(prowl.tool_calls) <= 2  # h, and at most the step a peer had in flight
