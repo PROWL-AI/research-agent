@@ -4,6 +4,15 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.3.4 (2026-10-25)
+
+- Dashboard copy without em dashes: the spend note, the decision card's budget line, the ledger caption and the login
+  page title read the same with ordinary punctuation.
+- Documentation brought in line with the code and the board: the current handoff is linked as current, the service is
+  described with both provider keys (FD-13 closed), delegation tokens are described as refused until the hub
+  publishes keys (KA-G03), scenarios CORE-06, CORE-17 and SCN-004 describe the 0.3.0 and 0.3.3 behaviour, and B-020
+  (the adoption-plan row exists) and B-027 (USD 15 decided) are closed.
+
 ## 0.3.3 (2026-10-24)
 
 - A job waiting for approval links the operator to the request in Fabric Dashboards

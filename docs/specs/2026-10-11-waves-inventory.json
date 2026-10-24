@@ -482,16 +482,15 @@
       "id": "FD-13",
       "title": "Provider wiring: PROWL_API_KEY and an LLM key through an Observatory consumer; none exist in any vault slot for prowl-research",
       "source": "research_agent/service/app.py:55-57; observatory names (prowl-research: none)",
-      "status": "open — LLM key wired (installed d868706 launches with vault prowl-research-agent RESEARCH_LLM_API_KEY; health degraded for prowl only); prowl_ key blocked (B-043)",
+      "status": "closed",
       "area": "fabric",
       "node": "N-FAB",
-      "blocked_by": [
-        "B-043"
-      ],
+      "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 5,
       "release": "this",
-      "notes": "LLM key: openrouter.py issue; prowl_ key: no door yet — research issuing path in wave 5."
+      "notes": "LLM key: openrouter.py issue; prowl_ key: no door yet — research issuing path in wave 5.",
+      "evidence": "closed 2026-10-18: both keys in vault folder prowl-research-agent (LLM key B-042, prowl_ key B-043); 0.3.3 reports ready, degraded []"
     },
     {
       "id": "B-002",
@@ -520,10 +519,10 @@
         "KA-09"
       ],
       "closable_in_one_pass": false,
-      "notes": "Offline harness + planted-bad fixtures in wave 3/4 scope; the live calibration pass spends money. W6-T1 offline half done 2026-10-17: planted fixtures + code vetoes + harness (docs/evidence/judge-calibration); live half waits on B-042.",
+      "notes": "Offline harness and fixtures done 2026-10-17; live calibration on the fixtures 2026-10-19. Left: one report labelled by the operator.",
       "wave": 6,
       "release": "this",
-      "evidence": "fixture half PASS 2026-10-19 (agreement 1.0, 10 fixtures, USD 0.0077); person agreement waits on B-049"
+      "evidence": "fixture half PASS 2026-10-19 (agreement 1.0, 10 fixtures); live runs exist; the person half waits on the operator labelling runs/accept-subscription-20261021b/report.md"
     },
     {
       "id": "KA-G02",
@@ -533,31 +532,30 @@
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [
-        "FD-13",
-        "B-017",
-        "KA-G01"
+        "B-017"
       ],
       "closable_in_one_pass": false,
-      "needs_operator": "spend cites the 2026-10-09 approval (~$2-3 per run) plus one durable budget row B-027",
+      "needs_operator": "the operator labels one report (B-017)",
       "wave": 6,
       "release": "this",
-      "notes": "W6-T1 offline half done 2026-10-17: planted fixtures + code vetoes + harness (docs/evidence/judge-calibration); live half waits on B-042."
+      "notes": "Live finance and subscription runs exist (runs/accept-finance-20261020*, runs/accept-subscription-20261021b); the human review half waits on B-017."
     },
     {
       "id": "B-027",
       "title": "No spend policy for prowl-research; one durable budget request with a concrete amount for wave 6 live acceptance",
       "source": "estate authority record (L1 asked once at first paid run)",
-      "status": "needs-operator",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "wave": 6,
-      "release": "this"
+      "release": "this",
+      "evidence": "closed as decided: USD 15 for wave-6 live acceptance (operator, 2026-10-12)"
     },
     {
       "id": "FD-14",
-      "title": "Native dashboard panel rendering NOT_VERIFIED (cua.getApp timed out); host is 0.6.7, latest 0.7.1",
+      "title": "Native dashboard panel rendering NOT_VERIFIED: the dashboard-tab capture is owed",
       "source": "docs/evidence/fabric-dashboard/VERIFICATION.md:16; fabric-dashboards host_status",
       "status": "needs-operator",
       "area": "acceptance",
@@ -566,10 +564,10 @@
         "B-002"
       ],
       "closable_in_one_pass": false,
-      "needs_operator": "host update 0.6.7→0.7.1 is operator administration; a visible native-panel look",
+      "needs_operator": "a capture while the operator's host shows this service",
       "wave": 6,
       "release": "this",
-      "evidence": "partial 2026-10-18: host is 0.7.12 (>= 0.7.1, the update is done); the service page rendered in the native panel (state tab, 23:05 CEST); a dashboard-tab capture is pending a moment when the operator is not using the host"
+      "evidence": "host updated (0.8.0 on 2026-10-25); the service page rendered in the native panel 2026-10-18; a dashboard-tab capture is owed while the host shows this service"
     },
     {
       "id": "KA-G03",
@@ -604,14 +602,15 @@
       "id": "B-020",
       "title": "prowl-research has no row in the Fabric delegation-model adoption plan (step 4: callee adopts)",
       "source": "Fabric delegation-model adoption plan (estate document)",
-      "status": "in-flight — PR #113 merged 2026-10-17 without our row; re-ask via the board (B-033)",
+      "status": "closed",
       "area": "fabric",
       "node": "N-EXT",
       "blocked_by": [],
       "closable_in_one_pass": true,
       "notes": "Asked of the plan owner by cross-session message; not this repository's file.",
       "wave": null,
-      "release": "external"
+      "release": "external",
+      "evidence": "closed 2026-10-25: row present in passioncode-ai/fabric delegation plan README.md:98 (commit 9ff570b4), named by neutral role"
     },
     {
       "id": "B-026",
@@ -1488,6 +1487,19 @@
       "blocked_by": [],
       "closable_in_one_pass": true,
       "evidence": "closed: wall-clock readiness deadline, 2026-10-24",
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-094",
+      "title": "0.3.0 and 0.3.1 installed a stale committed build/lib",
+      "source": "install check of 0.3.1, 2026-10-24",
+      "status": "closed",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "evidence": "closed: PR #43, 0.3.2",
       "wave": 4,
       "release": "this"
     }

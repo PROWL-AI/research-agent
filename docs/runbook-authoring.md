@@ -37,7 +37,8 @@ markers run in parallel workers (`lookup` = 1 inline agent, `comparison` = 3,
 `deep` = 5). Omit it to derive the class from `max_tool_calls` (≤15 lookup,
 ≤45 comparison, above that deep) — declaring it is for runbooks whose budget
 misleads (a 60-call runbook of strictly serial steps wants `effort: lookup`).
-Set `RESEARCH_NO_SUBAGENTS=1` to force sequential execution for a run.
+Set `RESEARCH_NO_SUBAGENTS=1` to force sequential execution for a run. Under the Fabric service neither applies:
+the dashboard's «Работники внутри запроса» setting (1 to 5, default 1) fixes the worker count of each job.
 
 Rules:
 
@@ -67,7 +68,9 @@ Rules:
   bound them. Set `max_llm_usd` when a runbook's synthesis is heavy (many
   transforms, long reports) so the default does not stop it early. Size budgets
   for the scenario's real cost, not aspirationally, and give the runbook a drop
-  order for the day the fan-out outgrows them.
+  order for the day the fan-out outgrows them. Steps that read an earlier step's whole output keep one
+  tool call each under `max_tool_calls` (B-086), so unrelated steps may end `skipped_budget` earlier than the
+  plan order alone would suggest; they yield only while that still lets a reading step run (B-087).
 
 ## Body grammar
 
@@ -98,7 +101,7 @@ Follow the flagship (`saas-competitor-teardown/SKILL.md`):
    argument (B-070). When a step analyses a whole earlier result (a page
    for an LLM-analysis tool), name the earlier step: the planner writes
    `{{output:<step name>}}` and the step's stored response is sent, cut at
-   16 000 characters (B-074). When a provider refuses a value its schema does not
+   16 000 characters per step, shared by all its references to earlier outputs (B-074, B-085). When a provider refuses a value its schema does not
    rule out, add the limit, with its source, to
    `research_agent/agent/tool_limits.py` rather than to one runbook: every
    planner that may call the tool is told it (B-071). When the limit also

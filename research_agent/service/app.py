@@ -177,7 +177,7 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
             return FileResponse(STATIC / name)
         if not operator(request):
             if path in {"/", "/dashboard"}:
-                return HTMLResponse('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Prowl Research — вход</title><link rel="stylesheet" href="/static/styles.css"><main class="login"><p class="eyebrow">PROWL / RESEARCH</p><h1>Откройте через Fabric</h1><p>Сессия панели создаётся в Fabric Dashboards. Ключи не нужно вставлять в браузер.</p></main></html>', 401)
+                return HTMLResponse('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Prowl Research · вход</title><link rel="stylesheet" href="/static/styles.css"><main class="login"><p class="eyebrow">PROWL / RESEARCH</p><h1>Откройте через Fabric</h1><p>Сессия панели создаётся в Fabric Dashboards. Ключи не нужно вставлять в браузер.</p></main></html>', 401)
             return JSONResponse({"error": "Сессия истекла. Откройте сервис в Fabric Dashboards заново."}, 401)
         if request.method == "POST" and request.headers.get("x-prowl-request") != "1":
             return JSONResponse({"error": "request header required"}, 403)

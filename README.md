@@ -317,8 +317,8 @@ and false evidence verification (KA-07…KA-09 — wave 3, ledger schema 2). The
 contracts live in `tests/test_ka_contracts.py`. The historical probe file stays as the
 audit's cut: 11 of its 12 cases pass; its success control asserts a cwd-relative
 `raw_ref`, which wave 2 replaced with a run-dir-relative one.
-The [2026-10-10 handoff](docs/HANDOFF.md) links the remediation plan and records the audited source revision,
-checks and next repair tasks. The offline suite is `.venv/bin/python -m pytest
+The [2026-10-10 handoff](docs/HANDOFF.md) links the remediation plan and records the audited source revision and
+checks (its repair tasks are history; the handoff's first entry is current). The offline suite is `.venv/bin/python -m pytest
 tests/ -q` (network-free); its pass count is a fact about one revision, so it is
 recorded with that revision in the handoff rather than here. A green run does
 not establish live provider quality or Fabric host acceptance.
@@ -364,7 +364,7 @@ spend.
 
 ## Fabric service and operator dashboard
 
-The separate `prowl-research-service` entry point adds durable jobs, observed tool/LLM receipts, human decisions and a service-owned dashboard for Fabric Dashboards. It reuses the existing research core. See [Fabric setup and architecture](docs/FABRIC.md), [dashboard design](docs/design/fabric-dashboard.md), and [current verification/handoff](docs/evidence/fabric-dashboard/HANDOFF.md). Legacy CLI/stdio and their existing run directories remain separate entry points. Other agents call the service directly with a delegation token from the Fabric hub (DEC-0039; the service's own agent token from loopback needs none), and an ended research job is continued with `research.run` + `resumeJobId` without paying again for what was already paid ([FABRIC.md](docs/FABRIC.md#resume-b-039)).
+The separate `prowl-research-service` entry point adds durable jobs, observed tool/LLM receipts, human decisions and a service-owned dashboard for Fabric Dashboards. It reuses the existing research core. See [Fabric setup and architecture](docs/FABRIC.md), [dashboard design](docs/design/fabric-dashboard.md), the [current handoff](docs/HANDOFF.md) and [verification](docs/evidence/fabric-dashboard/VERIFICATION.md) (waves 1 to 5 history: [Fabric handoff](docs/evidence/fabric-dashboard/HANDOFF.md)). Legacy CLI/stdio and their existing run directories remain separate entry points. Other agents on this machine reach it through the `prowl` gateway profile with the service's own agent token from loopback (tier T0, no delegation token needed). The callee side of Fabric hub delegation tokens (DEC-0039) is built, but a presented token is refused until an issuer is configured, and the hub publishes no keys yet (KA-G03). An an ended research job is continued with `research.run` + `resumeJobId` without paying again for what was already paid ([FABRIC.md](docs/FABRIC.md#resume-b-039)).
 
 ## License
 

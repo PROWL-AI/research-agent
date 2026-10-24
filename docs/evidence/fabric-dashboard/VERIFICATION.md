@@ -12,13 +12,13 @@ Runtime source and installed build: **891fbc995cb382ec6ccaed5f1b91611918b931c7**
 | Installed service | 27 PASS, 5 NOT_RUN, 0 FAIL | [service probe](raw/service-probe-891fbc9.json); own MCP credential deliberately unavailable to descriptor-token probe |
 | Own MCP / gateway transport | PASS for initialize/list/read; anonymous and wrong-role both 401 | [gateway SDK](raw/gateway-sdk.log); 7 tools, 14 runbooks |
 | Installed end-to-end tutorial | PASS — gateway → service job → operator session decision → 3 rows, stable trace; 0 provider calls | [installed tutorial](raw/installed-tutorial.log); synthetic receipts excluded from real usage |
-| Fabric Dashboards host | available 0.6.7; resolver and OS dispatch accepted | [host receipt](raw/fabric-host.log) |
+| Fabric Dashboards host | available 0.6.7 at the time (0.8.0 on 2026-10-25); resolver and OS dispatch accepted | [host receipt](raw/fabric-host.log) |
 | Native page rendering | NOT_VERIFIED | `cua.getApp("Fabric Dashboards")` twice timed out at 30 seconds. No browser fallback was used as a replacement host acceptance |
 | Fabric delegation, callee side | PASS (offline, test key) | `tests/test_delegation.py`; [FD-12 packet](HUB-PACKET.md) |
 | Fabric host chain (issuer → caller → service) | NOT_RUN — host issuer absent | hub `fabric-hub/0.1` publishes no JWKS (404, 2026-10-17); KA-G03, wave 6 |
-| Paid provider acceptance | NOT_RUN | New supervised service has no provider credentials; no funds spent by these probes |
+| Paid provider acceptance | NOT_RUN through the service (B-081) | Keys connected since 2026-10-18 (FD-13). Paid acceptance ran through the CLI (`runs/accept-*`, B-053 onward); the first research job through the installed service waits for the operator's approval on the dashboard (two expired unapproved on 2026-10-23, nothing spent) |
 | UX docs | PASS, exit 0 | `python3 <super-ux-0.59.1>/scripts/ux_lint.py` returned `OK — docs/ux is consistent` |
-| Hosted CI | NOT_RUN | `.github/workflows/nightly.yml` now exists (added 2026-10-11, B-031): nightly schedule plus manual dispatch, no push/PR triggers, per the estate nightly CI policy. First scheduled run pending; stays NOT_RUN until a run is read green. GitHub runs a schedule from the default branch only, so the file on this unmerged branch does not run until it reaches the default branch |
+| Hosted CI | PASS (nightly) | `.github/workflows/nightly.yml` (added 2026-10-11, B-031): nightly schedule plus manual dispatch, no push or PR triggers, per the estate nightly CI policy. Green every night from 2026-10-20; last read: run 40041573199 at `6573dc5`, 2026-10-23 (`gh run list --workflow nightly.yml`) |
 
 ## Wave 5 — Fabric contract revision 6, 2026-10-17
 
@@ -64,7 +64,7 @@ Code commit **198a227** (fix round after the three blind certifications of `77a0
 - Browser navigation initially rendered a form before its pending refresh completed, which erased a typed model. Navigation now presents a loading state until that refresh finishes; the WebKit dirty-settings regression passes.
 - The old stdio duplicate-run check followed awaited checkpoint I/O; a live task could finish during that await and admit another submission from stale checkpoint state. It now also rejects live duplicates before yielding. KA-06 (run-lock ownership) is addressed in wave 1; certification pending.
 - Queue rank alone could overbook a slot when an older request was approved after a newer one started. Admission now counts executing jobs and admits only the next queued job into an available slot; regression passes.
-- Cold install on this busy machine exceeded the original 20-second readiness poll. The installer now allows a bounded 120-second warm-up. Duplicate process locking happens before heavy imports.
+- Cold install on this busy machine exceeded the original 20-second readiness poll. The installer then allowed a bounded 120-second warm-up (since 0.3.1 a 600 s wall-clock deadline, `--ready-timeout`, B-093). Duplicate process locking happens before heavy imports.
 - Initial service probe had a 150.1ms health median and a case-sensitive cookie spelling failure; final installed probe has no failures. The cookie is HttpOnly; SameSite=Strict, and a reused code is refused.
 - Gateway SDK teardown logs `Session termination failed: 202`; operations and role-denial checks pass. This is retained as a transport teardown compatibility limitation, not hidden as a clean-session claim.
 
@@ -72,7 +72,10 @@ Code commit **198a227** (fix round after the three blind certifications of `77a0
 
 [Desktop overview](raw/overview-desktop.png), [decision](raw/approval-desktop.png), [readable data](raw/data-desktop.png), [mobile overview](raw/overview-mobile.png), [mobile learning](raw/learn-mobile.png). Reviewed for hierarchy, legibility, responsive overflow and explicit tutorial/unknown-cost labels. This is not an assistive-technology audit or live-provider result-quality acceptance. Daily spend chart has backend accounting controls; a populated live billing chart was not exercised with paid traffic.
 
-## Machine integration footprint
+## Machine integration footprint (2026-10-10)
+
+Since 2026-10-18 the service launches through `use_secret.py serve` with `PROWL_API_KEY` and `RESEARCH_LLM_API_KEY` from vault folder `prowl-research-agent`, and the installer keeps the current and previous release; the lines below are the first install.
+
 
 - Service descriptor `prowl-research.default`, loopback 18764, launchd `chat.prowl.research`, immutable installed release under `~/.local/share/prowl-research/releases/891fbc995cb3/`.
 - Data/credentials in `~/Library/Application Support/prowl-research/`; host and agent tokens separate. Provider keys absent.

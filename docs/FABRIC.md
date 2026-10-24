@@ -1,6 +1,6 @@
 # Prowl Research in Fabric
 
-Entry point for the Fabric adapter. Design: [dashboard specification](design/fabric-dashboard.md). Behavioral truth: [scenarios](ux/scenarios.md). Verification and remaining gates: [handoff](evidence/fabric-dashboard/HANDOFF.md).
+Entry point for the Fabric adapter. Design: [dashboard specification](design/fabric-dashboard.md). Behavioral truth: [scenarios](ux/scenarios.md). Current state and next task: [handoff](HANDOFF.md); verification: [VERIFICATION](evidence/fabric-dashboard/VERIFICATION.md); waves 1 to 5 history: [Fabric handoff](evidence/fabric-dashboard/HANDOFF.md).
 
 ## Ownership and architecture
 
@@ -24,7 +24,7 @@ flowchart LR
  S --> C
 ```
 
-Fabric owns ordering between agents. Prowl owns one bounded job. The journal keeps caller-declared requester/project/chain/node/parent and W3C trace context; these strings are not an admission receipt. Agents call this service directly (DEC-0039): the hub issues delegation tokens and is not on the call path. A verified token's principal and caller are recorded on the job and shown in the dashboard; caller-declared context stays declared. Another agent consumes `job.result.output` and calls the next agent itself. The new service is `prowl-research.default`, distinct from the unrelated private Research Agent installation.
+Fabric owns ordering between agents. Prowl owns one bounded job. The journal keeps caller-declared requester/project/chain/node/parent and W3C trace context; these strings are not an admission receipt. Agents call this service directly (DEC-0039): the hub issues delegation tokens and is not on the call path. Today a caller on this machine uses the service's own agent token from loopback (T0); a presented delegation token is refused until an issuer is configured, and the hub publishes no keys yet (KA-G03). A verified token's principal and caller are recorded on the job and shown in the dashboard; caller-declared context stays declared. Another agent consumes `job.result.output` and calls the next agent itself. The new service is `prowl-research.default`, distinct from the unrelated private Research Agent installation.
 
 ## Tools and parameters
 
@@ -65,6 +65,8 @@ python3 scripts/install-fabric-service.py
 prowl-research-service doctor --json
 ```
 
+On the operator's machine pass `--vault-project prowl-research-agent` ([AGENTS.md](../AGENTS.md)); without it the service restarts without provider keys and reports `degraded`.
+
 The installer creates an immutable commit release under `~/.local/share/prowl-research/releases/` from `git archive` of the commit (build output such as `build/` or `*.egg-info` is dropped first, so setuptools never installs a stale `build/lib`), a launchd label `chat.prowl.research`, a loopback listener on 18764, and `prowl-research.default.json` in the Fabric service registry. It preserves an explicitly disabled launchd label and retains the current and previous release. It then waits up to 600 s of wall-clock time for the service to answer on the new commit (`--ready-timeout` changes it, B-093); past that it exits non-zero, says the release and descriptor are installed and names the `curl` that checks readiness. It does not install credentials or alter other Research Agent services. Use the release's `venv/bin/prowl-research-service` if the entry point is not on PATH.
 
 Data: `~/Library/Application Support/prowl-research/` (SQLite and runs). Logs: `~/Library/Logs/prowl-research/`. Host token and agent token are separate owned 0600 files. Back up the data directory with the service stopped; do not commit it. The service takes its exclusive lock before creating tokens or reconciling jobs. Startup marks interrupted paid work for inspection; it never automatically resubmits it.
@@ -83,7 +85,7 @@ MCP registration: the `prowl-research` entry lives in each agent client's own co
 
 **Delegation (DEC-0039, FD-12).** Callers call this service directly; the estate hub only issues delegation tokens. A loopback caller with the service's agent token is T0 and needs no token; a delegation token it sends is still verified and recorded on the job. A caller with only a delegation token, or off the machine, is T2 and must present a valid one. Configure `RESEARCH_DELEGATION_ISSUER`, `RESEARCH_DELEGATION_JWKS` (and optionally `RESEARCH_DELEGATION_AUDIENCE`, default `prowl-research.default`); the well-known document then declares `auth.delegation`. Without them a presented token is refused (fail closed). The service binds loopback only; a caller from another machine has no route to it. Route, refusals and the pending host-chain receipt: [HUB-PACKET](evidence/fabric-dashboard/HUB-PACKET.md).
 
-**Dashboard.** The page uses `fabric-dashboard-kit@1.1.3` (DEC-0036): kit chrome and navigation, the estate themes and scheme (the host's appearance wins), fluid grids and keyboard-reachable scroll boxes; the well-known document declares the dashboard extension (minWidth 360). Layout probe: `check_dashboard_layout.mjs` 17 rules PASS at 320–1280 px (2026-10-17). On kit 1.1.2 (2026-10-22, B-079): `scripts/test-dashboard.mjs` WebKit PASS at 1440, 390 and 360 px ([receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.2.json); kit 1.1.1: [receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.1.json)). M1 wave B readability checks: WebKit PASS at `5023b06` ([receipt](evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)). Kit 1.1.3 (2026-10-23, B-084): no section link cut at 360 or 390 px, WebKit PASS ([receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.3.json)).
+**Dashboard.** The page uses `fabric-dashboard-kit@1.1.3` (DEC-0036): kit chrome and navigation, the estate themes and scheme (the host's appearance wins), fluid grids and keyboard-reachable scroll boxes; the well-known document declares the dashboard extension (minWidth 360). Layout probe: `check_dashboard_layout.mjs` (fabric-agent-adapter, `skills/building-fabric-services/scripts/`) 17 rules PASS at 320–1280 px (2026-10-17). On kit 1.1.2 (2026-10-22, B-079): `scripts/test-dashboard.mjs` WebKit PASS at 1440, 390 and 360 px ([receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.2.json); kit 1.1.1: [receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.1.json)). M1 wave B readability checks: WebKit PASS at `5023b06` ([receipt](evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)). Kit 1.1.3 (2026-10-23, B-084): no section link cut at 360 or 390 px, WebKit PASS ([receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.3.json)).
 
 ## Names
 
