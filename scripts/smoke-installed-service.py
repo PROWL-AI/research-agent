@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from pathlib import Path
 import httpx
 from mcp import ClientSession
@@ -9,13 +10,21 @@ from mcp.client.streamable_http import streamablehttp_client
 async def main():
     root = Path.home() / "Library/Application Support/prowl-research"
     origin = "http://127.0.0.1:18764"
+
+    def usage_now():
+        token = (root / "host.token").read_text().strip()
+        return httpx.get(origin + "/fabric/v1/usage", headers={"Authorization": "Bearer " + token}, timeout=10).json()["days"]
     role = (Path.home() / ".config/agentgateway/secrets/roles/prowl").read_text().strip()
     async with streamablehttp_client("http://127.0.0.1:47845/mcp/prowl-research", headers={"x-agw-key": role}) as (r, w, _):
         async with ClientSession(r, w) as mcp:
             await mcp.initialize()
-            # One key per installed build: a fixed key returned the first install's completed
-            # job to every later smoke, which then never saw input_required.
+            # One key per smoke run: a fixed key returned an earlier smoke's completed job,
+            # which then never showed input_required (per build was not enough: a second smoke
+            # of one build hit the first one's job).
             build = httpx.get(origin + "/.well-known/fabric-service", timeout=5).json()["service"]["build"]["commit"][:12]
+            build += "-" + time.strftime("%Y%m%dT%H%M%S", time.gmtime())
+            # A tutorial adds no usage; real research runs may already have (B-081, 2026-10-25).
+            before = usage_now()
             result = await mcp.call_tool(
                 "research.tutorial",
                 {
@@ -52,11 +61,7 @@ async def main():
             assert job["status"] == "completed"
             assert job["result"]["trace"]["traceparent"].split("-")[1] == "a1" * 16
             assert len(job["result"]["output"]["rows"]) == 3
-            async with httpx.AsyncClient() as c:
-                usage = (
-                    await c.get(origin + "/fabric/v1/usage", headers={"Authorization": "Bearer " + (root / "host.token").read_text().strip()})
-                ).json()
-            assert usage["days"] == []
+            assert usage_now() == before, "the tutorial changed the usage report"
             print(
                 json.dumps(
                     {
@@ -66,7 +71,7 @@ async def main():
                         "decision": "synthetic tutorial approved via operator session",
                         "tracePreserved": True,
                         "rows": 3,
-                        "realUsageDays": 0,
+                        "tutorialUsage": "unchanged",
                         "providerCalls": 0,
                     }
                 )

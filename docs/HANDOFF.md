@@ -15,6 +15,11 @@ Operator: «разберись со всеми долгами оперативн
   report called assumed claims VERIFIED (now `status_mislabel`, repaired by the writer). Mutants
   `failed-call-keeps-its-cause` and `verified-label-away-from-citation`.
 
+Installed `7b3dbfeb9ff2` (merge of PR #46, tag `v0.3.5`, [release](https://github.com/PROWL-AI/research-agent/releases/tag/v0.3.5)):
+`ready`, `degraded: []`, installed code equal to its sources. The smoke first failed after install: it asserted that the
+service had no real usage at all, which B-081's run made false; it now asserts that the tutorial leaves usage unchanged
+and uses one key per smoke run (PR #47), smoke PASS (`pr-048b6308f62a7fe13319`).
+
 Filed: **B-096**, Prowl's SearchApi plan has used its monthly searches (every SearchApi engine answers `HTTP 429`);
 a payment, the operator's; the operator was told through the communicator. B-095 gained a note: `job.approved` names
 no actor today. B-042 unchanged: Observatory's MCP answered `stale-server` this session.
