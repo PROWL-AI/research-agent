@@ -1,5 +1,31 @@
 # Research-agent handoff
 
+## Current entry, 2026-10-25: first service research run, release 0.3.5 (supersedes every "Exact next task" below)
+
+Operator: «разберись со всеми долгами оперативно и закрой задачи». Closed:
+- **B-081**: `pr-7bd2bc01ca789c51f668` (`research.run`, `market-pulse`, AI meeting note-taker apps, US, 12 months, LLM
+  cap USD 0.50) created at 00:27:19 UTC, approved on the operator's dashboard at 00:27:35, finished `completed`, outcome
+  `partial`: 41 calls completed, 12 refused by SearchApi's monthly quota; USD 0.38 inside the wave-6 USD 15 record.
+- **FD-14**: the dashboard tab captured from the Fabric Dashboards host window
+  ([capture](evidence/fabric-dashboard/raw/fd14-host/dashboard-tab-requests.png)); the host's sidebar is cropped out
+  because it lists other private agents (this repository is public), the full frame stays on the operator's machine.
+- Two defects the run exposed, fixed in 0.3.5: a failed call kept no cause (now `error.message`, secret-free, at most
+  300 characters, and «Причина: …» on the «Шаги» tab; WebKit check `failed-call-says-why`), and a status label away
+  from its citation (`[C39]. **Confidence: VERIFIED**`, `**Confidence:** VERIFIED [C37]`) went unchecked, so the
+  report called assumed claims VERIFIED (now `status_mislabel`, repaired by the writer). Mutants
+  `failed-call-keeps-its-cause` and `verified-label-away-from-citation`.
+
+Filed: **B-096**, Prowl's SearchApi plan has used its monthly searches (every SearchApi engine answers `HTTP 429`);
+a payment, the operator's; the operator was told through the communicator. B-095 gained a note: `job.approved` names
+no actor today. B-042 unchanged: Observatory's MCP answered `stale-server` this session.
+
+Open and not this agent's alone: B-096 (operator: SearchApi plan), B-017 and KA-G02 (the operator labels one report),
+B-095 (CT-124 and CT-125 still proposed in `passioncode-ai/fabric-agent-contract` `docs/backlog.md:136-137` on
+2026-10-25), B-001, B-042, B-067, B-073, KA-01, KA-02, KA-G03, KA-G04 (other owners).
+
+**Exact next task:** B-095 once CT-124 and CT-125 land; a second `market-pulse` run after B-096 clears, to measure a
+complete pulse.
+
 ## Current entry, 2026-10-25: documentation truth pass, release 0.3.4 (supersedes every "Exact next task" below)
 
 Operator: «доделай до конца что осталось за тобой и обнови документацию и исправь ошибки». A blind product reading of

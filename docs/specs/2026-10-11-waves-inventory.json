@@ -557,17 +557,16 @@
       "id": "FD-14",
       "title": "Native dashboard panel rendering NOT_VERIFIED: the dashboard-tab capture is owed",
       "source": "docs/evidence/fabric-dashboard/VERIFICATION.md:16; fabric-dashboards host_status",
-      "status": "needs-operator",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-ACC",
       "blocked_by": [
         "B-002"
       ],
-      "closable_in_one_pass": false,
-      "needs_operator": "a capture while the operator's host shows this service",
+      "closable_in_one_pass": true,
       "wave": 6,
       "release": "this",
-      "evidence": "host updated (0.8.0 on 2026-10-25); the service page rendered in the native panel 2026-10-18; a dashboard-tab capture is owed while the host shows this service"
+      "evidence": "closed 2026-10-25: dashboard-tab capture from the host window, docs/evidence/fabric-dashboard/raw/fd14-host/dashboard-tab-requests.png (sha256 75a40149539a)"
     },
     {
       "id": "KA-G03",
@@ -1325,12 +1324,12 @@
       "id": "B-081",
       "title": "A research run through the installed service",
       "source": "milestone M1 review, 2026-10-22",
-      "status": "open",
+      "status": "closed",
       "area": "service",
       "node": "N-ACC",
       "blocked_by": [],
       "closable_in_one_pass": true,
-      "evidence": "docs/specs/2026-10-22-milestone-m1.md section 0",
+      "evidence": "closed 2026-10-25: pr-7bd2bc01ca789c51f668 approved on the dashboard, completed (partial: SearchApi quota, B-096), USD 0.38",
       "wave": 6,
       "release": "this"
     },
@@ -1518,6 +1517,20 @@
       "evidence": "pin only after CT-124 (adapter kits) and CT-125 (Fabric hub) land",
       "wave": 5,
       "release": "this"
+    },
+    {
+      "id": "B-096",
+      "title": "Prowl's SearchApi plan has used all of its monthly searches: every SearchApi engine answers HTTP 429",
+      "source": "live run pr-7bd2bc01ca789c51f668, 2026-10-25 (events.log: HTTP 429 from searchapi(google_news, bing_news, google_jobs, google_forums, youtube, google_trends_autocomplete))",
+      "status": "needs-operator",
+      "area": "acceptance",
+      "node": "N-EXT",
+      "blocked_by": [],
+      "closable_in_one_pass": false,
+      "needs_operator": "upgrade or top up the SearchApi plan behind prowl.chat (a payment)",
+      "wave": null,
+      "release": "external",
+      "evidence": "12 of 41 calls of the B-081 run refused with HTTP 429 'You have used all of the searches for the month'"
     }
   ]
 }

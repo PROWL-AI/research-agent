@@ -82,7 +82,7 @@ try{
  assert(await page.getByRole('heading',{name:'Исследования, на виду.'}).isVisible());
  assert.deepEqual(errors,[]);
  await readability(browser);
- console.log(JSON.stringify({browser:'Playwright WebKit',viewports:['1440x1000','390x844','360x740'],evidence,checks:['empty','status-chip','russian-kit-labels','verified-initiator','scroll-box-prepared','requests-360-no-overflow','approval','tutorial','steps','table','report','fixture-spend-exclusion','chains','dirty-settings','settings-diff','search-empty','mobile-no-overflow','offline-keeps-snapshot','spend-windows','per-report','attention-now-only','older-failures-folded','failure-words-first','coverage-research','coverage-tool','nav-no-cut-360-390','learn-call-route'],pageErrors:errors,status:'PASS'}));
+ console.log(JSON.stringify({browser:'Playwright WebKit',viewports:['1440x1000','390x844','360x740'],evidence,checks:['empty','status-chip','russian-kit-labels','verified-initiator','scroll-box-prepared','requests-360-no-overflow','approval','tutorial','steps','table','report','fixture-spend-exclusion','chains','dirty-settings','settings-diff','search-empty','mobile-no-overflow','offline-keeps-snapshot','spend-windows','per-report','attention-now-only','older-failures-folded','failure-words-first','coverage-research','coverage-tool','nav-no-cut-360-390','learn-call-route','failed-call-says-why'],pageErrors:errors,status:'PASS'}));
 }catch(e){console.error(e);throw e;}finally{
  if(browser)await browser.close();
  child.kill('SIGTERM');
@@ -133,6 +133,9 @@ async function readability(browser){
   await page.screenshot({path:evidence+'/failure-closed-desktop.png',fullPage:true});
   await page.getByText('Подробности',{exact:true}).click();
   await page.getByText('прогон: cancelled').waitFor();
+  // A failed call says why on the steps tab (2026-10-25: a provider 429 was only in the log file).
+  await page.getByRole('tab',{name:'Шаги'}).click();
+  await page.getByText('Причина: HTTP 429 from searchapi(google_news): Too Many Requests').waitFor();
   await page.getByText('Агент может продолжить этот прогон',{exact:false}).waitFor();
   await page.screenshot({path:evidence+'/failure-open-desktop.png',fullPage:true});
   // Coverage, in Russian, on a research job and on a tool job.

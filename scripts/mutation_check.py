@@ -183,6 +183,11 @@ MUTANTS = [
     ("approval-link-opens-in-fabric-dashboards", "research_agent/service/protocol.py",
      "    return f\"fabric-dashboards://service/{DASHBOARD_SERVICE}?path={quote(page, safe='')}\"\n",
      "    return \"http://127.0.0.1:18764\" + page\n", ["tests/test_service.py"]),
+    ("verified-label-away-from-citation", "research_agent/agent/report_checks.py",
+     "        if cited and all(claims[ref].status.value != \"verified\" for ref in cited):\n",
+     "        if False:\n", ["tests/test_judge_calibration.py"]),
+    ("failed-call-keeps-its-cause", "research_agent/service/runtime.py",
+     "            error = failure(exc)\n", "            pass\n", ["tests/test_service.py"]),
     ("service-events-in-file-log", "research_agent/service/store.py",
      "        emit(log, kind, _LOG_LEVELS.get(level, logging.INFO), **fields)\n", "", ["tests/test_service_parity.py"]),
 ]
