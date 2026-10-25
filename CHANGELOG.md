@@ -4,6 +4,17 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.3.5 (2026-10-25)
+
+- A failed call keeps its cause: the call journal stores a secret-free reason (at most 300 characters) for a failed
+  tool or model call, and the request's «Шаги» tab shows it as «Причина: …». Before, a provider's `HTTP 429` reached
+  only the log file and the receipt said «failed» (found on the first service research run, B-081).
+- A status label away from its citation is checked too: `**Confidence: VERIFIED**` after a cited sentence, or
+  `**Confidence:** VERIFIED [C37]`, is a `status_mislabel` when no claim the line cites is verified, and the writer
+  repairs it. The first service research run (B-081) reached its report with two such labels on assumed claims.
+- FD-14 closed: the dashboard tab captured inside the Fabric Dashboards host.
+- B-096 filed: Prowl's SearchApi plan has used its monthly searches, so SearchApi engines answer `HTTP 429`.
+
 ## 0.3.4 (2026-10-25)
 
 - Dashboard copy without em dashes: the spend note, the decision card's budget line, the ledger caption and the login

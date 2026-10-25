@@ -33,8 +33,12 @@ def main(root: Path) -> None:
         return record
 
     research = {"kind": "research", "runbook": "ads-creative-research", "inputs": {"brand": "Example"}}
-    job({**research, "inputs": {"brand": "Recent"}}, "fx-recent-failure", "failed", "failed", 0.1,
+    recent = job({**research, "inputs": {"brand": "Recent"}}, "fx-recent-failure", "failed", "failed", 0.1,
         error={"code": "timeout", "message": "Wall-clock timeout reached.", "data": {"terminalCode": "cancelled"}})
+    # A failed call names its cause on the steps tab (free, 25 days ago: no spend window moves).
+    call = store.start_call(recent["id"], "tool", "google_news", {"q": "fixture"})
+    store.finish_call(call, status="failed", costUsd=0.0, costBasis="provider", startedAt=stamp(25),
+                      error={"message": "HTTP 429 from searchapi(google_news): Too Many Requests"})
     for n, code in enumerate(["interrupted", "interrupted", "execution-failed"]):
         job({**research, "inputs": {"brand": f"Old {n}"}}, f"fx-old-failure-{n}", "failed", "interrupted", 5 + n,
             error={"code": code, "message": "Execution interrupted; upstream outcome may be unknown."})

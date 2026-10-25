@@ -232,6 +232,48 @@ async def test_billed_tool_failure_is_persisted(tmp_path):
     assert store.calls(job["id"])[0]["status"] == "failed"
 
 
+async def test_failed_tool_call_records_why(tmp_path):
+    # A failed call names its cause in the journal and on the dashboard (2026-10-25: a
+    # live run's provider 429 was only in the log file; the receipt said "failed").
+    from mcp.types import CallToolResult, TextContent
+    from research_agent.service.runtime import ObservedProwl
+    from research_agent.prowl_client import ToolCallError
+
+    store = Store(tmp_path)
+    job = store.create({"kind": "tool"}, "failure-why")[0]
+    reason = "HTTP 429 from searchapi(google_news): Too Many Requests; Authorization: Bearer sk-live-abcdefgh12345678"
+
+    class Session:
+        async def call_tool(self, *args, **kwargs):
+            return CallToolResult(content=[TextContent(type="text", text=json.dumps(
+                {"success": False, "error_class": "unknown_error", "error": reason}))])
+
+    prowl = ObservedProwl("fake", "https://example.invalid").observe(store, job)
+    prowl._session = Session()
+    with pytest.raises(ToolCallError):
+        await prowl.call_tool("google_news", {})
+    error = store.calls(job["id"])[0]["error"]
+    assert "HTTP 429 from searchapi(google_news)" in error["message"]
+    assert "sk-live" not in error["message"] and "[redacted]" in error["message"]
+    assert len(error["message"]) <= 300
+
+
+async def test_failed_llm_call_records_the_status(tmp_path):
+    from research_agent.service.runtime import ObservedLLM
+    from research_agent.llm import LLMError
+
+    store = Store(tmp_path)
+    job = store.create({"kind": "research"}, "llm-why")[0]
+    llm = ObservedLLM("https://example.invalid", "fake", "cheap", "strong").observe(store, job)
+    await llm._client.aclose()
+    llm._client = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(402, json={"error": {"message": "Insufficient credits"}})))
+    with pytest.raises(LLMError):
+        await llm.complete([{"role": "user", "content": "x"}])
+    await llm.aclose()
+    receipt = store.calls(job["id"])[0]
+    assert receipt["status"] == "failed" and receipt["error"]["message"].startswith("HTTP 402")
+
+
 async def test_llm_truncated_billed_response_recorded_once(tmp_path):
     from research_agent.service.runtime import ObservedLLM
     from research_agent.llm import LLMError

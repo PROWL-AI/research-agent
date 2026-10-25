@@ -33,6 +33,17 @@ def scrub(value):
     return value
 
 
+# Credential-shaped values inside free text (a provider's error message), redacted before
+# the journal keeps a failure's cause.
+SECRET_VALUE = re.compile(r"(?i)(bearer\s+|(?:authorization|api[_-]?key|token|password|secret|cookie)\s*[:=]\s*)\S+|\b(?:sk|pk|rk|prowl)[-_][A-Za-z0-9_-]{8,}")
+
+
+def failure(exc):
+    """Why a call failed, for the journal and the dashboard: secret-free, at most 300 characters."""
+    text = SECRET_VALUE.sub(lambda m: (m.group(1) or "") + "[redacted]", f"{exc}" or type(exc).__name__)
+    return {"message": text[:300]}
+
+
 def child_trace(parent):
     if parent is None:
         return None
@@ -78,7 +89,7 @@ class ObservedProwl(ProwlClient):
             raise refused from exc
         start = time.monotonic()
         index = len(self.call_log)
-        result, status = None, "failed"
+        result, status, error = None, "failed", None
         try:
             result = await super()._invoke(prowl_tool, arguments, record=record)
             status = "completed"
@@ -86,13 +97,16 @@ class ObservedProwl(ProwlClient):
         except asyncio.CancelledError:
             status = "unknown"
             raise
+        except Exception as exc:
+            error = failure(exc)
+            raise
         finally:
             # The record is allocated before dispatch and receives billed failure costs too.
             receipt = self.call_log[index] if len(self.call_log) > index else None
             cost = money(receipt.cost_usd) if receipt else None
             self.store.finish_call(call, status=status, durationMs=int((time.monotonic()-start)*1000),
                                    costUsd=cost, costBasis="provider" if cost is not None else "unknown",
-                                   output=bounded(scrub(result)))
+                                   output=bounded(scrub(result)), **({"error": error} if error else {}))
 
 
 class ObservedLLM(LLMClient):
@@ -133,11 +147,16 @@ class ObservedLLM(LLMClient):
                 try:
                     self._extract(data)  # a truncated or empty completion is a failed call
                     fields["status"] = "completed"
-                except LLMError:
-                    pass
+                except LLMError as exc:
+                    fields["error"] = failure(exc)
+            else:
+                fields["error"] = failure(f"HTTP {response.status_code}")
             return response
         except asyncio.CancelledError:
             fields["status"] = "unknown"
+            raise
+        except Exception as exc:
+            fields["error"] = failure(exc)
             raise
         finally:
             self.store.finish_call(call, durationMs=int((time.monotonic()-start)*1000), **fields)

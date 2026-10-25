@@ -401,6 +401,20 @@ def test_a_verified_tag_on_an_unverified_claim_is_a_defect(tmp_path):
     assert _kinds("# R\n\nTraffic is 150,000 visits [C1] [UNVERIFIED].\n", ledger) == []
 
 
+def test_a_verified_label_away_from_its_citation_is_a_defect(tmp_path):
+    # The first service research run (B-081, 2026-10-25) wrote these shapes: the label after the
+    # sentence or before the citation. The adjacent-tag rule missed both and the report called
+    # assumed claims VERIFIED.
+    ledger = _ledger(tmp_path, TRAFFIC)
+    assert _kinds("# R\n\n- Traffic is 150,000 visits [C1]. **Confidence: VERIFIED (single source)**\n", ledger) == ["status_mislabel"]
+    assert _kinds("# R\n\n**Confidence:** VERIFIED (single source) [C1][CONFLICT]\n", ledger) == ["status_mislabel"]
+    assert _kinds("# R\n\n- **VERIFIED (single source):** one source says it, nothing corroborates it.\n", ledger) == []
+    assert _kinds("# R\n\nTraffic is 150,000 visits [C1–UNVERIFIED]. Confidence: UNVERIFIED.\n", ledger) == []
+    assert _kinds("# R\n\nTraffic is 150,000 visits [C1]. VERIFIED claims are listed below.\n", ledger) == []
+    ledger.claims[0].status = type(ledger.claims[0].status)("verified")
+    assert _kinds("# R\n\n- Traffic is 150,000 visits [C1]. **Confidence: VERIFIED**\n", ledger) == []
+
+
 def test_a_verified_tag_on_a_verified_claim_is_fine(tmp_path):
     ledger = _ledger(tmp_path, TRAFFIC)
     ledger.claims[0].status = type(ledger.claims[0].status)("verified")

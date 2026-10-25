@@ -63,12 +63,12 @@
 - **Preconditions:** Запрос завершён.
 - **Steps:**
   1. Открыть данные, отчёт, шаги и исходный JSON.
-- **Expected result:** Таблица не требует чтения JSON; сырой текст не выполняется как HTML. Запрос с ошибкой сначала говорит, что произошло и какой следующий шаг, словами по коду ошибки (у исследования, прерванного или остановленного по времени, добавлено: агент может продолжить этот прогон, готовые шаги повторно не оплачиваются; сам вызов `research.run` с `resumeJobId` назван под «Подробности»); исходное сообщение, код и код завершения прогона лежат под «Подробности» (B-066 принцип 5). Запрос, который получил ответ инструмента с известным ограничением охвата (TikTok Ads Library: только Европа; у исследования его завершённый шаг, у разового вызова завершённый вызов), показывает плашку «Охват источника» по-русски на вкладках «Данные» и «Источники», и для разового вызова, и для исследования, включая запросы, завершённые до этого изменения (B-078).
-- **Acceptance criteria:** Таблица не требует чтения JSON; сырой текст не выполняется как HTML; у ошибки первым видно действие, а не исходный текст провайдера; плашка охвата есть у исследования с `tiktok_ads_library` и у разового вызова этого инструмента; доказательства записываются в verification.
+- **Expected result:** Таблица не требует чтения JSON; сырой текст не выполняется как HTML. Запрос с ошибкой сначала говорит, что произошло и какой следующий шаг, словами по коду ошибки (у исследования, прерванного или остановленного по времени, добавлено: агент может продолжить этот прогон, готовые шаги повторно не оплачиваются; сам вызов `research.run` с `resumeJobId` назван под «Подробности»); исходное сообщение, код и код завершения прогона лежат под «Подробности» (B-066 принцип 5). Запрос, который получил ответ инструмента с известным ограничением охвата (TikTok Ads Library: только Европа; у исследования его завершённый шаг, у разового вызова завершённый вызов), показывает плашку «Охват источника» по-русски на вкладках «Данные» и «Источники», и для разового вызова, и для исследования, включая запросы, завершённые до этого изменения (B-078). Упавший вызов на вкладке «Шаги» называет причину строкой «Причина: …» (сообщение провайдера без секретов, до 300 символов): до 2026-10-25 у вызова был только статус «ошибка», и отказ провайдера HTTP 429 виден был лишь в файле журнала.
+- **Acceptance criteria:** Таблица не требует чтения JSON; сырой текст не выполняется как HTML; у ошибки первым видно действие, а не исходный текст провайдера; плашка охвата есть у исследования с `tiktok_ads_library` и у разового вызова этого инструмента; упавший вызов называет причину; доказательства записываются в verification.
 - **States covered:** loading, empty, error, success
 - **Errors & recovery:** Ошибка сохраняет снимок; обновить панель. Платные вызовы не повторяются автоматически.
 - **UI elements:** Навигация, журнал, вкладки, форма решения, настройки.
-- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool) and tests/test_service.py; WebKit PASS 2026-10-23 (M1-B, frames in ../evidence/fabric-dashboard/raw/m1-wave-b/, [receipt](../evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)); see docs/evidence/fabric-dashboard/VERIFICATION.md
+- **Coverage:** scripts/test-dashboard.mjs (seeded readability checks: spend-windows, per-report, attention-now-only, older-failures-folded, failure-words-first, coverage-research, coverage-tool, failed-call-says-why) and tests/test_service.py (`test_failed_tool_call_records_why`, `test_failed_llm_call_records_the_status`); WebKit PASS 2026-10-25 for failed-call-says-why; WebKit PASS 2026-10-23 (M1-B, frames in ../evidence/fabric-dashboard/raw/m1-wave-b/, [receipt](../evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)); see docs/evidence/fabric-dashboard/VERIFICATION.md
 - **Screen:** Детали
 
 ### SCN-004: Решение человека
@@ -200,7 +200,7 @@
 | CORE-06 | Остановка по бюджету: вызовы, USD, минуты | 2 | UNVERIFIED |
 | CORE-07 | Остановка по бюджету LLM | 4 | UNVERIFIED |
 | CORE-08 | Оплаченный сбой входит в бюджет и после продолжения | 2 | PASS@0b0347b |
-| CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | PASS@5fcf2f4 |
+| CORE-09 | `verified` только с цитатой в сохранённом raw или двумя независимыми источниками | 3 | PASS@a022938 |
 | CORE-10 | Конфликт остаётся конфликтом | 3 | PASS@5fcf2f4 |
 | CORE-11 | Потеря доказательств → `partial`, не `complete` | 2 | PASS@2bbf566 |
 | CORE-12 | Переписать отчёт активного прогона нельзя | 1 | PASS@583f1d1 |
@@ -313,16 +313,16 @@
 - **Coverage:** `test_ka12_billed_failure_cost_survives_resume`
 
 ### CORE-09: `verified` только с цитатой в сохранённом raw или двумя независимыми источниками
-- **Status:** PASS@5fcf2f4
+- **Status:** PASS@a022938
 - **Actor:** оператор (P-01), читающий отчёт; вызывающий агент, потребляющий ledger
 - **Trigger:** извлечение утверждений из шага
 - **Preconditions:** raw шага сохранён с `raw_sha256`.
 - **Steps:**
   1. Прогнать; открыть ledger и отчёт.
 - **Expected result:** утверждение `verified` только если (а) его цитата найдена в сохранённом raw (после нормализации пробелов, sha256 совпадает) и значение стоит внутри цитаты, или (б) ≥2 согласных утверждения с разными известными `independence_key`; два инструмента над одним URL — один источник; два поставщика одного исходного датасета (`google_trends` и `serpapi_google_trends`) — один источник; URL засчитывается, только если его называет raw или запрос; утверждения одного шага не подтверждают друг друга; transform и LLM-инструменты (Perplexity, Gemini, Google AI) — не источник.
-- **Failure outcome:** цитата не найдена или источник `unknown` — утверждение не `verified`; v1 `verbatim` без цитаты понижается до `assumed` с раскрытием.
+- **Failure outcome:** цитата не найдена или источник `unknown` — утверждение не `verified`; v1 `verbatim` без цитаты понижается до `assumed` с раскрытием. Отчёт не называет VERIFIED утверждение, которое ledger держит иначе: метку рядом со ссылкой (`[C1] VERIFIED`) и метку статуса в той же строке (`[C1]. **Confidence: VERIFIED**`, `**Confidence:** VERIFIED [C1]`), когда ни одно процитированное в строке утверждение не `verified`, код считает дефектом `status_mislabel`, и writer её чинит (2026-10-25: первый исследовательский прогон сервиса, B-081, вышел с такими метками у `assumed`-утверждений).
 - **Wave:** 3 (N-EVID; KA-07, KA-08, KA-09)
-- **Coverage:** `test_ka08_fabricated_verbatim_is_not_verified`, `test_ka09_same_document_is_not_two_independent_sources`, `test_span_verification_reads_the_whole_stored_raw`, `test_two_independent_publishers_corroborate`, `test_two_data_providers_without_urls_corroborate_but_one_provider_does_not`, `test_transform_claim_never_corroborates_its_source`, `test_transform_quote_never_span_verifies`, `test_v1_verbatim_claim_without_a_quote_is_downgraded_on_load`, `test_tampered_raw_is_a_typed_extraction_failure_and_the_resume_finishes`, `test_a_bare_number_quote_is_not_a_quote`, `test_a_quote_copied_from_the_json_the_extractor_saw_is_found`, `test_value_in_quote_matches_numbers_on_number_boundaries`, `test_an_invented_source_url_does_not_make_a_second_source`, `test_urls_named_by_the_raw_count_but_one_step_is_one_delivery`, `test_a_web_tool_claim_without_a_url_is_no_source`, `test_a_quote_not_found_neither_verifies_nor_counts`, `test_an_llm_answer_tool_never_span_verifies`, `test_independence_is_the_upstream_source_not_the_delivery_tool`
+- **Coverage:** `test_ka08_fabricated_verbatim_is_not_verified`, `test_ka09_same_document_is_not_two_independent_sources`, `test_span_verification_reads_the_whole_stored_raw`, `test_two_independent_publishers_corroborate`, `test_two_data_providers_without_urls_corroborate_but_one_provider_does_not`, `test_transform_claim_never_corroborates_its_source`, `test_transform_quote_never_span_verifies`, `test_v1_verbatim_claim_without_a_quote_is_downgraded_on_load`, `test_tampered_raw_is_a_typed_extraction_failure_and_the_resume_finishes`, `test_a_bare_number_quote_is_not_a_quote`, `test_a_quote_copied_from_the_json_the_extractor_saw_is_found`, `test_value_in_quote_matches_numbers_on_number_boundaries`, `test_an_invented_source_url_does_not_make_a_second_source`, `test_urls_named_by_the_raw_count_but_one_step_is_one_delivery`, `test_a_web_tool_claim_without_a_url_is_no_source`, `test_a_quote_not_found_neither_verifies_nor_counts`, `test_an_llm_answer_tool_never_span_verifies`, `test_independence_is_the_upstream_source_not_the_delivery_tool`, `test_a_verified_label_away_from_its_citation_is_a_defect` (mutant `verified-label-away-from-citation`)
 
 ### CORE-10: Конфликт остаётся конфликтом
 - **Status:** PASS@5fcf2f4

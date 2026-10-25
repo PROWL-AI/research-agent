@@ -148,16 +148,31 @@ _CONFLICT_REF_RE = re.compile(r"\[CONFLICT\b[^\]]*\]")
 _TAGGED_CITATION_RE = re.compile(r"(\[[^\]]*?\bC\d+[^\]]*?\])\s*\(?\s*VERIFIED\b")
 
 
+#: A status label naming VERIFIED away from its citation ("**Confidence: VERIFIED (single
+#: source)**", "**Confidence:** VERIFIED"). The word in prose ("VERIFIED claims are listed
+#: below") is not a label, and UNVERIFIED does not match.
+_VERIFIED_LABEL_RE = re.compile(r"(?i:confidence|status)\W{0,6}VERIFIED\b")
+
+
 def _status_mislabels(report_md: str, claims: dict[str, Any]) -> list[tuple[str, str]]:
     """(claim id, line) for each citation tagged VERIFIED whose claim the ledger
     does not hold as verified (CORE-09: the writer must not call a claim
-    VERIFIED that the ledger marks otherwise)."""
+    VERIFIED that the ledger marks otherwise). A label away from its citation
+    (after the sentence, or before the citation) counts when no claim the line
+    cites is verified: the label then cannot be about any of them (B-081 run)."""
     found = []
     for line in report_md.splitlines():
+        tagged = False
         for match in _TAGGED_CITATION_RE.finditer(line):
             for ref in (f"C{n}" for n in _CITATION_ID_RE.findall(match.group(1))):
                 if ref in claims and claims[ref].status.value != "verified":
                     found.append((ref, line))
+                    tagged = True
+        if tagged or not _VERIFIED_LABEL_RE.search(line):
+            continue
+        cited = [ref for ref in (f"C{n}" for n in _CITATION_ID_RE.findall(line)) if ref in claims]
+        if cited and all(claims[ref].status.value != "verified" for ref in cited):
+            found.append((cited[0], line))
     return found
 
 
