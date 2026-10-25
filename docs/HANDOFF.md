@@ -21,15 +21,17 @@ service had no real usage at all, which B-081's run made false; it now asserts t
 and uses one key per smoke run (PR #47), smoke PASS (`pr-048b6308f62a7fe13319`).
 
 Filed: **B-096**, Prowl's SearchApi plan has used its monthly searches (every SearchApi engine answers `HTTP 429`);
-a payment, the operator's; the operator was told through the communicator. B-095 gained a note: `job.approved` names
+a payment, the operator's; the operator was told through the communicator. SearchApi's account endpoint reads 10 000 of
+10 000 searches used in the period ending 2026-10-30 21:46 UTC (production and local use one key), so it clears by
+itself then unless the plan is raised sooner. B-095 gained a note: `job.approved` names
 no actor today. B-042 unchanged: Observatory's MCP answered `stale-server` this session.
 
 Open and not this agent's alone: B-096 (operator: SearchApi plan), B-017 and KA-G02 (the operator labels one report),
 B-095 (CT-124 and CT-125 still proposed in `passioncode-ai/fabric-agent-contract` `docs/backlog.md:136-137` on
 2026-10-25), B-001, B-042, B-067, B-073, KA-01, KA-02, KA-G03, KA-G04 (other owners).
 
-**Exact next task:** B-095 once CT-124 and CT-125 land; a second `market-pulse` run after B-096 clears, to measure a
-complete pulse.
+**Exact next task:** B-095 once CT-124 and CT-125 land; a second `market-pulse` run after B-096 clears (2026-10-30 21:46 UTC
+at the latest), to measure a complete pulse.
 
 ## Current entry, 2026-10-25: documentation truth pass, release 0.3.4 (supersedes every "Exact next task" below)
 
