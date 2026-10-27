@@ -4,6 +4,12 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.3.6 (2026-10-27)
+
+- Dashboard on `fabric-dashboard-kit@1.1.5`, with Fabric's button: «Чат с Fabric о сервисе Prowl Research» opens a
+  chat about this service in Fabric; the link carries the service id only (B-088).
+- No local user name or private-wiki name in the public tree (B-097, the tree part).
+
 ## 0.3.5 (2026-10-25)
 
 - A failed call keeps its cause: the call journal stores a secret-free reason (at most 300 characters) for a failed
