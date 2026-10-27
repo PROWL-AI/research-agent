@@ -11,7 +11,7 @@ F.F.
 =================================== FAILURES ===================================
 ___________ test_ka06_non_owner_cannot_mutate_locked_checkpoint[run] ___________
 
-wired = PosixPath('/private/var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/pytest-of-sshlg/pytest-251/test_ka06_non_owner_cannot_mut0/runs')
+wired = PosixPath('<tmp>/pytest-of-<user>/pytest-251/test_ka06_non_owner_cannot_mut0/runs')
 entry = 'run'
 
     @pytest.mark.parametrize("entry", ["run", "startup"])
@@ -38,7 +38,7 @@ docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py:64: Assert
 ERROR    research_agent.mcp_server:mcp_server.py:147 run active-owner failed: run active-owner is locked by another process
 _________ test_ka06_non_owner_cannot_mutate_locked_checkpoint[startup] _________
 
-wired = PosixPath('/private/var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/pytest-of-sshlg/pytest-251/test_ka06_non_owner_cannot_mut1/runs')
+wired = PosixPath('<tmp>/pytest-of-<user>/pytest-251/test_ka06_non_owner_cannot_mut1/runs')
 entry = 'startup'
 
     @pytest.mark.parametrize("entry", ["run", "startup"])
@@ -65,7 +65,7 @@ docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py:64: Assert
 WARNING  research_agent.mcp_server:mcp_server.py:347 run active-owner marked interrupted: server restarted before completion
 ___________ test_ka07_valueless_claim_cannot_erase_numeric_conflict ____________
 
-tmp_path = PosixPath('/private/var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/pytest-of-sshlg/pytest-251/test_ka07_valueless_claim_cann0')
+tmp_path = PosixPath('<tmp>/pytest-of-<user>/pytest-251/test_ka07_valueless_claim_cann0')
 
     def test_ka07_valueless_claim_cannot_erase_numeric_conflict(tmp_path):
         ledger = Ledger(tmp_path / "ledger.json")
@@ -84,7 +84,7 @@ E         + verified
 docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py:77: AssertionError
 ________________ test_ka08_fabricated_verbatim_is_not_verified _________________
 
-tmp_path = PosixPath('/private/var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/pytest-of-sshlg/pytest-251/test_ka08_fabricated_verbatim_0')
+tmp_path = PosixPath('<tmp>/pytest-of-<user>/pytest-251/test_ka08_fabricated_verbatim_0')
 
     async def test_ka08_fabricated_verbatim_is_not_verified(tmp_path):
         llm = FakeLLM()
@@ -108,7 +108,7 @@ E        +  where True = any(<generator object test_ka08_fabricated_verbatim_is_
 docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py:95: AssertionError
 ____________ test_ka09_same_document_is_not_two_independent_sources ____________
 
-tmp_path = PosixPath('/private/var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/pytest-of-sshlg/pytest-251/test_ka09_same_document_is_not0')
+tmp_path = PosixPath('<tmp>/pytest-of-<user>/pytest-251/test_ka09_same_document_is_not0')
 
     def test_ka09_same_document_is_not_two_independent_sources(tmp_path):
         ledger = Ledger(tmp_path / "ledger.json")
@@ -126,7 +126,7 @@ E        +  where False = all(<generator object test_ka09_same_document_is_not_t
 docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py:107: AssertionError
 _________ test_ka10_evidence_failure_cannot_report_complete[raw_write] _________
 
-wired = PosixPath('/private/var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/pytest-of-sshlg/pytest-251/test_ka10_evidence_failure_can0/runs')
+wired = PosixPath('<tmp>/pytest-of-<user>/pytest-251/test_ka10_evidence_failure_can0/runs')
 monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a89ca10>
 fault = 'raw_write'
 
@@ -160,7 +160,7 @@ docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py:131: Asser
 ERROR    research_agent.agent.subagent:subagent.py:252 worker 0: raw artifact save failed for step 0: synthetic raw artifact write failure
 ________ test_ka10_evidence_failure_cannot_report_complete[extraction] _________
 
-wired = PosixPath('/private/var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/pytest-of-sshlg/pytest-251/test_ka10_evidence_failure_can1/runs')
+wired = PosixPath('<tmp>/pytest-of-<user>/pytest-251/test_ka10_evidence_failure_can1/runs')
 monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a89d710>
 fault = 'extraction'
 
@@ -194,7 +194,7 @@ docs/reports/2026-10-10-agent-deep-audit/raw/probe_agent_contracts.py:131: Asser
 WARNING  research_agent.agent.subagent:subagent.py:258 worker 0: claim extraction failed for step 0: synthetic extractor failure
 ___________ test_ka11_known_cost_does_not_discard_previous_estimates ___________
 
-wired = PosixPath('/private/var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/pytest-of-sshlg/pytest-251/test_ka11_known_cost_does_not_0/runs')
+wired = PosixPath('<tmp>/pytest-of-<user>/pytest-251/test_ka11_known_cost_does_not_0/runs')
 
     async def test_ka11_known_cost_does_not_discard_previous_estimates(wired):
         client = ScriptedClient([
@@ -219,7 +219,7 @@ WARNING  research_agent.agent.orchestrator:orchestrator.py:166 plan item 1 (base
 WARNING  research_agent.agent.orchestrator:orchestrator.py:166 plan item 2 (baseline-2) dropped: duplicate step (same tool and arguments)
 ________________ test_ka12_billed_failure_cost_survives_resume _________________
 
-wired = PosixPath('/private/var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/pytest-of-sshlg/pytest-251/test_ka12_billed_failure_cost_0/runs')
+wired = PosixPath('<tmp>/pytest-of-<user>/pytest-251/test_ka12_billed_failure_cost_0/runs')
 
     async def test_ka12_billed_failure_cost_survives_resume(wired):
         client = ScriptedClient([{
@@ -248,7 +248,7 @@ WARNING  research_agent.prowl_client:prowl_client.py:205 prowl refused prowl_cal
 ERROR    research_agent.agent.subagent:subagent.py:229 worker 0: hard failure at step 0, worker stops: prowl_call_tool: upstream_error
 ______________ test_control_known_cost_stops_before_next_dispatch ______________
 
-wired = PosixPath('/private/var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/pytest-of-sshlg/pytest-251/test_control_known_cost_stops_0/runs')
+wired = PosixPath('<tmp>/pytest-of-<user>/pytest-251/test_control_known_cost_stops_0/runs')
 
     async def test_control_known_cost_stops_before_next_dispatch(wired):
         client = ScriptedClient([{"rows": [], "billing": {"actual_cost_usd": 0.6}}])

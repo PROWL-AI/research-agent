@@ -126,7 +126,7 @@
       "closable_in_one_pass": true,
       "wave": 1,
       "release": "this",
-      "notes": "vault commit `870ff961` is an ancestor of obsidian-memory-vault `origin/master` `bf2fd5cd`; card `projects/prowl-research/prowl-research.md` and one `prowl-research.default` row in `synthesis/agent-estate.md` present there, measured 2026-10-16"
+      "notes": "the card and the estate row landed in the operator's private wiki (commit `870ff961`, an ancestor of its `origin/master` `bf2fd5cd`); card `projects/prowl-research/prowl-research.md` and one `prowl-research.default` row in `synthesis/agent-estate.md` present there, measured 2026-10-16"
     },
     {
       "id": "B-024",
