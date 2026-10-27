@@ -27,6 +27,15 @@ try{
  await page.locator('#service-chip',{hasText:'Работает с ограничениями'}).waitFor();
  assert.equal(await page.locator('#fd-theme option:checked').textContent(),'Графит');
  assert.equal(await page.locator('#fd-scheme option[value=auto]').textContent(),'Как в системе');
+ // B-088: Fabric's button (kit 1.1.5) speaks Russian on this page and its link carries the service id only.
+ const fabricButton=page.locator('.fd-fabric-button button, button.fd-fabric-button').first();
+ await fabricButton.waitFor();
+ await fabricButton.click();
+ const chat=page.getByRole('menuitem',{name:'Чат с Fabric о сервисе Prowl Research'}).or(page.getByRole('link',{name:'Чат с Fabric о сервисе Prowl Research'}));
+ await chat.waitFor();
+ assert.equal(await chat.getAttribute('href'),'fabric://chat?service=prowl-research.default');
+ assert(!(await page.getByText('Chat with Fabric',{exact:false}).count()),'English Fabric label on a Russian page');
+ await page.keyboard.press('Escape');
  await page.getByRole('button',{name:'Открыть учебный пример',exact:true}).click();
  await page.getByRole('heading',{name:'Разрешить этот запрос?'}).waitFor();
  await page.screenshot({path:evidence+'/approval-desktop.png',fullPage:true});
@@ -82,7 +91,7 @@ try{
  assert(await page.getByRole('heading',{name:'Исследования, на виду.'}).isVisible());
  assert.deepEqual(errors,[]);
  await readability(browser);
- console.log(JSON.stringify({browser:'Playwright WebKit',viewports:['1440x1000','390x844','360x740'],evidence,checks:['empty','status-chip','russian-kit-labels','verified-initiator','scroll-box-prepared','requests-360-no-overflow','approval','tutorial','steps','table','report','fixture-spend-exclusion','chains','dirty-settings','settings-diff','search-empty','mobile-no-overflow','offline-keeps-snapshot','spend-windows','per-report','attention-now-only','older-failures-folded','failure-words-first','coverage-research','coverage-tool','nav-no-cut-360-390','learn-call-route','failed-call-says-why'],pageErrors:errors,status:'PASS'}));
+ console.log(JSON.stringify({browser:'Playwright WebKit',viewports:['1440x1000','390x844','360x740'],evidence,checks:['empty','status-chip','russian-kit-labels','verified-initiator','scroll-box-prepared','requests-360-no-overflow','approval','tutorial','steps','table','report','fixture-spend-exclusion','chains','dirty-settings','settings-diff','search-empty','mobile-no-overflow','offline-keeps-snapshot','spend-windows','per-report','attention-now-only','older-failures-folded','failure-words-first','coverage-research','coverage-tool','nav-no-cut-360-390','learn-call-route','failed-call-says-why','fabric-button-russian'],pageErrors:errors,status:'PASS'}));
 }catch(e){console.error(e);throw e;}finally{
  if(browser)await browser.close();
  child.kill('SIGTERM');
@@ -160,7 +169,7 @@ async function readability(browser){
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'readability 360 overflow');
   await page.screenshot({path:evidence+'/overview-readability-360.png',fullPage:true});
   // B-084: at 360 and 390 px, whatever section is current, no visible nav link sticks out of the list
-  // (kit 1.1.2 left a half-cut «Цепо» beside «Ещё»; 1.1.3 folds it).
+  // (kit 1.1.2 left a half-cut «Цепо» beside «Ещё»; 1.1.3 and later fold it).
   for(const width of [360,390]){
    await page.setViewportSize({width,height:740});
    for(const section of ['overview','requests','chains','costs','learn','settings']){

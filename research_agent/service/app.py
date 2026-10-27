@@ -37,7 +37,7 @@ def code_digest():
 #: The dashboard's declaration (ED-9, DEC-0036): the kit it ships and the
 #: estate themes the host may apply.
 DASHBOARD_EXTENSION = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
-DASHBOARD_KIT = "fabric-dashboard-kit@1.1.3"
+DASHBOARD_KIT = "fabric-dashboard-kit@1.1.5"
 DASHBOARD_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
 
 
@@ -172,7 +172,7 @@ def create_app(root: Path, host_token: str, agent_token: str, port=18764, build=
         if path.startswith("/static/"):
             name = path.removeprefix("/static/")
             if name not in {"app.js", "styles.css", "fabric-dashboard.css", "fabric-dashboard.js",
-                            "Fraunces.ttf", "Newsreader.ttf", "JetBrainsMono.ttf"}:
+                            "fabric-button.js", "Fraunces.ttf", "Newsreader.ttf", "JetBrainsMono.ttf"}:
                 return Response(status_code=404)
             return FileResponse(STATIC / name)
         if not operator(request):

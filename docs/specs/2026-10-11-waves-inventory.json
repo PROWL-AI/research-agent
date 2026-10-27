@@ -1420,7 +1420,7 @@
       "node": "N-SVC",
       "blocked_by": [],
       "closable_in_one_pass": true,
-      "evidence": "closed as decided: English-only labels would break russian-kit-labels; kit owner asked, 2026-10-24",
+      "evidence": "closed 2026-10-27: kit 1.1.5 loads Fabric's button with Russian labels (check fabric-button-russian)",
       "wave": 4,
       "release": "this"
     },
