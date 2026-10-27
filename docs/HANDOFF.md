@@ -1,5 +1,24 @@
 # Research-agent handoff
 
+## Current entry, 2026-10-27: release 0.3.6, B-088 done, B-097 filed (supersedes every "Exact next task" below)
+
+Board: DEC-0126 (org transfer to `appvillis-com`, thread `3b676949`) names «research-agent», most likely the
+operator's `ssheleg/research-agent`, not this public PROWL-AI repository; answered so, nothing moved. Its audit here
+(`gitleaks git`: one false positive; 48 of 219 commits authored with the operator's personal e-mail; machine traces in
+the tree) became **B-097**: the tree part fixed in PR #50, the history part is the operator's (a public history cannot
+be rewritten without force-push). The one-approval rule (thread `69f5aba4`) answered «adopted».
+
+**B-088 closed**: kit `fabric-dashboard-kit@1.1.5` loads Fabric's button with Russian labels (PR #51, WebKit check
+`fabric-button-russian`, red without the button). Release **0.3.6** (tag `v0.3.6`), installed `bb30f5b829d1`: `ready`,
+`degraded: []`, smoke PASS (`pr-af7791ef9d2cd82f835a`), installed code equal to its sources; suite 758.
+
+Open: B-096 (SearchApi quota back 2026-10-30 21:46 UTC; a session-only check is set for 23:03 that day, so if this
+session is gone, read `/api/v1/me` then), B-097 history (operator), B-095 (CT-124, CT-125), B-017/KA-G02 (operator
+labels a report), others' rows.
+
+**Exact next task:** after 2026-10-30 21:46 UTC, confirm the SearchApi quota, close B-096 and create a second
+`market-pulse` run (operator approves on the dashboard); B-095 once CT-124 and CT-125 land.
+
 ## Current entry, 2026-10-25: first service research run, release 0.3.5 (supersedes every "Exact next task" below)
 
 Operator: «разберись со всеми долгами оперативно и закрой задачи». Closed:
