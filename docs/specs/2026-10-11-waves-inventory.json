@@ -1510,11 +1510,10 @@
       "area": "fabric",
       "node": "N-FAB",
       "blocked_by": [
-        "CT-124",
         "CT-125"
       ],
       "closable_in_one_pass": false,
-      "evidence": "pin only after CT-124 (adapter kits) and CT-125 (Fabric hub) land",
+      "evidence": "CT-124 landed 2026-10-26 (adapter 0.50.0); waits for CT-125 (hub forwards decisions); adapter guidance: keep tools as today until then",
       "wave": 5,
       "release": "this"
     },
