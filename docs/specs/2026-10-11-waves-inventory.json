@@ -1531,6 +1531,20 @@
       "wave": null,
       "release": "external",
       "evidence": "12 of 41 calls of the B-081 run refused with HTTP 429 'You have used all of the searches for the month'"
+    },
+    {
+      "id": "B-097",
+      "title": "Public repository carries the operator's private traces (author e-mail in 48 commits, machine paths, private wiki reference)",
+      "source": "org-transfer audit, board thread 3b676949, 2026-10-27",
+      "status": "needs-operator",
+      "area": "docs",
+      "node": "N-DOCS",
+      "blocked_by": [],
+      "closable_in_one_pass": false,
+      "needs_operator": "accept the public history as is, or decide a rewrite (needs force-push)",
+      "wave": 1,
+      "release": "this",
+      "evidence": "gitleaks git: 1 false positive; authors 169 r@e.com, 2 dev@prowl.chat, 48 personal"
     }
   ]
 }
