@@ -1535,15 +1535,14 @@
       "id": "B-097",
       "title": "Public repository carries the operator's private traces (author e-mail in 48 commits, machine paths, private wiki reference)",
       "source": "org-transfer audit, board thread 3b676949, 2026-10-27",
-      "status": "needs-operator",
+      "status": "closed",
       "area": "docs",
       "node": "N-DOCS",
       "blocked_by": [],
-      "closable_in_one_pass": false,
-      "needs_operator": "accept the public history as is, or decide a rewrite (needs force-push)",
+      "closable_in_one_pass": true,
       "wave": 1,
       "release": "this",
-      "evidence": "gitleaks git: 1 false positive; authors 169 r@e.com, 2 dev@prowl.chat, 48 personal"
+      "evidence": "closed 2026-10-28: tree fixed in PR #50; history kept as is by the operator's decision («оставить», 2026-10-28); gitleaks git: 1 false positive"
     }
   ]
 }

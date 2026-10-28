@@ -1,5 +1,18 @@
 # Research-agent handoff
 
+## Current entry, 2026-10-28: B-097 closed, history kept (supersedes every "Exact next task" below)
+
+Operator, this project's session, 2026-10-28, on the public history of `PROWL-AI/research-agent`: «оставить». B-097
+is closed: the tree part was fixed in PR #50, the history stays as it is (no rewrite, no force-push). Board: DEC-0126
+thread `3b676949` read through 2026-10-28; this project is not an addressee of the transfer.
+
+Open: B-096 (SearchApi quota back 2026-10-30 21:46 UTC; session check at 23:03 that day), B-095 (CT-125 in
+`passioncode-ai/fabric-agent-contract` still `open: proposed` on 2026-10-28; session check every 4 hours),
+B-017/KA-G02 (operator labels a report), others' rows. Open rows: 12 of 114 (`scripts/plan/assign_waves.py --check`).
+
+**Exact next task:** after 2026-10-30 21:46 UTC, confirm the SearchApi quota (`/api/v1/me`), close B-096 and create a
+second `market-pulse` run (operator approves on the dashboard); B-095 once CT-125 lands.
+
 ## Current entry, 2026-10-27: release 0.3.6, B-088 done, B-097 filed (supersedes every "Exact next task" below)
 
 Board: DEC-0126 (org transfer to `appvillis-com`, thread `3b676949`) names «research-agent», most likely the
