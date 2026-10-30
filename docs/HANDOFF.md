@@ -1,5 +1,20 @@
 # Research-agent handoff
 
+## Current entry, 2026-10-30: B-096 still open after the period reset (supersedes every "Exact next task" below)
+
+SearchApi `/api/v1/me`, read 2026-10-30 22:03 UTC with the production key (only quota fields printed): the new period
+runs 2026-10-30 21:46:35 UTC to 2026-11-30 21:46:35 UTC, yet `current_month_usage` 10 000 of `monthly_allowance`
+10 000 and `remaining_credits` 0. The quota did not come back with the period, so B-096 stays open and no second
+`market-pulse` run is created. Either SearchApi's counter lags or the plan's renewal charge failed: the account and
+its billing are the operator's (https://www.searchapi.io/dashboard). The key sits in `0xDEV/.env`, not in the
+Observatory vault; moving it there is a secret-store write this session may not make.
+
+Open: B-096 (above; session recheck 2026-10-31), B-095 (CT-125 still `open: proposed`), B-017/KA-G02 (operator labels
+a report), others' rows.
+
+**Exact next task:** read `/api/v1/me` again; when `remaining_credits` > 0, close B-096 and tell the operator a second
+`market-pulse` run can be created (they approve it on the dashboard); B-095 once CT-125 lands.
+
 ## Current entry, 2026-10-28: B-097 closed, history kept (supersedes every "Exact next task" below)
 
 Operator, this project's session, 2026-10-28, on the public history of `PROWL-AI/research-agent`: «оставить». B-097
