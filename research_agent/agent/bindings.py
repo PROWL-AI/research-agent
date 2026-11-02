@@ -5,8 +5,9 @@ a result (an app's numeric store id, a package name found by a search) cannot
 be written literally. The planner writes it as a placeholder, ``{{name}}``, and
 puts a transform before the step whose instruction says where the value is.
 That transform ends its note with a fenced ``bindings`` block; a value is kept
-only when it appears verbatim in a raw artifact of the run, so a model cannot
-invent an id. Before dispatch the step's arguments are filled; a placeholder
+only when it appears verbatim in a raw artifact of the run or in the run's own
+inputs (B-098: the operator's words are a source too), so a model cannot invent
+an id. Before dispatch the step's arguments are filled; a placeholder
 nobody resolved is never sent (the provider would refuse it and bill the call).
 """
 
@@ -184,9 +185,26 @@ def strip_block(note: str) -> str:
     return _BLOCK_RE.sub("", note or "").rstrip()
 
 
+def brief_texts(brief: Any) -> list[str]:
+    """Every string value of the run's inputs, in order (B-098): what the operator
+    wrote grounds a binding as verbatim as an artifact does. Numbers and flags are
+    left out; a value that short proves nothing anyway."""
+    found: list[str] = []
+    if isinstance(brief, str):
+        found.append(brief)
+    elif isinstance(brief, dict):
+        for item in brief.values():
+            found.extend(brief_texts(item))
+    elif isinstance(brief, (list, tuple)):
+        for item in brief:
+            found.extend(brief_texts(item))
+    return found
+
+
 def grounded(candidates: dict[str, str], names: Iterable[str], texts: Iterable[str]) -> tuple[dict[str, str], dict[str, str]]:
     """(kept, rejected-with-reason): a value is kept when its name was asked
-    for and the value appears verbatim in one of the raw artifact texts."""
+    for and the value appears verbatim in one of the texts (the raw artifacts,
+    and the run's inputs since B-098)."""
     asked = set(names)
     corpus = list(texts)
     kept: dict[str, str] = {}
@@ -197,7 +215,7 @@ def grounded(candidates: dict[str, str], names: Iterable[str], texts: Iterable[s
         elif len(value) < _MIN_GROUNDED_LEN:
             rejected[name] = "value too short to check"
         elif not any(value in text for text in corpus):
-            rejected[name] = "value not found in any raw artifact"
+            rejected[name] = "value not found in any raw artifact or run input"
         else:
             kept[name] = value
     return kept, rejected

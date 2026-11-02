@@ -1,5 +1,27 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-02: B-098 closed, 0.3.7 (supersedes every "Exact next task" below)
+
+Operator, 2026-11-02, in this session: «улучши работу агента». The service's own signals were read first: Fabric
+Dashboards `activity` and `audit` for `prowl-research.default` (no error, no failing part), the events log
+(`~/Library/Logs/prowl-research/events.log`, 52 warning lines, all from run `pr-7bd2bc01ca789c51f668`). Besides the
+known B-096 refusals, that run lost 15 required trend steps to `step.unbound`: the transform that was to derive
+`{{term1}}`..`{{term5}}` had no artifact (its source, `google_trends_autocomplete`, was refused) and bindings were
+grounded in raw artifacts only, so even the SerpApi trend steps never ran although the brief named the market.
+
+Done: B-098 (README, CORE-18, CHANGELOG 0.3.7, board, inventory). A transform a later step waits on now sees the run's
+inputs; a value they state verbatim is bound (`from_inputs` in `bindings.resolved`). Checks run: `pytest` 762 passed,
+`ruff check research_agent tests` clean, `scripts/plan/assign_waves.py --check` open 12 of 115.
+
+Found on the way, not this repository's: the operator's personal research service (`research-agent.main`, another
+repository) logs its `search` role cut by its 400-token cap in 25 of 28 answers and its synthesis re-sent with a
+raised cap in 8 of 16 first attempts; reported to that project, not fixed here.
+
+Open: unchanged (B-096, B-095, B-017/KA-G02, B-067, B-073, B-042, B-001 waived).
+
+**Exact next task:** unchanged from the entry below; the next `market-pulse` run is also B-098's live receipt (the trend
+steps should run on the brief's market even while SearchApi answers 429).
+
 ## Current entry, 2026-11-02: B-067 and B-073 handed to prowl-app (supersedes every "Exact next task" below)
 
 Operator, 2026-11-02, relayed by the fabric-workspace-f1 session: «продолжи все агентов». Every open row here waits on

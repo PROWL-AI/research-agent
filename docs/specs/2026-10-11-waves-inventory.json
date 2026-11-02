@@ -1543,6 +1543,19 @@
       "wave": 1,
       "release": "this",
       "evidence": "closed 2026-10-28: tree fixed in PR #50; history kept as is by the operator's decision («оставить», 2026-10-28); gitleaks git: 1 false positive"
+    },
+    {
+      "id": "B-098",
+      "title": "A value the request itself names could not fill a placeholder: bindings were grounded in raw artifacts only",
+      "source": "live run pr-7bd2bc01ca789c51f668, 2026-10-25 (checkpoint: 15 required trend steps 'not sent: no earlier step resolved {{term1}}'..'{{term5}}')",
+      "status": "closed",
+      "area": "acceptance",
+      "node": "N-ACC",
+      "blocked_by": [],
+      "closable_in_one_pass": true,
+      "wave": 6,
+      "release": "this",
+      "evidence": "closed 2026-11-02: run inputs ground a binding (bindings.brief_texts), tests/test_plan_bindings.py 4 new, 0.3.7"
     }
   ]
 }

@@ -4,6 +4,14 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.3.7 (2026-11-02)
+
+- A value the request itself names grounds a placeholder: a transform a later step waits on now sees the run's inputs
+  and may bind a value they state verbatim, as it binds one an artifact states. On market-pulse run
+  `pr-7bd2bc01ca789c51f668` the refused trends autocomplete (B-096) left `{{term1}}`..`{{term5}}` unbound and 15
+  required trend steps unsent, SerpApi's included, although the brief named the market (B-098). A value neither
+  source states is still discarded and never sent.
+
 ## 0.3.6 (2026-10-27)
 
 - Dashboard on `fabric-dashboard-kit@1.1.5`, with Fabric's button: «Чат с Fabric о сервисе Prowl Research» opens a

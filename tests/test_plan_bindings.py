@@ -176,3 +176,74 @@ def test_the_planner_is_told_how_to_write_a_placeholder():
 
     assert "{{snake_case_name}}" in _PLAN_INSTRUCTIONS
     assert "is not sent" in _PLAN_INSTRUCTIONS
+
+
+# ── B-098: the request's own words ground a value too ──────────────────────
+#
+# Live run pr-7bd2bc01ca789c51f668 (market-pulse, 2026-10-25): the first step,
+# google_trends_autocomplete, was refused (SearchApi quota, B-096); the transform
+# that was to derive {{term1}}..{{term5}} saw no artifact and bound nothing, so 15
+# required trend steps were never sent, the SerpApi ones included, although the
+# brief itself named the market ("AI meeting note-taker apps"). A value the
+# operator's inputs state verbatim is grounded as an artifact's is.
+
+
+def test_brief_texts_are_the_string_values_of_the_inputs():
+    brief = {"market": "AI note apps", "geo": "US", "months": 12, "competitors": ["a.com", 7],
+             "nested": {"k": "deep value"}}
+    assert bindings.brief_texts(brief) == ["AI note apps", "US", "a.com", "deep value"]
+    assert bindings.brief_texts({}) == []
+    assert bindings.brief_texts(None) == []
+
+
+def _seed_plan() -> dict:
+    return {"plan": [
+        {"step": "seed terms", "tool": "transform", "arguments": {},
+         "instruction": "From the brief: give seed_domain"},
+        {"step": "seed stats", "tool": TOOL, "arguments": {"domain": "{{seed_domain}}"}, "on_error_skip": True},
+        {"step": "other", "tool": TOOL, "arguments": {"domain": "b.com"}},
+    ]}
+
+
+async def test_a_value_the_brief_states_is_bound_and_sent(lookup_runbook, tmp_path):
+    runs = tmp_path / "runs"
+    prowl = IdProwl()
+    llm = FakeLLM()
+    llm.plan_payload = _seed_plan()
+    llm.transform_text = "No artifact yet; the brief names a.com.\n```bindings\n{\"seed_domain\": \"a.com\"}\n```"
+    await Orchestrator(prowl, llm, runs_root=runs).run("bind-lookup", BRIEF, run_id="brief-bound")
+
+    assert [c["arguments"]["domain"] for c in prowl.tool_calls] == ["a.com", "b.com"]
+    checkpoint = _checkpoint(runs, "brief-bound")
+    assert checkpoint["bindings"] == {"seed_domain": "a.com"}
+    assert _step(checkpoint, "seed stats")["state"] == "completed"
+    # the transform saw the request inputs, named as the operator's words
+    prompt = next(c for c in llm.calls if "Values later steps need" in c["messages"][-1]["content"])
+    content = prompt["messages"][-1]["content"]
+    assert "## Request inputs" in content and '"a.com"' in content
+
+
+async def test_a_value_neither_the_brief_nor_an_artifact_states_is_still_discarded(lookup_runbook, tmp_path):
+    runs = tmp_path / "runs"
+    prowl = IdProwl()
+    llm = FakeLLM()
+    llm.plan_payload = _seed_plan()
+    llm.transform_text = "```bindings\n{\"seed_domain\": \"invented.com\"}\n```"
+    await Orchestrator(prowl, llm, runs_root=runs).run("bind-lookup", BRIEF, run_id="brief-invented")
+
+    assert [c["arguments"]["domain"] for c in prowl.tool_calls] == ["b.com"]
+    checkpoint = _checkpoint(runs, "brief-invented")
+    assert checkpoint["bindings"] == {}
+    assert _step(checkpoint, "seed stats")["state"] == "skipped_on_error"
+
+
+async def test_a_transform_no_later_step_needs_does_not_get_the_request_inputs(lookup_runbook, tmp_path):
+    runs = tmp_path / "runs"
+    llm = FakeLLM()
+    llm.plan_payload = {"plan": [
+        {"step": "a", "tool": TOOL, "arguments": {"domain": "b.com"}},
+        {"step": "sum", "tool": "transform", "arguments": {}, "instruction": "Summarise a"},
+    ]}
+    await Orchestrator(IdProwl(), llm, runs_root=runs).run("bind-lookup", BRIEF, run_id="no-names")
+    transform_calls = [c for c in llm.calls if "## Instruction\nSummarise a" in c["messages"][-1]["content"]]
+    assert transform_calls and all("## Request inputs" not in c["messages"][-1]["content"] for c in transform_calls)

@@ -1087,10 +1087,12 @@ class Orchestrator:
                     texts.append(store.read_artifact(s.raw_ref))
                 except OSError as exc:
                     log.warning("bindings: %s unreadable: %s", s.raw_ref, exc)
-        kept, rejected = plan_bindings.grounded(candidates, names, texts)
+        inputs = plan_bindings.brief_texts(checkpoint.brief)
+        kept, rejected = plan_bindings.grounded(candidates, names, texts + inputs)
         checkpoint.bindings.update(kept)
+        from_inputs = sorted(n for n, v in kept.items() if not any(v in t for t in texts))
         emit(log, "bindings.resolved", run_id=checkpoint.run_id, step_id=record.step_id,
-             kept=sorted(kept), rejected=rejected or None)
+             kept=sorted(kept), from_inputs=from_inputs or None, rejected=rejected or None)
 
     async def _run_transform(self, record: StepRecord, checkpoint: Checkpoint, store: ArtifactStore) -> str:
         instruction = record.instruction or (
@@ -1128,13 +1130,20 @@ class Orchestrator:
             + "\n".join(f"- {_refusal_text(s)}" for s in refused[-10:])
         ) if refused else ""
         names = plan_bindings.wanted(checkpoint.steps[position + 1:], checkpoint.bindings)
+        # The run's inputs are the operator's own words, a source for a value even when the
+        # tool that was to find it returned nothing (B-098). Shown only to a transform a later
+        # step waits on, so every other transform reads the artifacts alone, as before.
         bindings_part = (
+            "\n\n## Request inputs (the operator's own words)\n"
+            f"{_UNTRUSTED_OPEN}\n{json.dumps(checkpoint.brief, ensure_ascii=False, indent=2)[:_TRANSFORM_CONTEXT_CHARS]}\n"
+            f"{_UNTRUSTED_CLOSE}"
             "\n\n## Values later steps need (B-065)\n"
-            f"Later steps of the plan need: {', '.join(names)}. For each one an artifact above states, "
-            "end your answer with one fenced block, the value copied exactly as the artifact writes it:\n"
+            f"Later steps of the plan need: {', '.join(names)}. For each one an artifact above or the "
+            "request inputs state, end your answer with one fenced block, the value copied exactly as "
+            "written there:\n"
             "```bindings\n{\"<name>\": \"<value>\"}\n```\n"
-            "Leave out a name no artifact states; never guess one. A value not found verbatim in the "
-            "raw artifacts is discarded."
+            "Leave out a name neither states; never guess one. A value not found verbatim in the "
+            "raw artifacts or the request inputs is discarded."
         ) if names else ""
         user = (
             f"## Instruction\n{instruction}\n\n"

@@ -219,7 +219,8 @@ runbook (SKILL.md)  →  brief  →  plan  →  parallel research sub-agents
 - **A value only an earlier step returns is a placeholder.** The plan is written before any tool runs, so an
   argument such as an app's numeric store id is planned as `{{headspace_apple_id}}`, with a transform before the
   step that names it. That transform ends its note with a fenced `bindings` block; a value is kept only when a raw
-  artifact of the run states it verbatim (`checkpoint.bindings`), and the step sends the filled arguments
+  artifact of the run or the run's own inputs state it verbatim (`checkpoint.bindings`; the inputs since B-098, so a
+  market the operator named still reaches the trend steps when the tool that was to list terms is refused), and the step sends the filled arguments
   (`bound_arguments`; `arguments` keeps the plan as written). A placeholder nobody resolved is never sent: the step
   is `skipped_on_error` (or `failed`, when required) with `not sent: no earlier step resolved {{name}}`, and it does
   not count toward the refusals in a row (B-065).
