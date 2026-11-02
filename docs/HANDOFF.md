@@ -1,5 +1,23 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-02: B-067 and B-073 handed to prowl-app (supersedes every "Exact next task" below)
+
+Operator, 2026-11-02, relayed by the fabric-workspace-f1 session: «продолжи все агентов». Every open row here waits on
+someone else, and two of them waited on an owner who had never been told: B-067 (`resolve_app_store_ids` keeps another
+brand's app) and B-073 (`tiktok_ads_library` documents `country` as `US`, which the provider refuses) live in prowl-app,
+which is not a Fabric project. They are filed in prowl-app's own ledger as T401 and T402, PR PROWL-AI/prowl-app#29
+(docs only, `docs/ux/lint.py` exits 0, lease taken and released). It is left for prowl-app to merge, because a merge to
+its `master` deploys and that repository ships through `./deploy.sh`.
+
+Rechecked 2026-11-02: CT-125 still `open: proposed`; SearchApi `/api/v1/me` on 2026-10-31 still read 10 000 of 10 000,
+`remaining_credits` 0.
+
+Open: B-096 (the operator's SearchApi billing, https://www.searchapi.io/dashboard), B-095 (CT-125), B-017/KA-G02 (operator
+labels a report), B-067 and B-073 (prowl-app, T401 and T402), B-042 (Observatory registry), B-001 (waived).
+
+**Exact next task:** read `/api/v1/me`; when `remaining_credits` > 0, close B-096 and tell the operator a second
+`market-pulse` run can be created; B-095 once CT-125 lands; close B-067 and B-073 when prowl-app ships T401 and T402.
+
 ## Current entry, 2026-10-30: B-096 still open after the period reset (supersedes every "Exact next task" below)
 
 SearchApi `/api/v1/me`, read 2026-10-30 22:03 UTC with the production key (only quota fields printed): the new period
