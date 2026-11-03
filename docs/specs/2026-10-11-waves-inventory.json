@@ -1521,15 +1521,14 @@
       "id": "B-096",
       "title": "Prowl's SearchApi plan has used all of its monthly searches: every SearchApi engine answers HTTP 429",
       "source": "live run pr-7bd2bc01ca789c51f668, 2026-10-25 (events.log: HTTP 429 from searchapi(google_news, bing_news, google_jobs, google_forums, youtube, google_trends_autocomplete))",
-      "status": "needs-operator",
+      "status": "closed",
       "area": "acceptance",
       "node": "N-EXT",
       "blocked_by": [],
       "closable_in_one_pass": false,
-      "needs_operator": "upgrade or top up the SearchApi plan behind prowl.chat (a payment)",
       "wave": null,
       "release": "external",
-      "evidence": "12 of 41 calls of the B-081 run refused with HTTP 429 'You have used all of the searches for the month'"
+      "evidence": "closed 2026-11-03: the operator paid the plan («оплатил»); /api/v1/me reads usage 0 of 10 000 in the period 2026-10-30..2026-11-30; a test google search answered HTTP 200 with 10 organic results"
     },
     {
       "id": "B-097",

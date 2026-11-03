@@ -1,5 +1,21 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-03: B-096 closed (supersedes every "Exact next task" below)
+
+Operator, this session, 2026-11-03: «оплатил» (the SearchApi plan behind prowl.chat). SearchApi `/api/v1/me`, read
+the same day with the production key (quota fields only): `current_month_usage` 0 of `monthly_allowance` 10 000 for
+the period 2026-10-30 21:46:35 UTC to 2026-11-30 21:46:35 UTC; `remaining_credits` still reads 0, so it is not the
+signal. One test `engine=google` search answered HTTP 200 with 10 organic results. B-096 is closed
+([`evidence/backlog.md`](evidence/backlog.md) § Closed). Board watcher per the coordinator's rule until CO-409
+(2026-11-21, thread 44c43a06): session cron, `com.list {unread: true}` every ~12 minutes.
+
+Open: B-095 (CT-125 still `open: proposed` on 2026-11-03), B-017/KA-G02 (operator labels a report), B-067 and B-073
+(prowl-app T401, T402, PR #29), B-042 (Observatory registry), B-001 (waived). Open rows: 11 of 115
+(`scripts/plan/assign_waves.py --check`).
+
+**Exact next task:** a second `market-pulse` run can now be created (the operator approves it on the dashboard; the
+live receipt for B-098 comes from it); B-095 once CT-125 lands.
+
 ## Current entry, 2026-11-02: B-098 closed, 0.3.7 (supersedes every "Exact next task" below)
 
 Operator, 2026-11-02, in this session: «улучши работу агента». The service's own signals were read first: Fabric
