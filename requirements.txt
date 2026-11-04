@@ -1,0 +1,2 @@
+# Heroku (B-099): the package itself with the cloud extra; dependencies stay in pyproject.toml.
+.[cloud]

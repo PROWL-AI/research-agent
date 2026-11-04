@@ -26,6 +26,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.14"]
+# The cloud instance (B-099): Postgres for client keys and the state snapshot.
+cloud = ["psycopg[binary]>=3.2"]
 
 [project.scripts]
 prowl-research = "research_agent.__main__:main"
