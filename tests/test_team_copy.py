@@ -85,3 +85,21 @@ def test_a_commit_without_licence_is_refused(original, copy):
     sh(original, "commit", "-qm", "no licence")
     with pytest.raises(SystemExit):
         build(original, copy)
+
+
+def test_an_audit_other_than_ready_refuses(original, copy, tmp_path):
+    audit = tmp_path / "audit.py"
+    audit.write_text('import json; print(json.dumps({"verdict": "fix_tree"}))\n')
+    with pytest.raises(SystemExit) as exc:
+        builder.build("HEAD", copy, audit, out=lambda *_: None, root=original)
+    assert "fix_tree" in str(exc.value)
+    audit.write_text('import json; print(json.dumps({"verdict": "ready"}))\n')
+    builder.build("HEAD", copy, audit, out=lambda *_: None, root=original)
+
+
+def test_an_empty_copy_repository_takes_the_first_build(original, tmp_path):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    sh(empty, "init", "-q", "-b", "main")
+    builder.build("HEAD", empty, out=lambda *_: None, root=original)
+    assert (empty / ".copy" / "upstream.json").exists()
