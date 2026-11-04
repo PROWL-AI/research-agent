@@ -1,5 +1,31 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-04: B-099 cloud gateway, 0.4.0 (supersedes every "Exact next task" below)
+
+Operator, this session, 2026-11-04: make this agent a cloud agent like CMO Creative and Mobile Publisher, give the
+team tokens, a copy in Appvillis, a gateway for Claude Code to all tools (verbatim in
+[the spec](specs/2026-11-04-cloud-gateway.md)). Shape from the agent-transport plan (D15 copies, D16 share the agent,
+not the keys; Data Room `docs/plans/2026-10-27-agent-transport/README.md`) and CMO's cloud spec.
+
+Done (branch `feat/cloud-gateway`): `prowl-research-service cloud-run` (own https origin only, well-known behind the
+service token, `/mcp` behind `prc_` client keys with scopes, the client as each job's principal, `__Host-` cookie),
+`client add|rotate|revoke|list` (file or Postgres), the data folder snapshotted into Postgres, `Procfile`,
+`scripts/cloud.py deploy|config|register`, `scripts/build_team_copy.py` (the built tree passes Data Room's
+`org-transfer-audit` as `ready`), docs [CLOUD.md](CLOUD.md), [TEAM-ONBOARDING.md](TEAM-ONBOARDING.md), SECURITY,
+FABRIC, README, scenarios CORE-20 to CORE-23. Checks: the full suite, ruff, a live `cloud-run` on loopback
+(401 without the token, `instance: cloud`, 7 tools with a client key, 401 for the service token on `/mcp`, 403 over
+http), the client store and the snapshot against a real Postgres 17 through psycopg 3.3.8.
+
+Decisions (spec R-1 to R-10): the copy is `appvillis-com/prowl-research-agent` with this repository's MIT LICENSE;
+Heroku team `telegramcrew`, app `prowl-research`; every paid job still waits for the operator (a per-key allowance is
+B-100, the operator's); the service token never reaches `/mcp`.
+
+Open: B-099 T9 (create the copy repository and build it, the Heroku app and its Postgres, config vars from
+Observatory, a cloud OpenRouter key, first client keys, live checks), B-100 (operator), B-095 (CT-125), B-017/KA-G02,
+B-067/B-073 (prowl-app), B-042.
+
+**Exact next task:** B-099 T9 as [CLOUD.md](CLOUD.md) § Deploy and § Team copy describe.
+
 ## Current entry, 2026-11-03: B-096 closed (supersedes every "Exact next task" below)
 
 Operator, this session, 2026-11-03: «оплатил» (the SearchApi plan behind prowl.chat). SearchApi `/api/v1/me`, read

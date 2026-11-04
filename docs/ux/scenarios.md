@@ -211,6 +211,10 @@
 | CORE-17 | Отказ инструмента по одному шагу не останавливает прогон | 6 | UNVERIFIED |
 | CORE-18 | Значение из более раннего шага подставляется, неразрешённое не отправляется | 6 | UNVERIFIED |
 | CORE-19 | Шаблонный текст и значение, которое провайдер заведомо отклоняет, не отправляются | 6 | UNVERIFIED |
+| CORE-20 | Облако отвечает только своему https-адресу, описание службы закрыто токеном службы | B-099 | PASS@ba65158 |
+| CORE-21 | Член команды подключает Claude Code своим ключом; чужой, отозванный или без права ключ отказывается | B-099 | PASS@ba65158 |
+| CORE-22 | Задания клиента видны только ему; платное задание клиента ждёт оператора | B-099 | PASS@ba65158 |
+| CORE-23 | Состояние облака переживает перезапуск | B-099 | PASS@ba65158 |
 
 ### CORE-01: Запуск до терминального состояния (CLI, stdio MCP)
 - **Status:** PASS@583f1d1
@@ -446,3 +450,50 @@
 - **Wave:** 6 (N-ACC, B-070, B-071)
 - **Coverage:** `tests/test_not_sent_arguments.py` (52 теста; аргументы взяты из сохранённых прогонов)
 
+### CORE-20: Облако отвечает только своему https-адресу, описание службы закрыто токеном службы
+- **Status:** PASS@ba65158
+- **Actor:** оператор (P-01) через Fabric Dashboards; посторонний клиент в интернете
+- **Trigger:** запрос к облачному экземпляру `prowl-research.cloud`
+- **Preconditions:** `cloud-run` с `PUBLIC_ORIGIN` и `FABRIC_SERVICE_TOKEN`
+- **Steps:**
+  1. Запросить `/.well-known/fabric-service` без токена, с токеном, с чужим `Host`, по http, с чужим `Origin`.
+- **Expected result:** с токеном службы и своим адресом по https: документ с `instance: cloud`; без токена `401` без тела.
+- **Failure outcome:** чужой `Host`, `X-Forwarded-Proto` не `https`, чужой `Origin`: `403`, документ не отдаётся.
+- **Wave:** B-099 (M1, M2)
+- **Coverage:** `tests/test_cloud_service.py`: `test_only_its_own_https_origin`, `test_loopback_host_is_refused_in_the_cloud`, `test_well_known_needs_the_service_token`
+
+### CORE-21: Член команды подключает Claude Code своим ключом
+- **Status:** PASS@ba65158
+- **Actor:** член команды с Claude Code; оператор выдаёт ключи
+- **Trigger:** `claude mcp add --transport http prowl-research <origin>/mcp --header "Authorization: Bearer <ключ>"`
+- **Preconditions:** оператор выпустил ключ `client add <имя> --scopes …` ([TEAM-ONBOARDING.md](../TEAM-ONBOARDING.md))
+- **Steps:**
+  1. Вызвать `tools/list`, затем инструмент вне прав ключа.
+- **Expected result:** с действующим ключом виден список инструментов; инструмент в пределах прав создаёт задание.
+- **Failure outcome:** без ключа, с неверным, отозванным ключом или токеном службы: `401`; инструмент вне прав: ошибка `scope-not-granted`, задание не создаётся.
+- **Wave:** B-099 (M3)
+- **Coverage:** `tests/test_cloud_service.py`: `test_mcp_takes_only_client_keys`, `test_scopes_gate_each_capability`; `tests/test_cloud_clients.py`; `tests/test_cloud_cli.py`
+
+### CORE-22: Задания клиента видны только ему; платное задание ждёт оператора
+- **Status:** PASS@ba65158
+- **Actor:** два члена команды; оператор (P-01)
+- **Trigger:** клиент создаёт задание, другой клиент читает его или повторяет его ключ идемпотентности
+- **Preconditions:** у обоих действующие ключи
+- **Steps:**
+  1. Клиент A создаёт задание; клиент B вызывает `fabric.job.get` с его id и создаёт задание с тем же ключом идемпотентности.
+- **Expected result:** задание A записано с `client:A`; B получает ошибку на чужое задание и своё отдельное задание на тот же ключ; платное задание A в статусе `input_required`, пока оператор не одобрит в панели (SCN-004).
+- **Failure outcome:** клиент не может одобрить своё задание: решение принимает только оператор в панели.
+- **Wave:** B-099 (M3, R-6, R-7)
+- **Coverage:** `tests/test_cloud_service.py`: `test_a_clients_jobs_are_its_own`, `test_paid_jobs_still_wait_for_the_operator`
+
+### CORE-23: Состояние облака переживает перезапуск
+- **Status:** PASS@ba65158
+- **Actor:** оператор (P-01)
+- **Trigger:** перезапуск дайно Heroku
+- **Preconditions:** `DATABASE_URL` задан
+- **Steps:**
+  1. Создать задания, дождаться снимка, перезапустить дайно.
+- **Expected result:** задания и каталоги прогонов восстановлены из последнего целого снимка; неизменённый каталог не сохраняется повторно; хранятся три снимка.
+- **Failure outcome:** снимок с несовпадающим SHA-256 пропускается в пользу предыдущего; путь вне каталога данных в снимке отказывается.
+- **Wave:** B-099 (M4)
+- **Coverage:** `tests/test_cloud_snapshot.py` (7 тестов); проверка на настоящем Postgres (psycopg 3.3.8) записана в HANDOFF; живой `heroku ps:restart` после деплоя

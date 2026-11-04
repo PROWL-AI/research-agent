@@ -82,7 +82,90 @@ def token(root, name):
     return path.read_text().strip()
 
 
+def cloud_root(environ=os.environ):
+    return Path(environ.get("PROWL_RESEARCH_ROOT") or "/tmp/prowl-research")
+
+
+def client_command(argv, environ=os.environ, out=print):
+    """`client add|rotate|revoke|list`: the cloud instance's client keys (B-099 M3).
+    On Heroku: `heroku run prowl-research-service client add <name> --scopes read,tools.call`."""
+    from .clients import SCOPES, from_env
+
+    parser = argparse.ArgumentParser(prog="prowl-research-service client")
+    parser.add_argument("action", choices=["add", "rotate", "revoke", "list"])
+    parser.add_argument("name", nargs="?")
+    parser.add_argument("--scopes", default="read", help="comma-separated: " + ", ".join(SCOPES))
+    args = parser.parse_args(argv)
+    clients = from_env(cloud_root(environ), environ)
+    if args.action == "list":
+        out(json.dumps(clients.list(), ensure_ascii=False, indent=1))
+        return 0
+    if not args.name:
+        parser.error("a client name is required")
+    if args.action == "revoke":
+        clients.revoke(args.name)
+        out(f"revoked {args.name}")
+        return 0
+    key = clients.add(args.name, args.scopes.split(",")) if args.action == "add" else clients.rotate(args.name)
+    # The one time the key is shown: it is not stored, only its SHA-256.
+    out(f"{args.name}: {key}")
+    out("Shown once. Give it to its holder privately; it is never shown again.")
+    return 0
+
+
+def cloud_run(environ=os.environ):
+    """The cloud instance (B-099): Heroku's $PORT on all interfaces, its own https
+    origin only, client keys on /mcp, state restored from and saved to Postgres."""
+    import logging
+    import threading
+    import uvicorn
+    from .app import CloudSettings, create_app
+    from .clients import from_env as clients_from_env
+    from .snapshot import from_env as snapshots_from_env
+
+    origin = environ.get("PUBLIC_ORIGIN", "")
+    token_value = environ.get("FABRIC_SERVICE_TOKEN", "")
+    if not origin.startswith("https://") or origin.count("/") != 2:
+        raise SystemExit("PUBLIC_ORIGIN must be https://<host> without a path")
+    if len(token_value) < 32:
+        raise SystemExit("FABRIC_SERVICE_TOKEN must be set (at least 32 characters)")
+    port = int(environ.get("PORT", "8000"))
+    root = cloud_root(environ)
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+    snapshots = snapshots_from_env(environ)
+    if snapshots is not None:
+        snapshots.restore(root)
+    fd = lock(root)
+    os.umask(0o077)
+    stop = threading.Event()
+
+    def keep():
+        while not stop.wait(30):
+            try:
+                snapshots.save(root)
+            except Exception as exc:  # noqa: BLE001 — logged by name, retried in 30 s
+                logging.getLogger("research_agent.service.snapshot").warning("event=snapshot.failed error=%s", type(exc).__name__)
+
+    try:
+        # Heroku names the deployed commit; without it the code digest is computed as locally.
+        build = {"digest": "git:" + environ["SOURCE_VERSION"]} if environ.get("SOURCE_VERSION") else None
+        app = create_app(root, token_value, None, port, build, cloud=CloudSettings(origin=origin, clients=clients_from_env(root, environ)))
+        if snapshots is not None:
+            threading.Thread(target=keep, name="snapshot", daemon=True).start()
+        uvicorn.run(app, host="0.0.0.0", port=port, access_log=False, log_level="warning", timeout_graceful_shutdown=8,
+                    proxy_headers=False)
+    finally:
+        stop.set()
+        if snapshots is not None:
+            snapshots.save(root)
+        os.close(fd)
+
+
 def main():
+    if sys.argv[1:2] == ["client"]:
+        raise SystemExit(client_command(sys.argv[2:]))
+    if sys.argv[1:2] == ["cloud-run"]:
+        return cloud_run()
     parser = argparse.ArgumentParser(description="Prowl Research Fabric service")
     parser.add_argument("command", choices=["serve", "doctor"])
     parser.add_argument("--root", type=Path, default=default_root())
