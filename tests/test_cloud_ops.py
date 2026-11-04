@@ -73,7 +73,8 @@ def test_register_writes_a_remote_descriptor(tmp_path):
     token.chmod(0o600)
     path = cloud.register("https://research.example.com", token, tmp_path / "services", lambda *_: None)
     data = json.loads(path.read_text())
-    assert path.name == "prowl-research.cloud.json"
+    from research_agent.service.identity import SERVICE_ID
+    assert path.name == f"{SERVICE_ID}.cloud.json" and data["id"] == SERVICE_ID
     assert data["placement"] == "remote" and data["instance"] == "cloud" and data["lifecycle"] == {"manager": "none"}
     assert data["origin"] == "https://research.example.com" and "commands" not in data
     assert data["peer"]["custody"] == "organization-managed"
