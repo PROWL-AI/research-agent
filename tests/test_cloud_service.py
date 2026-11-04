@@ -118,6 +118,8 @@ async def test_the_page_and_identity_name_the_service(client):
     await client.get(r.json()["url"])
     page = (await client.get("/dashboard")).text
     # The original's page is its file, byte for byte; a copy's identity renames it.
-    assert page == (STATIC / "index.html").read_text()
+    assert f"<title>{SERVICE_NAME} · Fabric</title>" in page and f"<footer>{SERVICE_NAME} <span>" in page
+    if SERVICE_ID == "prowl-research":
+        assert page == (STATIC / "index.html").read_text()
     health = (await client.get("/.well-known/fabric-service", headers=bearer("service-value"))).json()
     assert health["service"]["id"] == SERVICE_ID and health["service"]["name"] == SERVICE_NAME
