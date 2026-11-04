@@ -24,7 +24,15 @@ Open: B-099 T9 (create the copy repository and build it, the Heroku app and its 
 Observatory, a cloud OpenRouter key, first client keys, live checks), B-100 (operator), B-095 (CT-125), B-017/KA-G02,
 B-067/B-073 (prowl-app), B-042.
 
-**Exact next task:** B-099 T9 as [CLOUD.md](CLOUD.md) § Deploy and § Team copy describe.
+State of T9, 2026-11-04: 0.4.0 tagged and installed locally (`ready`, `degraded: []`). The team copy is built
+locally from `187e01f` by `scripts/build_team_copy.py` on branch `sync/187e01fd1062` of a local repository
+(`_worktrees/prowl-research-agent-copy`, not pushed): org-transfer audit `ready`, its own suite 808 passed. Creating
+`appvillis-com/prowl-research-agent` was refused by this session's permission classifier (public data-sharing
+upload), so nothing left the machine; the Heroku app is not created and nothing was spent. Heroku check (read only):
+the operator's key reaches teams `telegramcrew`, `esimplus`, `degen-phone`; the name `prowl-research` is free.
+
+**Exact next task:** with the operator's go for the upload, create the private repository, push
+`sync/187e01fd1062:main`, then [CLOUD.md](CLOUD.md) § Deploy from the copy.
 
 ## Current entry, 2026-11-03: B-096 closed (supersedes every "Exact next task" below)
 
