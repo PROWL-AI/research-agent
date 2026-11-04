@@ -9,7 +9,7 @@
 
 The Heroku key is never an argument: run deploy and config under Observatory, e.g.
   python "$(project-observatory full-path)/tools/use_secret.py" run --env prod \\
-      sshlg-personal-os HEROKU_API_KEY -- python scripts/cloud.py deploy --app prowl-research
+      <project> HEROKU_API_KEY -- python scripts/cloud.py deploy --app prowl-research
 and for config add the provider slots the app needs to the same `use_secret.py run`.
 """
 from __future__ import annotations
