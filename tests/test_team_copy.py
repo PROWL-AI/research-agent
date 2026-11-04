@@ -103,3 +103,23 @@ def test_an_empty_copy_repository_takes_the_first_build(original, tmp_path):
     sh(empty, "init", "-q", "-b", "main")
     builder.build("HEAD", empty, out=lambda *_: None, root=original)
     assert (empty / ".copy" / "upstream.json").exists()
+
+
+def test_the_copy_carries_the_appvillis_prefix(original, copy):
+    (original / "research_agent" / "service").mkdir(parents=True)
+    (original / "research_agent" / "service" / "identity.py").write_text('SERVICE_ID = "prowl-research"\n')
+    (original / "README.md").write_text("# Prowl Research Agent\n\nrun `prowl-research run`\n")
+    (original / "docs" / "TEAM-ONBOARDING.md").write_text(
+        "claude mcp add --transport http prowl-research https://x/mcp\nprowl-research-service client add\nprowl-research.cloud\n")
+    sh(original, "add", "-A")
+    sh(original, "commit", "-qm", "identity")
+    build(original, copy)
+    identity = (copy / "research_agent" / "service" / "identity.py").read_text()
+    assert 'SERVICE_ID = "appvillis-prowl-research"' in identity and 'SERVICE_NAME = "Appvillis Prowl Research"' in identity
+    assert (copy / "README.md").read_text().startswith("# Appvillis Prowl Research: Prowl Research Agent")
+    assert "`prowl-research run`" in (copy / "README.md").read_text()
+    onboarding = (copy / "docs" / "TEAM-ONBOARDING.md").read_text()
+    assert "http appvillis-prowl-research https" in onboarding and "appvillis-prowl-research.cloud" in onboarding
+    assert "prowl-research-service client add" in onboarding
+    # The original keeps no prefix.
+    assert 'SERVICE_ID = "prowl-research"' in (original / "research_agent" / "service" / "identity.py").read_text()

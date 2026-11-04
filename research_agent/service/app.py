@@ -16,6 +16,7 @@ from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Redire
 from starlette.routing import Route
 from starlette.middleware.base import BaseHTTPMiddleware
 from .delegation import DelegationPolicy, is_loopback, refusal_http
+from .identity import HEADER, SERVICE_ID, SERVICE_NAME
 from .protocol import EFFECTS, Protocol, CAPABILITIES, artifact
 from .runtime import Runtime, runbooks
 from .store import Store, Conflict, now
@@ -82,6 +83,14 @@ def display(store, job):
         tools = [s.tool for s in checkpoint.steps if s.state == COMPLETED] if checkpoint else []
     return {"coverage": tool_limits.statements_ru(tools)}
 
+def page() -> str:
+    """The dashboard page, named after this service (identical bytes for the original)."""
+    html = (STATIC / "index.html").read_text()
+    return (html.replace("<title>Prowl Research · Fabric</title>", f"<title>{SERVICE_NAME} · Fabric</title>")
+                .replace('<p class="fd-title">PROWL · Research</p>', f'<p class="fd-title">{HEADER}</p>')
+                .replace("<footer>Prowl Research <span>", f"<footer>{SERVICE_NAME} <span>"))
+
+
 def create_app(root: Path, host_token: str, agent_token: str | None, port=18764, build=None, delegation=None,
                cloud: CloudSettings | None = None):
     delegation = delegation if delegation is not None else DelegationPolicy.from_env(EFFECTS)
@@ -99,10 +108,10 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
     @asynccontextmanager
     async def lifespan(app):
         with store.db:
-            store.event("service.started", "Prowl Research запущен.")
+            store.event("service.started", f"{SERVICE_NAME} запущен.")
         yield
         with store.db:
-            store.event("service.stopping", "Prowl Research завершает работу.")
+            store.event("service.stopping", f"{SERVICE_NAME} завершает работу.")
         await rt.close()
         store.db.close()
 
@@ -116,7 +125,7 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
 
     def health():
         reasons = degraded()
-        return {"protocol": "fabric-service/0.1", "service": {"id": "prowl-research", "instance": instance, "name": "Prowl Research", "version": __version__, "build": build},
+        return {"protocol": "fabric-service/0.1", "service": {"id": SERVICE_ID, "instance": instance, "name": SERVICE_NAME, "version": __version__, "build": build},
                 "process": {"pid": os.getpid(), "startedAt": started}, "status": "stopping" if rt.stopping else "degraded" if reasons else "ready", "degraded": reasons,
                 "surfaces": {"dashboard": {"path": "/dashboard", "login": True}, "mcp": {"path": "/mcp", "transport": "streamable-http", "auth": "own", "capabilities": CAPABILITIES},
                              "events": {"path": "/fabric/v1/events"}, "usage": {"path": "/fabric/v1/usage"}}, "update": {"available": None},
@@ -175,7 +184,7 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
             return JSONResponse({"url": "/fabric/v1/login?code=" + code, "expiresAt": expires})
         if path == "/fabric/v1/login":
             if not store.auth_valid("code", request.query_params.get("code", ""), consume=True):
-                return HTMLResponse("<p>Ссылка истекла или уже использована. Откройте Prowl Research в Fabric Dashboards заново.</p>", 403)
+                return HTMLResponse(f"<p>Ссылка истекла или уже использована. Откройте {SERVICE_NAME} в Fabric Dashboards заново.</p>", 403)
             response = RedirectResponse("/dashboard", 302)
             response.set_cookie(cookie, store.auth_create("session", 28800), max_age=28800, httponly=True, samesite="Strict", path="/",
                                 secure=bool(cloud))
@@ -223,12 +232,12 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
             return FileResponse(STATIC / name)
         if not operator(request):
             if path in {"/", "/dashboard"}:
-                return HTMLResponse('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Prowl Research · вход</title><link rel="stylesheet" href="/static/styles.css"><main class="login"><p class="eyebrow">PROWL / RESEARCH</p><h1>Откройте через Fabric</h1><p>Сессия панели создаётся в Fabric Dashboards. Ключи не нужно вставлять в браузер.</p></main></html>', 401)
+                return HTMLResponse('<!doctype html><html lang="ru"><meta charset="utf-8"><title>' + SERVICE_NAME + ' · вход</title><link rel="stylesheet" href="/static/styles.css"><main class="login"><p class="eyebrow">PROWL / RESEARCH</p><h1>Откройте через Fabric</h1><p>Сессия панели создаётся в Fabric Dashboards. Ключи не нужно вставлять в браузер.</p></main></html>', 401)
             return JSONResponse({"error": "Сессия истекла. Откройте сервис в Fabric Dashboards заново."}, 401)
         if request.method == "POST" and request.headers.get("x-prowl-request") != "1":
             return JSONResponse({"error": "request header required"}, 403)
         if path in {"/", "/dashboard"}:
-            return FileResponse(STATIC / "index.html")
+            return HTMLResponse(page())
         if path == "/api/state":
             jobs = store.jobs()
             summaries = []

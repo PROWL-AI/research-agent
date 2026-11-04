@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from research_agent.config import DEFAULT_LLM_MODEL, DEFAULT_LLM_MODEL_STRONG
 from research_agent.events import emit
+from .identity import SERVICE_ID
 
 TERMINAL = {"completed", "failed", "cancelled"}
 
@@ -268,5 +269,5 @@ class Store:
             totals = {key: sum(r[key] for r in by_model) for key in ("calls", "unpricedCalls", "inputTokens", "outputTokens")}
             costs = [r["costUsd"] for r in by_model if r["costUsd"] is not None]
             result.append(dict(date=date, byModel=by_model, costUsd=sum(costs) if costs else None, **totals))
-        return {"protocol": "fabric-service/0.1", "service": {"id": "prowl-research", "instance": "default"},
+        return {"protocol": "fabric-service/0.1", "service": {"id": SERVICE_ID, "instance": "default"},
                 "generatedAt": now(), "currency": "USD", "days": result}

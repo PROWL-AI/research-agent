@@ -109,3 +109,15 @@ async def test_session_cookie_is_host_prefixed_and_secure(client):
     cookie = r.headers["set-cookie"]
     assert cookie.startswith("__Host-prowl_operator=") and "Secure" in cookie and "Path=/" in cookie and "Domain" not in cookie
     assert (await client.get("/api/state")).status_code == 200
+
+
+async def test_the_page_and_identity_name_the_service(client):
+    from research_agent.service.app import STATIC
+    from research_agent.service.identity import SERVICE_ID, SERVICE_NAME
+    r = await client.post("/fabric/v1/login-code", headers=bearer("service-value"))
+    await client.get(r.json()["url"])
+    page = (await client.get("/dashboard")).text
+    # The original's page is its file, byte for byte; a copy's identity renames it.
+    assert page == (STATIC / "index.html").read_text()
+    health = (await client.get("/.well-known/fabric-service", headers=bearer("service-value"))).json()
+    assert health["service"]["id"] == SERVICE_ID and health["service"]["name"] == SERVICE_NAME
