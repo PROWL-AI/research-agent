@@ -104,17 +104,22 @@ def build(ref: str, copy: Path, audit: Path | None = None, out=print, root: Path
     leaked = [n for n in git(copy, "ls-files", "--others", "--cached", "--exclude-standard").splitlines() if n.startswith(FORBIDDEN)]
     if leaked:
         raise SystemExit("refused: forbidden paths in the copy: " + ", ".join(leaked[:5]))
-    if audit is not None:
-        result = subprocess.run(["python3", str(audit), str(copy), "--no-history", "--json"], capture_output=True, text=True)
-        verdict = json.loads(result.stdout or "{}").get("verdict")
-        if verdict != "ready":
-            raise SystemExit(f"refused: org-transfer audit verdict {verdict!r} on the built tree")
     git(copy, "add", "-A")
     count = len(git(root, "rev-list", f"{upstream['previousRevision']}..{sha}").split()) if upstream["previousRevision"] else None
     message = (f"chore(copy): sync with the original at {sha[:12]}" + (f" ({count} commits)" if count else "")
                + f"\n\nSource-Revision: {ALIAS}@{sha}\n")
     subprocess.run(["git", "-C", str(copy), "-c", f"user.name={AUTHOR[0]}", "-c", f"user.email={AUTHOR[1]}",
                     "commit", "-q", "--allow-empty", "-m", message], check=True)
+    # The audit reads a committed tree, so it runs on the build commit; a refused build
+    # stays on its local branch, which is never pushed.
+    if audit is not None:
+        result = subprocess.run(["python3", str(audit), str(copy), "--no-history", "--json"], capture_output=True, text=True)
+        try:
+            verdict = json.loads(result.stdout).get("verdict")
+        except ValueError:
+            verdict = None
+        if verdict != "ready":
+            raise SystemExit(f"refused: org-transfer audit verdict {verdict!r} on {branch}; do not push it")
     out(f"built {branch} in {copy}")
     out(f"after its checks: git -C {copy} push origin {branch}:main  (fast-forward only)")
     return branch
