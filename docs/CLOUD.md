@@ -9,8 +9,8 @@ Teammates read [TEAM-ONBOARDING.md](TEAM-ONBOARDING.md).
 
 | | Local (`default`) | Cloud (`cloud`) |
 |---|---|---|
-| Where | the operator's Mac, `127.0.0.1:18764`, launchd | Heroku, app `prowl-research`, `$PORT` behind Heroku's TLS router |
-| Code | this repository | the team copy `appvillis-com/prowl-research-agent`, built from a named commit of this one |
+| Where | the operator's Mac, `127.0.0.1:18764`, launchd | Heroku, app `appvillis-prowl-research`, `$PORT` behind Heroku's TLS router |
+| Code | this repository | the team copy `appvillis-com/appvillis-prowl-research`, built from a named commit of this one |
 | Provider keys | the operator's Observatory | config vars of the app only |
 | Who calls `/mcp` | the operator's agents (agent token, delegation) | clients with a `prc_` key, one per person or agent |
 | Page | Fabric Dashboards, one-time code | Fabric Dashboards, one-time code; cookie `__Host-prowl_operator`, `Secure` |
@@ -33,10 +33,10 @@ byte for byte (`tests/test_service.py`).
 ## Client keys
 
 ```sh
-heroku run -a prowl-research -- prowl-research-service client add anna --scopes read,research.run,tools.call
-heroku run -a prowl-research -- prowl-research-service client list
-heroku run -a prowl-research -- prowl-research-service client rotate anna
-heroku run -a prowl-research -- prowl-research-service client revoke anna
+heroku run -a appvillis-prowl-research -- prowl-research-service client add anna --scopes read,research.run,tools.call
+heroku run -a appvillis-prowl-research -- prowl-research-service client list
+heroku run -a appvillis-prowl-research -- prowl-research-service client rotate anna
+heroku run -a appvillis-prowl-research -- prowl-research-service client revoke anna
 ```
 
 `add` and `rotate` print the key once; only its SHA-256 is stored (`research_agent/service/clients.py`). Scopes:
@@ -57,17 +57,17 @@ Heroku key and provider keys never enter argv or chat: run under Observatory.
 
 ```sh
 # Once: the app, its database and its buildpack (team telegramcrew, spec R-3).
-heroku apps:create prowl-research --team telegramcrew --buildpack heroku/python
+heroku apps:create appvillis-prowl-research --team telegramcrew --buildpack heroku/python
 heroku addons:create heroku-postgresql:essential-0 -a prowl-research
 
 # Config vars by name (values from the environment use_secret.py builds; printed: names only).
 python "$(project-observatory full-path)/tools/use_secret.py" run --env prod <project> HEROKU_API_KEY \
   PROWL_API_KEY OPENROUTER_API_KEY FABRIC_SERVICE_TOKEN -- \
-  python scripts/cloud.py config --app prowl-research PROWL_API_KEY OPENROUTER_API_KEY FABRIC_SERVICE_TOKEN
+  python scripts/cloud.py config --app appvillis-prowl-research PROWL_API_KEY OPENROUTER_API_KEY FABRIC_SERVICE_TOKEN
 
 # A build of one commit: its own suite runs first, a red suite refuses the deploy.
 python "$(project-observatory full-path)/tools/use_secret.py" run --env prod <project> HEROKU_API_KEY -- \
-  python scripts/cloud.py deploy --app prowl-research --ref <sha>
+  python scripts/cloud.py deploy --app appvillis-prowl-research --ref <sha>
 ```
 
 The team copy deploys from the copy: the same `scripts/cloud.py deploy` in its checkout.
@@ -75,7 +75,7 @@ The team copy deploys from the copy: the same `scripts/cloud.py deploy` in its c
 ## Team copy
 
 ```sh
-scripts/build_team_copy.py --ref <sha> --copy <clone of appvillis-com/prowl-research-agent> \
+scripts/build_team_copy.py --ref <sha> --copy <clone of appvillis-com/appvillis-prowl-research> \
   --audit <org-transfer-audit>
 git -C <copy> push origin sync/<sha12>:main     # after the branch's checks; fast-forward only
 ```

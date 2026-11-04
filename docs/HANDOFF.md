@@ -16,8 +16,8 @@ FABRIC, README, scenarios CORE-20 to CORE-23. Checks: the full suite, ruff, a li
 (401 without the token, `instance: cloud`, 7 tools with a client key, 401 for the service token on `/mcp`, 403 over
 http), the client store and the snapshot against a real Postgres 17 through psycopg 3.3.8.
 
-Decisions (spec R-1 to R-10): the copy is `appvillis-com/prowl-research-agent` with this repository's MIT LICENSE;
-Heroku team `telegramcrew`, app `prowl-research`; every paid job still waits for the operator (a per-key allowance is
+Decisions (spec R-1 to R-10): the copy is `appvillis-com/appvillis-prowl-research` with this repository's MIT LICENSE;
+Heroku team `telegramcrew`, app `appvillis-prowl-research`; every paid job still waits for the operator (a per-key allowance is
 B-100, the operator's); the service token never reaches `/mcp`.
 
 Open: B-099 T9 (create the copy repository and build it, the Heroku app and its Postgres, config vars from
@@ -27,7 +27,7 @@ B-067/B-073 (prowl-app), B-042.
 State of T9, 2026-11-04: 0.4.0 tagged and installed locally (`ready`, `degraded: []`). The team copy is built
 locally from `187e01f` by `scripts/build_team_copy.py` on branch `sync/187e01fd1062` of a local repository
 (`_worktrees/prowl-research-agent-copy`, not pushed): org-transfer audit `ready`, its own suite 808 passed. Creating
-`appvillis-com/prowl-research-agent` was refused by this session's permission classifier (public data-sharing
+`appvillis-com/appvillis-prowl-research` was refused by this session's permission classifier (public data-sharing
 upload), so nothing left the machine; the Heroku app is not created and nothing was spent. Heroku check (read only):
 the operator's key reaches teams `telegramcrew`, `esimplus`, `degen-phone`; the name `prowl-research` is free.
 

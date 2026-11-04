@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the team copy of Prowl Research (B-099 M7, D15).
 
-The copy `appvillis-com/prowl-research-agent` is built only from a named commit of this
+The copy `appvillis-com/appvillis-prowl-research` is built only from a named commit of this
 repository; nobody edits it by hand. One flow, original to copy:
 
     scripts/build_team_copy.py --ref <sha> --copy <clone of the copy> [--audit <org-transfer-audit>]
@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import re
 import subprocess
 import tarfile
 from datetime import datetime, timezone
@@ -29,10 +30,37 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ALIAS = "prowl-research"
-AUTHOR = ("prowl-research-agent", "prowl-research-agent@users.noreply.github.com")
+AUTHOR = ("appvillis-prowl-research", "appvillis-prowl-research@users.noreply.github.com")
 #: What stays with the original: the operator's run evidence and reports, the session
 #: handoff log, pipeline state. The code, runbooks, specs and user docs travel.
 FORBIDDEN = ("docs/evidence/", "docs/reports/", "docs/HANDOFF.md", "runs/", ".task-pipeline/", "node_modules/")
+
+
+#: The copy's own names (operator, 2026-11-04): an agent that goes to Appvillis carries
+#: the `appvillis-` prefix in its id and «Appvillis» in its name; the original keeps none.
+COPY_ID = "appvillis-prowl-research"
+COPY_NAME = "Appvillis Prowl Research"
+IDENTITY = f'''"""Who this service is, in one place: the Appvillis team copy (written by the builder)."""
+
+SERVICE_ID = "{COPY_ID}"
+SERVICE_NAME = "{COPY_NAME}"
+HEADER = "APPVILLIS · PROWL · Research"
+'''
+#: Team-facing documents name the copy's service, app and MCP server, never the original's.
+RENAMED_DOCS = ("docs/CLOUD.md", "docs/TEAM-ONBOARDING.md")
+ORIGINAL_ID = re.compile(r"(?<![\w/@-])prowl-research(?![\w-])")
+
+
+def rename(files: dict[str, bytes]) -> dict[str, bytes]:
+    files = dict(files)
+    files["research_agent/service/identity.py"] = IDENTITY.encode()
+    for name in RENAMED_DOCS:
+        if name in files:
+            files[name] = ORIGINAL_ID.sub(COPY_ID, files[name].decode()).encode()
+    if "README.md" in files:
+        text = files["README.md"].decode()
+        files["README.md"] = re.sub(r"^# ", f"# {COPY_NAME}: ", text, count=1).encode()
+    return files
 
 
 def git(repo, *args, text=True):
@@ -81,7 +109,7 @@ def build(ref: str, copy: Path, audit: Path | None = None, out=print, root: Path
     if blocked:
         raise SystemExit("refused: copy commits not ported to the original (add `Backports: <sha>` there first): "
                          + ", ".join(b[:12] for b in blocked))
-    files = tree(sha, root)
+    files = rename(tree(sha, root))
     if "LICENSE" not in files:
         raise SystemExit("refused: the commit has no LICENSE")
     marker = copy / ".copy/upstream.json"

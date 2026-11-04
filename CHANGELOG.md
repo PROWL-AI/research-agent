@@ -4,6 +4,14 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.4.1 (2026-11-04)
+
+- The team copy carries the Appvillis prefix (operator, 2026-11-04, relayed on the Fabric board): the service's id and
+  name live in one module, `research_agent/service/identity.py`, which the copy builder rewrites to
+  `appvillis-prowl-research` / «Appvillis Prowl Research»; the copy's README, runbook and team onboarding name the
+  copy's service, Heroku app and MCP server. The original keeps no prefix and its page is byte for byte its file.
+  Copy repository `appvillis-com/appvillis-prowl-research`, Heroku app `appvillis-prowl-research` (B-099).
+
 ## 0.4.0 (2026-11-04)
 
 - The cloud instance, a team gateway (B-099): `prowl-research-service cloud-run` serves runbooks and every Prowl tool

@@ -8,6 +8,7 @@ import secrets
 import stat
 import sys
 from pathlib import Path
+from .identity import SERVICE_ID, SERVICE_NAME
 
 
 
@@ -166,7 +167,7 @@ def main():
         raise SystemExit(client_command(sys.argv[2:]))
     if sys.argv[1:2] == ["cloud-run"]:
         return cloud_run()
-    parser = argparse.ArgumentParser(description="Prowl Research Fabric service")
+    parser = argparse.ArgumentParser(description=f"{SERVICE_NAME} Fabric service")
     parser.add_argument("command", choices=["serve", "doctor"])
     parser.add_argument("--root", type=Path, default=default_root())
     parser.add_argument("--port", type=int, default=18764)
@@ -182,7 +183,7 @@ def main():
             response = httpx.get(f"http://127.0.0.1:{args.port}/.well-known/fabric-service", timeout=3)
             response.raise_for_status()
             data = response.json()
-            matched = data["service"]["id"] == "prowl-research" and data["service"]["instance"] == "default"
+            matched = data["service"]["id"] == SERVICE_ID and data["service"]["instance"] == "default"
             print(json.dumps({"reachable": True, "identityMatches": matched, "health": data,
                               "eventLog": str(args.log_dir / "events.log")}, ensure_ascii=False))
             raise SystemExit(0 if matched else 1)

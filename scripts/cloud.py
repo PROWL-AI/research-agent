@@ -29,6 +29,9 @@ from urllib.parse import urlsplit
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from research_agent.service.identity import SERVICE_ID, SERVICE_NAME  # noqa: E402
+
 API = "https://api.heroku.com"
 ROOT = Path(__file__).resolve().parents[1]
 SERVICES = Path.home() / "Library/Application Support/ai.passioncode.fabric/services"
@@ -95,7 +98,7 @@ def descriptor(origin: str, token_file: Path) -> dict:
     if parts.scheme != "https" or parts.path not in {"", "/"} or parts.query or "@" in parts.netloc or not parts.hostname or "." not in parts.hostname:
         raise SystemExit("origin must be https://<public DNS name> without a path")
     return {
-        "protocol": "fabric-service/0.1", "id": "prowl-research", "instance": "cloud", "name": "Prowl Research (cloud)",
+        "protocol": "fabric-service/0.1", "id": SERVICE_ID, "instance": "cloud", "name": f"{SERVICE_NAME} (cloud)",
         "summary": "The team's research gateway: runbooks and Prowl tools behind personal client keys",
         "placement": "remote", "origin": f"https://{parts.netloc}",
         "auth": {"tokenFile": str(token_file)}, "lifecycle": {"manager": "none"},
@@ -112,7 +115,7 @@ def register(origin: str, token_file: Path, services: Path = SERVICES, out=print
     if mode != 0o600:
         raise SystemExit(f"the token file must be 0600, it is {oct(mode)}")
     services.mkdir(parents=True, exist_ok=True)
-    target = services / "prowl-research.cloud.json"
+    target = services / f"{SERVICE_ID}.cloud.json"
     target.write_text(json.dumps(descriptor(origin, token_file), indent=1) + "\n")
     out(f"wrote {target}")
     return target
