@@ -87,6 +87,12 @@ MCP registration: the `prowl-research` entry lives in each agent client's own co
 
 **Dashboard.** The page uses `fabric-dashboard-kit@1.1.5` (DEC-0036): kit chrome and navigation, Fabric's button (`fabric-button.js`, Russian labels on this `lang="ru"` page, B-088), the estate themes and scheme (the host's appearance wins), fluid grids and keyboard-reachable scroll boxes; the well-known document declares the dashboard extension (minWidth 360). Layout probe: `check_dashboard_layout.mjs` (fabric-agent-adapter, `skills/building-fabric-services/scripts/`) 17 rules PASS at 320–1280 px (2026-10-17). On kit 1.1.2 (2026-10-22, B-079): `scripts/test-dashboard.mjs` WebKit PASS at 1440, 390 and 360 px ([receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.2.json); kit 1.1.1: [receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.1.json)). M1 wave B readability checks: WebKit PASS at `5023b06` ([receipt](evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)). Kit 1.1.3 (2026-10-23, B-084): no section link cut at 360 or 390 px, WebKit PASS ([receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.3.json)).
 
+## Cloud instance (B-099)
+
+The same service runs as `prowl-research.cloud` on Heroku (`prowl-research-service cloud-run`): placement `remote`,
+`/mcp` behind client keys (`prc_`, scopes `read`, `research.run`, `tools.call`), the service token for the page and
+the Fabric surfaces only. Its descriptor is written by `scripts/cloud.py register`. Runbook: [CLOUD.md](CLOUD.md).
+
 ## Names
 
 This provider is service `prowl-research.default`, repository `PROWL-AI/research-agent`, provider id `https://prowl.chat/fabric/providers/research-agent` (`fabric-agent.json`). Its tools are `research.run`, `research.tools.call`, `research.list_runbooks`, `research.artifact.get`, `research.tutorial`, `fabric.job.get` and `fabric.job.cancel`. The legacy stdio server (`prowl-research mcp`) is a separate surface of the same core and exposes `research.run`, `research.list_runbooks`, `research.get_status` and `research.get_report`.

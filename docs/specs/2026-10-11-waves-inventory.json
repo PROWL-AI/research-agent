@@ -1555,6 +1555,33 @@
       "wave": 6,
       "release": "this",
       "evidence": "closed 2026-11-02: run inputs ground a binding (bindings.brief_texts), tests/test_plan_bindings.py 4 new, 0.3.7"
+    },
+    {
+      "id": "B-099",
+      "title": "The cloud instance as the team gateway: client keys, copy in appvillis-com, Heroku, Fabric remote",
+      "source": "operator, 2026-11-04 (spec docs/specs/2026-11-04-cloud-gateway.md)",
+      "status": "open",
+      "area": "service",
+      "node": "N-SVC",
+      "blocked_by": [],
+      "closable_in_one_pass": false,
+      "evidence": "0.4.0: cloud-run, client keys, snapshot, scripts; T9 (copy, Heroku app, live checks) left",
+      "wave": 4,
+      "release": "this"
+    },
+    {
+      "id": "B-100",
+      "title": "Per-key daily allowance approves a client's paid job without a person",
+      "source": "spec B-099 R-6",
+      "status": "needs-operator",
+      "area": "cost",
+      "node": "N-COST",
+      "blocked_by": [],
+      "closable_in_one_pass": false,
+      "needs_operator": "decide whether team keys may spend without a person, and how much a day",
+      "wave": 2,
+      "release": "this",
+      "evidence": "default: every paid job waits for the operator"
     }
   ]
 }

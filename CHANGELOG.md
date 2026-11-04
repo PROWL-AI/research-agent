@@ -4,6 +4,17 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.4.0 (2026-11-04)
+
+- The cloud instance, a team gateway (B-099): `prowl-research-service cloud-run` serves runbooks and every Prowl tool
+  to teammates' Claude Code through `/mcp` with personal client keys (`prc_`, SHA-256 only, scopes `read`,
+  `research.run`, `tools.call`, `client add|rotate|revoke|list`). It answers only its own https origin, keeps the
+  well-known document behind the service token, records the client as each job's principal, and keeps its data
+  folder in Postgres across dyno restarts. Paid jobs still wait for the operator. Without cloud variables the local
+  service is unchanged. Operator scripts: `scripts/cloud.py deploy|config|register`, `scripts/build_team_copy.py`
+  for the copy in `appvillis-com`. Runbook [docs/CLOUD.md](docs/CLOUD.md), onboarding
+  [docs/TEAM-ONBOARDING.md](docs/TEAM-ONBOARDING.md).
+
 ## 0.3.7 (2026-11-02)
 
 - A value the request itself names grounds a placeholder: a transform a later step waits on now sees the run's inputs
