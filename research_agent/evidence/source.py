@@ -26,6 +26,7 @@ toward treating two sources as one — the safe direction for `verified`.
 from __future__ import annotations
 
 import re
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -201,12 +202,54 @@ def normalize_space(text: str) -> str:
     return _WS.sub(" ", text).strip()
 
 
+# A comparison governs the number right after it. A quote that starts after
+# one ("100 visits" out of "at least 100 visits", or after "<=") drops what the
+# source said, so that occurrence is not a match (agents database, research
+# template 1.2.4, case cut-from-word-comparison). A currency mark or a short
+# code may sit between ("more than US$ 100").
+_COMPARISON_SIGNS = frozenset("<>=≤≥≈≠≲≳~")
+_SIGN_REACH = 16
+COMPARISON_WORDS = (
+    "at least", "at most", "up to", "more than", "less than", "fewer than", "greater than",
+    "no more than", "no less than", "not more than", "not less than", "as many as", "as much as",
+    "upwards of", "over", "under", "above", "below", "exceeding", "minimum", "maximum",
+)
+_WORD_GOVERNS = re.compile(
+    r"\b(?:" + "|".join(re.escape(w) for w in COMPARISON_WORDS) + r")\s*(?:[a-z]{1,3}\s*)?[^\w\s]{0,2}\s*$",
+    re.IGNORECASE,
+)
+
+
+def _comparison_governs(before: str) -> bool:
+    """The text right before a quote ends in a comparison, in words or a sign."""
+    if _WORD_GOVERNS.search(before[-40:]):
+        return True
+    for ch in reversed(before.replace(" ", "")[-_SIGN_REACH:]):
+        if ch.isdigit() or ch.isalpha():
+            return False
+        if ch in _COMPARISON_SIGNS:
+            return True
+    return False
+
+
+def _cuts_a_number(text: str, start: int) -> bool:
+    """A quote starting at a digit begins inside a larger number ("200" of "1,200")."""
+    if start == 0 or not text[start].isdigit():
+        return False
+    previous = text[start - 1]
+    if previous.isdigit() or previous in "-+":
+        return True
+    return previous in ".," and start >= 2 and text[start - 2].isdigit()
+
+
 def find_quote(quote: str | None, text: str) -> tuple[int, int] | None:
     """(start, end) of the quote in `text` (offsets into `text` itself),
     whitespace-normalized and case-insensitive, matched on token boundaries.
 
     A quote must say more than a bare number: `1200` alone would be "found"
-    inside any id or larger figure, so a quote needs at least one word."""
+    inside any id or larger figure, so a quote needs at least one word. An
+    occurrence cut right after a comparison ("at least", "up to", "<=") or
+    inside a larger number is skipped; a later clean occurrence still counts."""
     if not quote or not isinstance(quote, str):
         return None
     needle = normalize_space(quote)
@@ -218,8 +261,12 @@ def find_quote(quote: str | None, text: str) -> tuple[int, int] | None:
         pattern = r"(?<![0-9A-Za-z])" + pattern
     if needle[-1].isalnum():
         pattern += r"(?![0-9A-Za-z])"
-    match = re.search(pattern, text, re.IGNORECASE)
-    return (match.start(), match.end()) if match else None
+    for match in re.finditer(pattern, text, re.IGNORECASE):
+        start = match.start()
+        if _comparison_governs(text[:start]) or _cuts_a_number(text, start):
+            continue
+        return (start, match.end())
+    return None
 
 
 _GROUP_SEP = re.compile(r"(?<=\d)[,\u00a0\u202f' ](?=\d{3}(?!\d))")
@@ -241,21 +288,63 @@ def _as_number(value: Any) -> float | None:
         return None
 
 
+# Scale words multiply the number before them, so "1.5 million" and
+# "1,500,000" are one number and "1.5 billion" is another (agents database,
+# research template 1.2.4, case scale-word-same-number).
+SCALES = {"thousand": 3, "million": 6, "mln": 6, "mn": 6, "billion": 9, "bn": 9, "trillion": 12}
+_SCALED = re.compile(
+    r"(?<![\d.])(\d+(?:[.,]\d+)*)\s*(" + "|".join(SCALES) + r")\b",
+    re.IGNORECASE,
+)
+
+
+def _scaled_numbers(text: str) -> list[Decimal]:
+    """Each number followed by a scale word, resolved: '1.5 million' -> 1500000."""
+    found: list[Decimal] = []
+    for m in _SCALED.finditer(_GROUP_SEP.sub("", text)):
+        try:
+            found.append(Decimal(m.group(1).replace(",", "")) * 10 ** SCALES[m.group(2).lower()])
+        except InvalidOperation:
+            continue
+    return found
+
+
+def _as_scaled_number(value: Any) -> Decimal | None:
+    """A value written with a scale word ("1.5 million", "$7bn"), resolved."""
+    if not isinstance(value, str):
+        return None
+    text = value.strip().strip("$€£ ")
+    m = _SCALED.fullmatch(_GROUP_SEP.sub("", text))
+    if m is None:
+        return None
+    try:
+        return Decimal(m.group(1).replace(",", "")) * 10 ** SCALES[m.group(2).lower()]
+    except InvalidOperation:
+        return None
+
+
 def value_in_quote(value: Any, quote: str) -> bool:
     """The claim's value is literally present in the quote it cites. Numbers
     match on number boundaries (1200 is not inside 11,200, nor 1,200.5);
-    thousands separators inside a digit group are ignored."""
+    thousands separators inside a digit group are ignored, and a scale word is
+    resolved first, so 1500000 is in "1.5 million" but not in "1.5 billion"."""
     if value is None:
         return True
     if isinstance(value, bool):
         return False
     number = _as_number(value)
+    scaled_value = _as_scaled_number(value)
+    if number is None and scaled_value is not None:
+        number = float(scaled_value)
     if number is not None:
         candidates = {repr(number) if not number.is_integer() else str(int(number))}
         if not number.is_integer():
             candidates.add(str(number))
         packed = _GROUP_SEP.sub("", quote)
-        return any(re.search(rf"(?<![\d.]){re.escape(c)}(?!\.\d|\d)", packed) for c in candidates)
+        if any(re.search(rf"(?<![\d.]){re.escape(c)}(?!\.\d|\d)", packed) for c in candidates):
+            return True
+        exact = scaled_value if scaled_value is not None else Decimal(repr(number))
+        return any(found == exact for found in _scaled_numbers(quote))
     text = str(value).strip()
     if not text:
         return False

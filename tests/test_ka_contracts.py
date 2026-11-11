@@ -1677,3 +1677,39 @@ def test_a_chart_over_a_conflict_claim_is_rejected(tmp_path):
     ledger.add(claim="2", value=2, subject="s", source_tool="moz_b")
     spec = ChartSpec(type="bar", title="t", labels=["a", "b"], values=[1, 2], claim_refs=["C1", "C2"])
     assert "conflict" in (validate_against_ledger(spec, ledger) or "")
+
+
+# Agents database, research template 1.2.4 (cases scale-word-same-number,
+# cut-from-word-comparison): a scale word is resolved before numbers are
+# compared, and a quote cut right after a comparison (a sign or words) is not
+# found, because it drops what the source actually said.
+@pytest.mark.parametrize("value,quote,found", [
+    (1500000, "reached 1.5 million users", True),
+    ("1,500,000", "reached 1.5 million users", True),
+    ("1.5 million", "reached 1,500,000 users", True),
+    (1500000, "reached 1.5 billion users", False),
+    (2000, "about 2 thousand stores", True),
+    (1.5, "reached 1.5 million users", True),
+    (7000000000, "a $7bn market", True),
+])
+def test_value_in_quote_resolves_scale_words(value, quote, found):
+    from research_agent.evidence.source import value_in_quote
+
+    assert value_in_quote(value, quote) is found
+
+
+@pytest.mark.parametrize("quote,text,found", [
+    ("100 visits per month", "The site gets at least 100 visits per month.", False),
+    ("100 visits per month", "The site gets up to 100 visits per month.", False),
+    ("$100 a month", "Plans cost more than $100 a month.", False),
+    ("100 visits per month", "The site gets ≥ 100 visits per month.", False),
+    ("200 visits per month", "The site gets 1,200 visits per month.", False),
+    ("100 visits per month", "The site gets 100 visits per month.", True),
+    ("at least 100 visits per month", "The site gets at least 100 visits per month.", True),
+    # the guarded occurrence is skipped, a later clean one is still found
+    ("100 visits per month", "Up to 100 visits per month in May; 100 visits per month in June.", True),
+])
+def test_find_quote_refuses_a_cut_after_a_comparison(quote, text, found):
+    from research_agent.evidence.source import find_quote
+
+    assert (find_quote(quote, text) is not None) is found
