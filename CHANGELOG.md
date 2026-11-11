@@ -4,6 +4,13 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## Unreleased
+
+- Quote verification follows the agents database research template 1.2.4 (B-101): a scale word is resolved
+  before numbers are compared (1500000 is in "1.5 million", not in "1.5 billion"), and a quote cut right after a
+  comparison written in words ("at least", "up to", "more than") or a sign, or inside a larger number, is not found.
+  A claim that relied on such a cut now stays `assumed` instead of `verified`.
+
 ## 0.4.1 (2026-11-04)
 
 - The team copy carries the Appvillis prefix (operator, 2026-11-04, relayed on the Fabric board): the service's id and
