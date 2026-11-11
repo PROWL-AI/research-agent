@@ -3,6 +3,30 @@
 Start at [`docs/HANDOFF.md`](docs/HANDOFF.md): its first entry names the exact next task. The board is
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## Add, never replace: rule R28 (operator, 2026-11-11)
+
+Operator, 2026-11-11, verbatim (agents database rule R28, board request aed4e06a): «чтобы мы не испортили, типа, уже
+существующие генерации, мы всегда только добавили, чтобы всегда можно было посмотреть, если мы какие-то стили меняем,
+то это, типа, возможно, стоит клонировать и добавить, как новый стиль, чем меняет старый. только улучшали и все
+изменения были логированы, основывались, и был типа бэклог, изменения велся. Это жесткое правило для агентов для работы
+в этих репозиториях ... чтобы при, когда люди разные меняют агентов, они не ухудшали их.» It binds every agent and every
+person of an organization working in this repository and in every copy of it (the team copy is built from this tree).
+
+Never:
+
+- change or delete what shipped: runbooks (at their `version`), report templates, recipes, formats, styles, prompts and
+  the reports made with them stay readable and repeatable. A changed runbook bumps `version` and keeps the shipped
+  text beside it, byte for byte, as `research_agent/runbooks/<name>/versions/<old version>.md`; a changed template is
+  a new file. An entry leaves only by a mark in `catalog/retired.json` with its date and reason, and the file stays.
+- accept a change without proof: a test, an acceptance or a before/after measurement shows it is no worse. A
+  regression is rolled back first and fixed second.
+- make a change, as an agent or as a person, without a row in [`docs/evidence/backlog.md`](docs/evidence/backlog.md)
+  and a line in [`CHANGELOG.md`](CHANGELOG.md) that say why and on what basis.
+
+The gate: `python scripts/check_add_only.py` (in the suite as `tests/test_add_only.py`, in the nightly with
+`--base HEAD^1`) refuses an edited or deleted shipped entry and a lock that lost a name. After adding an entry, run
+`python scripts/check_add_only.py --write`: it adds new names to `catalog/shipped.lock.json` and never rewrites one.
+
 ## Opening the dashboard (operator rule, 2026-10-24)
 
 The service's pages open **only in Fabric Dashboards**, never in a browser (Safari, Dia or Chrome), in links you

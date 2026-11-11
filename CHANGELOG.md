@@ -6,6 +6,11 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- Rule R28 of the agents database, add and never replace (B-105): what shipped is never changed or deleted.
+  `catalog/shipped.lock.json` holds the hash of every runbook at its version and every report template;
+  `scripts/check_add_only.py` (the database pattern `add-only-catalog` 1.0.0) refuses an edited or deleted entry and
+  a lock that lost a name, in the suite and in the nightly. A changed runbook bumps its version and keeps the shipped
+  text in `versions/`. The rule is in `AGENTS.md`.
 - Quote verification follows the agents database research template 1.2.4 (B-101): a scale word is resolved
   before numbers are compared (1500000 is in "1.5 million", not in "1.5 billion"), and a quote cut right after a
   comparison written in words ("at least", "up to", "more than") or a sign, or inside a larger number, is not found.
