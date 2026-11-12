@@ -4,6 +4,11 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## Unreleased
+
+- The cloud deploy gate passes again (B-116): a test that asks git what is tracked skips in the extracted archive the
+  gate runs, which has no index; every cloud deploy since 0.4.0 had been refused.
+
 ## 0.5.0 (2026-11-12)
 
 - A caller's daily allowance (B-100): a paid job an agent creates starts without a person when its worst case (the
