@@ -1,0 +1,13 @@
+{
+ "id": "fb-20261113-4f6722",
+ "date": "2026-11-13",
+ "origin": "audit of the runbook source against research 1.7.1, 2026-11-12",
+ "template": "research",
+ "kind": "improvement",
+ "evidence": [
+  "6da57ba931fb:research_agent/service/allowance.py@5722585"
+ ],
+ "status": "open",
+ "decision": null,
+ "body": "Variant runbook and team-gateway. A caller's daily allowance approves a paid job whose worst case (the runbook's tool budget plus the run's LLM cap; a fixed reserve for one tool call; zero for the free tutorial) fits what is left of the caller's ceiling for the UTC day; above it the job waits for the operator. The template's team gateway step 7 says every paid job waits for the operator, which contradicts the key ceiling the template already requires (at least 10 USD per day) and left every agent's paid order waiting for a click. Measured on the runbook source on 2026-11-12: before, an agent in another account of a shared machine could not run any paid research without the operator pressing approve; after, its job started on the allowance and completed. Each decision records who made it (allowance or operator), the worst case, the day's spend and the ceiling."
+}
