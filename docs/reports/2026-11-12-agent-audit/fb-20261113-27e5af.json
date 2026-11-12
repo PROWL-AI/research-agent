@@ -1,0 +1,13 @@
+{
+ "id": "fb-20261113-27e5af",
+ "date": "2026-11-13",
+ "origin": "rollout of the runbook source's cloud instances, 2026-11-12",
+ "template": "research",
+ "kind": "error",
+ "evidence": [
+  "6da57ba931fb:research_agent/service/clients.py@5722585"
+ ],
+ "status": "open",
+ "decision": null,
+ "body": "Variant team-gateway, two traps in the cloud mode, both seen on the runbook source on 2026-11-12. (1) Client-key reads on Postgres with autocommit off leave the web process idle in a transaction; a schema change added later (ALTER TABLE ADD COLUMN IF NOT EXISTS) in every new process then waits forever for an exclusive lock, so one-off commands such as issuing a key hang. Fix: end each read transaction, and run the ALTER only when the catalogue lacks the column. (2) A deploy gate that runs the suite in an extracted archive refuses every deploy once a test asks git what is tracked; such a test skips outside a checkout. Also: the hosting platform's Python buildpack default of two web workers makes a single-process service exit on boot; pin one worker."
+}
