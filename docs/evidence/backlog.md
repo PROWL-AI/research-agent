@@ -34,6 +34,8 @@
 
 ## Closed
 
+- **B-117 · The cloud dyno crashed on Heroku's default WEB_CONCURRENCY** · closed 2026-11-12 · the Python buildpack sets `WEB_CONCURRENCY=2` on a 512 MB dyno, uvicorn reads it and exits with status 3 ("You must pass the application as an import string"); seen on the first boot of `prowl-research`. `cloud-run` passes `workers=1` (one process holds jobs, run locks and the snapshot thread); the app also carries `WEB_CONCURRENCY=1`.
+
 - **B-116 · The cloud deploy gate could not pass since 0.4.0** · closed 2026-11-12 · `scripts/cloud.py` `gate` runs the suite in an extracted `git archive`, which has no index, and `tests/test_installer.py::test_no_build_output_is_tracked` (B-094) calls `git ls-files` there: every cloud deploy after it was refused ("the commit's suite is not green"), found on the first deploy of `prowl-research` (audit 2026-11-12). The test now skips outside a git checkout; the repository's own run still checks it. Probe: the archive of `0efdf46` with the fix, 857 passed, 1 skipped.
 
 - **B-100 · A per-key daily allowance** · closed in 0.5.0 · the operator's word recorded in the agents database (intake in-20261112-996c34: every key carries a daily ceiling of at least 10 USD) and the delegation rules of 2026-11-05 and 2026-11-07 (an approval inside a task is the agent's; the operator presses nothing), asked again by the operator on 2026-11-12 («чтобы агенты имели доступ ... и могли делать качественный ресерч»). `research_agent/service/allowance.py`: a job within the caller's remaining daily ceiling starts without a person, above it waits; `tests/test_allowance.py` (13), `tests/test_cloud_service.py` (CORE-22, CORE-24).
