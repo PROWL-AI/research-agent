@@ -40,18 +40,9 @@ async def main():
             )
             assert not result.isError
             job_id = result.structuredContent["job"]["id"]
-            pending = await mcp.call_tool("fabric.job.get", {"id": job_id})
-            assert pending.structuredContent["job"]["status"] == "input_required"
-            async with httpx.AsyncClient(base_url=origin, follow_redirects=False) as c:
-                response = await c.post("/fabric/v1/login-code", headers={"Authorization": "Bearer " + (root / "host.token").read_text().strip()})
-                response.raise_for_status()
-                login = await c.get(response.json()["url"])
-                assert login.status_code == 302
-                job = (await c.get("/api/jobs/" + job_id)).json()["job"]
-                response = await c.post(
-                    "/api/jobs/" + job_id, headers={"X-Prowl-Request": "1"}, json={"action": "approve", "digest": job["proposal"]["digest"]}
-                )
-                response.raise_for_status()
+            # B-100 (0.5.0): the free tutorial starts on the caller's allowance, no operator session needed.
+            pending = (await mcp.call_tool("fabric.job.get", {"id": job_id})).structuredContent["job"]
+            assert pending["status"] in {"working", "completed"}, pending["status"]
             for _ in range(40):
                 result = await mcp.call_tool("fabric.job.get", {"id": job_id})
                 job = result.structuredContent["job"]
@@ -68,7 +59,7 @@ async def main():
                         "status": "PASS",
                         "jobId": job_id,
                         "transport": "gateway → service MCP",
-                        "decision": "synthetic tutorial approved via operator session",
+                        "decision": "synthetic tutorial started on the allowance (free)",
                         "tracePreserved": True,
                         "rows": 3,
                         "tutorialUsage": "unchanged",
