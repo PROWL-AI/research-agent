@@ -43,6 +43,10 @@ class Settings(BaseModel):
     max_workers: int = Field(default=1, ge=1, le=5)
 
 
+#: Seconds a request may wait for its decision before the operator is told about it.
+AWAITING_NOTICE_GRACE_SECONDS = 60
+
+
 class Store:
     def __init__(self, root: Path):
         self.root = root
@@ -140,7 +144,10 @@ class Store:
             job["proposal"] = {"digest": digest({"id": job_id, "request": request, "config": job["config"]}),
                                "expiresAt": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat().replace("+00:00", "Z")}
             self.db.execute("INSERT INTO jobs VALUES(?,?,?,?)", (job_id, request_key, request_hash, json.dumps(job)))
-            self.event("job.awaiting_choice", "Запрос ожидает проверки входных данных и разрешения запуска.", job, "notice", True)
+            # Recorded for the dashboard, not pushed: the caller usually approves at once, and a
+            # push here asked the operator about decisions already made (2026-11-12, four in four
+            # minutes). `_push_overdue_awaiting` pushes the ones still waiting after the grace.
+            self.event("job.awaiting_choice", "Запрос ожидает проверки входных данных и разрешения запуска.", job, "notice", False)
             return job, True
 
     def decide(self, job_id, proposal_digest, approve: bool):
@@ -201,7 +208,28 @@ class Store:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat().replace("+00:00", "Z")
         self.db.execute("DELETE FROM events WHERE id < (SELECT COALESCE(MAX(id),0)-999 FROM events) AND json_extract(body,'$.at') < ?", (cutoff,))
 
+    def _push_overdue_awaiting(self):
+        """Push the awaiting notice once for each request still undecided after the grace.
+
+        Run from `events()`, which the host polls, so no timer of our own is needed.
+        """
+        cutoff = (datetime.fromisoformat(now().replace("Z", "+00:00")) - timedelta(seconds=AWAITING_NOTICE_GRACE_SECONDS))
+        cutoff_s = cutoff.isoformat().replace("+00:00", "Z")
+        rows = self.db.execute(
+            "SELECT body FROM jobs WHERE json_extract(body,'$.status')='input_required' "
+            "AND json_extract(body,'$.createdAt') <= ? AND json_extract(body,'$.awaitingNoticePushed') IS NULL",
+            (cutoff_s,)).fetchall()
+        if not rows:
+            return
+        with self.db:
+            for row in rows:
+                job = json.loads(row[0])
+                job["awaitingNoticePushed"] = now()
+                self._save(job)
+                self.event("job.awaiting_choice", "Запрос ждёт решения: его никто не разрешил за минуту.", job, "notice", True)
+
     def events(self, after=None, limit=50):
+        self._push_overdue_awaiting()
         if after is None:
             latest = self.db.execute("SELECT id FROM events ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
             after = max(0, min([r[0] for r in latest], default=1) - 1)
