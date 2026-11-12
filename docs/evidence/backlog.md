@@ -34,6 +34,8 @@
 
 ## Closed
 
+- **B-119 · A one-off cloud command hung behind the web dyno** · closed 2026-11-13 · found while issuing keys on `prowl-research`: `heroku pg:ps` showed the web dyno's connection `idle in transaction` after `verify` (reads never committed, psycopg runs with `autocommit=False`) and three `ALTER TABLE ... ADD COLUMN IF NOT EXISTS daily_usd` (B-100, 0.5.0) waiting on it for 9 to 24 minutes. `verify` and `list` now end their transaction, and the ALTER runs only when `information_schema` lacks the column; `tests/test_cloud_clients.py::test_reads_never_leave_a_transaction_open_and_the_column_is_added_once`.
+
 - **B-118 · The cloud descriptor was refused by Fabric Dashboards** · closed 2026-11-12 · `scripts/cloud.py register` wrote a `peer` block without `residency` and `maxDataClass` and no `runner`; Fabric Dashboards answered `invalid` for `prowl-research.cloud`. The descriptor now carries residency `IE` (Heroku `eu`), `maxDataClass: internal` and `runner.credentialKind: key`, as `frame-agent.cloud` does.
 
 - **B-117 · The cloud dyno crashed on Heroku's default WEB_CONCURRENCY** · closed 2026-11-12 · the Python buildpack sets `WEB_CONCURRENCY=2` on a 512 MB dyno, uvicorn reads it and exits with status 3 ("You must pass the application as an import string"); seen on the first boot of `prowl-research`. `cloud-run` passes `workers=1` (one process holds jobs, run locks and the snapshot thread); the app also carries `WEB_CONCURRENCY=1`.

@@ -140,8 +140,11 @@ class PostgresClients:
     TABLE = """CREATE TABLE IF NOT EXISTS prowl_research_clients (
         name TEXT PRIMARY KEY, sha256 TEXT UNIQUE NOT NULL, scopes TEXT NOT NULL, prefix TEXT NOT NULL,
         created_at TEXT NOT NULL, revoked_at TEXT)"""
-    #: Added in 0.5.0 (B-100): a key created before carries the floor.
-    CEILING = f"ALTER TABLE prowl_research_clients ADD COLUMN IF NOT EXISTS daily_usd DOUBLE PRECISION NOT NULL DEFAULT {DAILY_FLOOR_USD}"
+    #: Added in 0.5.0 (B-100): a key created before carries the floor. Run only when the column is missing: an ALTER
+    #: waits for an exclusive lock, so every new process would queue behind the web dyno's connection (B-119).
+    CEILING = f"ALTER TABLE prowl_research_clients ADD COLUMN daily_usd DOUBLE PRECISION NOT NULL DEFAULT {DAILY_FLOOR_USD}"
+    HAS_CEILING = ("SELECT 1 FROM information_schema.columns WHERE table_name = 'prowl_research_clients'"
+                   " AND column_name = 'daily_usd'")
 
     def __init__(self, connect: Callable):
         self.connect = connect
@@ -152,7 +155,8 @@ class PostgresClients:
         if not self._ready:
             with connection.cursor() as cur:
                 cur.execute(self.TABLE)
-                cur.execute(self.CEILING)
+                if not cur.execute(self.HAS_CEILING).fetchone():
+                    cur.execute(self.CEILING)
             connection.commit()
             self._ready = True
         return connection
@@ -197,17 +201,21 @@ class PostgresClients:
         db.commit()
 
     def list(self) -> list[dict]:
-        with self._db().cursor() as cur:
+        db = self._db()
+        with db.cursor() as cur:
             rows = cur.execute("SELECT name, scopes, prefix, created_at, revoked_at, daily_usd FROM prowl_research_clients ORDER BY name").fetchall()
+        db.commit()  # end the read transaction: an open one holds a lock that a later ALTER waits on (B-119)
         return [{"name": r[0], "scopes": json.loads(r[1]), "prefix": r[2], "createdAt": r[3], "revokedAt": r[4], "dailyUsd": r[5]}
                 for r in rows]
 
     def verify(self, key) -> dict | None:
         if not _usable(key):
             return None
-        with self._db().cursor() as cur:
+        db = self._db()
+        with db.cursor() as cur:
             row = cur.execute("SELECT name, scopes, daily_usd FROM prowl_research_clients WHERE sha256=%s AND revoked_at IS NULL",
                               (_hash(key),)).fetchone()
+        db.commit()  # the web dyno verifies every request: never leave it idle in a transaction (B-119)
         return {"name": row[0], "scopes": json.loads(row[1]), "dailyUsd": max(row[2], DAILY_FLOOR_USD)} if row else None
 
 
