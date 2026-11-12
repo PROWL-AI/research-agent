@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "install-fabric-service.py"
 
 
@@ -144,5 +146,9 @@ def test_no_build_output_is_tracked():
     import subprocess
 
     root = SCRIPT.parent.parent
+    if not (root / ".git").exists():
+        # The cloud deploy gate runs the suite in an extracted `git archive` (scripts/cloud.py `gate`), which has no
+        # index: what is tracked is answered by the repository's own run of this test (B-116).
+        pytest.skip("not a git checkout")
     tracked = subprocess.run(["git", "ls-files", "build", "*.egg-info"], cwd=root, capture_output=True, text=True, check=True)
     assert tracked.stdout == ""
