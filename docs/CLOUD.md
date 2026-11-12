@@ -49,7 +49,11 @@ heroku run -a appvillis-prowl-research -- prowl-research-service client revoke a
 
 `fabric.job.get` and `fabric.job.cancel` act on the caller's own jobs only. A key's jobs carry `client:<name>` as
 their principal, so one client never reads, resumes or replays another's (`tests/test_cloud_service.py`). Every paid
-job waits for the operator's approval on the cloud page (spec R-6); a per-key allowance without a person is B-100.
+job starts on its own when its worst case fits what is left of the key's daily ceiling, and waits for the operator's
+approval on the cloud page otherwise (B-100, `research_agent/service/allowance.py`). Every key carries a ceiling of at
+least 10 USD per UTC day, 10 by default (the operator's word recorded in the agents database, intake
+in-20261112-996c34): `client add <name> --daily-usd 25`, `client limit <name> --daily-usd 25`. `--raw` prints only
+the key, for a pipe straight into the holder's vault slot.
 
 ## Deploy
 

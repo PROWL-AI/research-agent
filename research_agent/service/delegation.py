@@ -152,5 +152,8 @@ def recorded(verdict: dict[str, Any]) -> dict[str, Any] | None:
     """What a job keeps of a verified delegation: who acts for whom. Never the token."""
     if not verdict.get("principal"):
         return None
-    return {"principal": verdict["principal"], "caller": verdict.get("caller"), "chain": verdict.get("chain") or [],
+    kept = {"principal": verdict["principal"], "caller": verdict.get("caller"), "chain": verdict.get("chain") or [],
             "kid": verdict.get("kid"), "tier": verdict.get("tier")}
+    if verdict.get("dailyUsd") is not None:
+        kept["dailyUsd"] = verdict["dailyUsd"]  # a cloud client's own ceiling (B-100)
+    return kept

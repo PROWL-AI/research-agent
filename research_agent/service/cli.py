@@ -88,14 +88,18 @@ def cloud_root(environ=os.environ):
 
 
 def client_command(argv, environ=os.environ, out=print):
-    """`client add|rotate|revoke|list`: the cloud instance's client keys (B-099 M3).
-    On Heroku: `heroku run prowl-research-service client add <name> --scopes read,tools.call`."""
-    from .clients import SCOPES, from_env
+    """`client add|rotate|limit|revoke|list`: the cloud instance's client keys (B-099 M3, B-100).
+    On Heroku: `heroku run prowl-research-service client add <name> --scopes read,tools.call --daily-usd 10`.
+    `--raw` prints the key alone, for a pipe straight into the holder's vault slot (never into a transcript)."""
+    from .clients import DAILY_FLOOR_USD, SCOPES, from_env
 
     parser = argparse.ArgumentParser(prog="prowl-research-service client")
-    parser.add_argument("action", choices=["add", "rotate", "revoke", "list"])
+    parser.add_argument("action", choices=["add", "rotate", "limit", "revoke", "list"])
     parser.add_argument("name", nargs="?")
     parser.add_argument("--scopes", default="read", help="comma-separated: " + ", ".join(SCOPES))
+    parser.add_argument("--daily-usd", type=float, default=DAILY_FLOOR_USD,
+                        help=f"the key's ceiling per UTC day, at least {DAILY_FLOOR_USD:g} (B-100)")
+    parser.add_argument("--raw", action="store_true", help="print only the key, for a pipe into a vault")
     args = parser.parse_args(argv)
     clients = from_env(cloud_root(environ), environ)
     if args.action == "list":
@@ -107,8 +111,15 @@ def client_command(argv, environ=os.environ, out=print):
         clients.revoke(args.name)
         out(f"revoked {args.name}")
         return 0
-    key = clients.add(args.name, args.scopes.split(",")) if args.action == "add" else clients.rotate(args.name)
+    if args.action == "limit":
+        clients.limit(args.name, args.daily_usd)
+        out(f"{args.name}: daily ceiling {args.daily_usd:g} USD")
+        return 0
+    key = clients.add(args.name, args.scopes.split(","), args.daily_usd) if args.action == "add" else clients.rotate(args.name)
     # The one time the key is shown: it is not stored, only its SHA-256.
+    if args.raw:
+        out(key)
+        return 0
     out(f"{args.name}: {key}")
     out("Shown once. Give it to its holder privately; it is never shown again.")
     return 0

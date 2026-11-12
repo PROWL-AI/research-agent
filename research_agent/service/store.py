@@ -41,6 +41,9 @@ class Settings(BaseModel):
     parallel_jobs: int = Field(default=1, ge=1, le=4)
     timeout_minutes: int = Field(default=15, ge=1, le=60)
     max_workers: int = Field(default=1, ge=1, le=5)
+    #: B-100: what a local agent's paid jobs may reserve per UTC day before one waits for the operator; 0 turns the
+    #: allowance off. The floor 10 binds cloud client keys (`clients.py`), not this local setting.
+    agent_daily_usd: float = Field(default=10.0, ge=0, le=1000)
 
 
 #: Seconds a request may wait for its decision before the operator is told about it.
@@ -150,16 +153,29 @@ class Store:
             self.event("job.awaiting_choice", "Запрос ожидает проверки входных данных и разрешения запуска.", job, "notice", False)
             return job, True
 
-    def decide(self, job_id, proposal_digest, approve: bool):
+    def decide(self, job_id, proposal_digest, approve: bool, by: dict | None = None):
+        """`by` is the allowance's verdict (B-100) when the caller's daily allowance approved the job; None is the
+        operator. Either way the job keeps who decided, when, and its worst case, which counts against the
+        caller's day (`allowance.spent_today`)."""
+        from .allowance import worst_case_usd
+
         with self.db:
             job = self.job(job_id)
             if job["status"] != "input_required":
                 raise Conflict("Решение уже принято; повторный запуск запрещён.")
             if proposal_digest != job["proposal"]["digest"] or now() > job["proposal"]["expiresAt"]:
                 raise Conflict("Решение устарело или не соответствует запросу. Создайте новый запрос.")
-            job.update(status="working" if approve else "cancelled", phase="queued" if approve else "rejected", updatedAt=now())
+            decision = {"by": "operator", "worstCaseUsd": worst_case_usd(job["request"])} | (by or {})
+            job.update(status="working" if approve else "cancelled", phase="queued" if approve else "rejected", updatedAt=now(),
+                       decision=decision | {"approved": approve, "at": now()})
             self._save(job)
-            self.event("job.approved" if approve else "job.cancelled", "Запуск разрешён." if approve else "Запрос отклонён до выполнения.", job)
+            if not approve:
+                text = "Запрос отклонён до выполнения."
+            elif decision["by"] == "allowance":
+                text = "Запуск разрешён дневным лимитом вызывающего агента."
+            else:
+                text = "Запуск разрешён."
+            self.event("job.approved" if approve else "job.cancelled", text, job)
             return job
 
     def transition(self, job_id, status, phase, **fields):

@@ -145,7 +145,8 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
         if needed is not None and needed not in client["scopes"]:
             return {"ok": False, "code": "scope-not-granted", "detail": "client-key-scope"}
         who = "client:" + client["name"]
-        return {"ok": True, "tier": "client", "principal": who, "caller": who, "chain": [], "claims": None, "kid": None}
+        return {"ok": True, "tier": "client", "principal": who, "caller": who, "chain": [], "claims": None, "kid": None,
+                "dailyUsd": client.get("dailyUsd")}
 
     def operator(request):
         return store.auth_valid("session", request.cookies.get(cookie, ""))

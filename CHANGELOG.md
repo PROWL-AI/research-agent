@@ -4,7 +4,26 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
-## Unreleased
+## 0.5.0 (2026-11-12)
+
+- A caller's daily allowance (B-100): a paid job an agent creates starts without a person when its worst case (the
+  runbook's tool budget plus the run's LLM cap, 1 USD for one tool call, nothing for the tutorial) fits what is left of
+  the caller's ceiling for the UTC day; above it, the job waits for the operator as before. A cloud client key carries
+  its own ceiling, at least 10 USD per day and 10 by default (`client add --daily-usd`, `client limit`); local agents
+  share the setting `agent_daily_usd` (10 by default, 0 turns it off). The dashboard's own requests still wait for the
+  operator. Basis: the operator's word recorded in the agents database (intake in-20261112-996c34, research template
+  1.6.0) and the delegation rules of 2026-11-05 and 2026-11-07; before, every paid job of every agent waited for a click.
+  Each decision records who made it (`allowance` or `operator`), the worst case, the day's spend and the ceiling
+  (`research_agent/service/allowance.py`, `tests/test_allowance.py`).
+- `client add|rotate --raw` prints only the key, for a pipe straight into the holder's vault slot.
+- Model prices re-read from OpenRouter on 2026-11-12: `deepseek/deepseek-v4.1-flash` is 0.30 / 1.20 USD per 1M tokens,
+  not 0.04 / 0.70, so cheap-tier spend was under-counted; the operator's model map (Kimi K3.1 Pro, Sonnet 5.5, GLM 5.3,
+  Gemini 3.1 Pro) is priced, so a switch to it is no longer estimated at the unknown price.
+- The model key `prowl-research` monthly limit moved from 50 to 100 USD (the operator's default for every agent,
+  2026-11-07).
+- Audit of 2026-11-12 against the agents database template `research` 1.7.1, the Prowl product and the estate's
+  rules: [docs/reports/2026-11-12-agent-audit/README.md](docs/reports/2026-11-12-agent-audit/README.md); its gaps are
+  board rows B-106 to B-114.
 
 - The awaiting-decision notice is no longer pushed when a request is created: the caller usually approves
   at once, and the operator was asked four times on 2026-11-12 about decisions already made. A request still

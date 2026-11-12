@@ -19,8 +19,11 @@ from typing import Callable
 
 #: What a key may do. `read`: list runbooks, read artifacts, run the free tutorial.
 #: `research.run`: create research jobs. `tools.call`: create single Prowl tool jobs.
-#: Paid jobs of either kind still wait for the operator's approval (B-099 R-6).
+#: A paid job starts on its own when it fits the key's daily ceiling, else it waits for the operator (B-100).
 SCOPES = ("read", "research.run", "tools.call")
+#: Every key carries a daily USD ceiling of at least this, 10 by default: the operator's word recorded in the agents
+#: database (intake in-20261112-996c34, research template 1.6.0). A smaller one is refused.
+DAILY_FLOOR_USD = 10.0
 PREFIX = "prc_"
 NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
@@ -44,6 +47,16 @@ def _check(name: str, scopes) -> list[str]:
     if not scopes or any(s not in SCOPES for s in scopes):
         raise ValueError("scopes: one or more of " + ", ".join(SCOPES))
     return scopes
+
+
+def _ceiling(daily_usd) -> float:
+    try:
+        value = float(daily_usd)
+    except (TypeError, ValueError):
+        raise ValueError("daily ceiling: a number of USD") from None
+    if not value >= DAILY_FLOOR_USD or value > 1000:
+        raise ValueError(f"daily ceiling: at least {DAILY_FLOOR_USD:g} and at most 1000 USD per UTC day")
+    return value
 
 
 def _usable(key) -> bool:
@@ -71,13 +84,14 @@ class FileClients:
         os.replace(temp, self.path)
         self.path.chmod(0o600)
 
-    def add(self, name: str, scopes) -> str:
-        scopes = _check(name, scopes)
+    def add(self, name: str, scopes, daily_usd: float = DAILY_FLOOR_USD) -> str:
+        scopes, daily_usd = _check(name, scopes), _ceiling(daily_usd)
         data = self._load()
         if name in data:
             raise ValueError(f"client {name} exists; rotate it or choose another name")
         key = _new_key()
-        data[name] = {"sha256": _hash(key), "scopes": scopes, "prefix": key[:12], "createdAt": _now(), "revokedAt": None}
+        data[name] = {"sha256": _hash(key), "scopes": scopes, "prefix": key[:12], "createdAt": _now(), "revokedAt": None,
+                      "dailyUsd": daily_usd}
         self._write(data)
         return key
 
@@ -90,6 +104,14 @@ class FileClients:
         self._write(data)
         return key
 
+    def limit(self, name: str, daily_usd: float) -> None:
+        daily_usd = _ceiling(daily_usd)
+        data = self._load()
+        if name not in data or data[name]["revokedAt"]:
+            raise KeyError(f"no active client {name}")
+        data[name]["dailyUsd"] = daily_usd
+        self._write(data)
+
     def revoke(self, name: str) -> None:
         data = self._load()
         if name not in data:
@@ -98,8 +120,8 @@ class FileClients:
         self._write(data)
 
     def list(self) -> list[dict]:
-        return [{"name": n, "scopes": c["scopes"], "prefix": c["prefix"], "createdAt": c["createdAt"], "revokedAt": c["revokedAt"]}
-                for n, c in sorted(self._load().items())]
+        return [{"name": n, "scopes": c["scopes"], "prefix": c["prefix"], "createdAt": c["createdAt"], "revokedAt": c["revokedAt"],
+                 "dailyUsd": c.get("dailyUsd", DAILY_FLOOR_USD)} for n, c in sorted(self._load().items())]
 
     def verify(self, key) -> dict | None:
         if not _usable(key):
@@ -107,7 +129,7 @@ class FileClients:
         wanted = _hash(key)
         for name, c in self._load().items():
             if not c["revokedAt"] and secrets.compare_digest(c["sha256"], wanted):
-                return {"name": name, "scopes": c["scopes"]}
+                return {"name": name, "scopes": c["scopes"], "dailyUsd": max(c.get("dailyUsd", DAILY_FLOOR_USD), DAILY_FLOOR_USD)}
         return None
 
 
@@ -118,6 +140,8 @@ class PostgresClients:
     TABLE = """CREATE TABLE IF NOT EXISTS prowl_research_clients (
         name TEXT PRIMARY KEY, sha256 TEXT UNIQUE NOT NULL, scopes TEXT NOT NULL, prefix TEXT NOT NULL,
         created_at TEXT NOT NULL, revoked_at TEXT)"""
+    #: Added in 0.5.0 (B-100): a key created before carries the floor.
+    CEILING = f"ALTER TABLE prowl_research_clients ADD COLUMN IF NOT EXISTS daily_usd DOUBLE PRECISION NOT NULL DEFAULT {DAILY_FLOOR_USD}"
 
     def __init__(self, connect: Callable):
         self.connect = connect
@@ -128,19 +152,20 @@ class PostgresClients:
         if not self._ready:
             with connection.cursor() as cur:
                 cur.execute(self.TABLE)
+                cur.execute(self.CEILING)
             connection.commit()
             self._ready = True
         return connection
 
-    def add(self, name: str, scopes) -> str:
-        scopes = _check(name, scopes)
+    def add(self, name: str, scopes, daily_usd: float = DAILY_FLOOR_USD) -> str:
+        scopes, daily_usd = _check(name, scopes), _ceiling(daily_usd)
         db = self._db()
         with db.cursor() as cur:
             if cur.execute("SELECT 1 FROM prowl_research_clients WHERE name=%s", (name,)).fetchone():
                 raise ValueError(f"client {name} exists; rotate it or choose another name")
             key = _new_key()
-            cur.execute("INSERT INTO prowl_research_clients(name, sha256, scopes, prefix, created_at, revoked_at) VALUES (%s,%s,%s,%s,%s,NULL)",
-                        (name, _hash(key), json.dumps(scopes), key[:12], _now()))
+            cur.execute("INSERT INTO prowl_research_clients(name, sha256, scopes, prefix, created_at, revoked_at, daily_usd)"
+                        " VALUES (%s,%s,%s,%s,%s,NULL,%s)", (name, _hash(key), json.dumps(scopes), key[:12], _now(), daily_usd))
         db.commit()
         return key
 
@@ -154,6 +179,15 @@ class PostgresClients:
         db.commit()
         return key
 
+    def limit(self, name: str, daily_usd: float) -> None:
+        daily_usd = _ceiling(daily_usd)
+        db = self._db()
+        with db.cursor() as cur:
+            if not cur.execute("SELECT 1 FROM prowl_research_clients WHERE name=%s AND revoked_at IS NULL", (name,)).fetchone():
+                raise KeyError(f"no active client {name}")
+            cur.execute("UPDATE prowl_research_clients SET daily_usd=%s WHERE name=%s", (daily_usd, name))
+        db.commit()
+
     def revoke(self, name: str) -> None:
         db = self._db()
         with db.cursor() as cur:
@@ -164,15 +198,17 @@ class PostgresClients:
 
     def list(self) -> list[dict]:
         with self._db().cursor() as cur:
-            rows = cur.execute("SELECT name, scopes, prefix, created_at, revoked_at FROM prowl_research_clients ORDER BY name").fetchall()
-        return [{"name": r[0], "scopes": json.loads(r[1]), "prefix": r[2], "createdAt": r[3], "revokedAt": r[4]} for r in rows]
+            rows = cur.execute("SELECT name, scopes, prefix, created_at, revoked_at, daily_usd FROM prowl_research_clients ORDER BY name").fetchall()
+        return [{"name": r[0], "scopes": json.loads(r[1]), "prefix": r[2], "createdAt": r[3], "revokedAt": r[4], "dailyUsd": r[5]}
+                for r in rows]
 
     def verify(self, key) -> dict | None:
         if not _usable(key):
             return None
         with self._db().cursor() as cur:
-            row = cur.execute("SELECT name, scopes FROM prowl_research_clients WHERE sha256=%s AND revoked_at IS NULL", (_hash(key),)).fetchone()
-        return {"name": row[0], "scopes": json.loads(row[1])} if row else None
+            row = cur.execute("SELECT name, scopes, daily_usd FROM prowl_research_clients WHERE sha256=%s AND revoked_at IS NULL",
+                              (_hash(key),)).fetchone()
+        return {"name": row[0], "scopes": json.loads(row[1]), "dailyUsd": max(row[2], DAILY_FLOOR_USD)} if row else None
 
 
 def from_env(root: Path, environ=os.environ):

@@ -42,6 +42,7 @@ research_agent = ["runbooks/**/*", "report/templates/**/*", "service/static/*", 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = ["allowance: runs with the B-100 daily allowance on (it is off in other service tests)"]
 
 # This checkout sits inside another repository's folder (0xDEV/pyproject.toml has its own
 # [tool.ruff]); without this section ruff silently used that one: target 3.10 (false F821 on

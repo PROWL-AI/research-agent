@@ -1,5 +1,25 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-12: audit, 0.5.0 allowance, rollout to every instance (supersedes every "Exact next task" below)
+
+Operator, 2026-11-12, this session (Fabric task `afcbab45`): audit this agent and the personal Research Agent against
+the product and our agents, improve, and put both on every instance and Studio space so agents can do research
+(verbatim in [the audit report](reports/2026-11-12-agent-audit/README.md)).
+
+Done: the audit (report above; gaps B-106 to B-115); 0.5.0, the caller's daily allowance (B-100 closed) and the model
+price table; model key `prowl-research` and the personal `research-agent` key raised to 100 USD a month.
+
+Rollout plan (report section 4): Studio spaces reach cloud instances, `prowl-research` (personal Heroku account; spaces
+sshlg, passioncode, assessment, aiteam1) and `appvillis-prowl-research` (team `telegramcrew`; spaces appvillis, esim),
+one client key per space in that space's vault, an `http` MCP entry with a headers helper.
+
+Human gate (B-111): each cloud instance needs its own `prowl_` key, made only from a signed-in prowl.chat session
+(`/api/v1/keys` takes a session, not a key); requested through Observatory's secret window, never in chat.
+
+**Exact next task:** the state of each instance is in the rollout table of the latest commit's report; finish the
+instances whose Prowl key has landed (`scripts/cloud.py config`, then `client add --raw` into each space's vault and
+its MCP entry).
+
 ## Current entry, 2026-11-04: B-099 cloud gateway, 0.4.0 (supersedes every "Exact next task" below)
 
 Operator, this session, 2026-11-04: make this agent a cloud agent like CMO Creative and Mobile Publisher, give the
