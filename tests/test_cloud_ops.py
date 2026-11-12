@@ -78,3 +78,5 @@ def test_register_writes_a_remote_descriptor(tmp_path):
     assert data["placement"] == "remote" and data["instance"] == "cloud" and data["lifecycle"] == {"manager": "none"}
     assert data["origin"] == "https://research.example.com" and "commands" not in data
     assert data["peer"]["custody"] == "organization-managed"
+    assert data["peer"]["residency"] == ["IE"] and data["peer"]["maxDataClass"] == "internal"
+    assert data["runner"] == {"credentialKind": "key"}

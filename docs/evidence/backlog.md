@@ -34,6 +34,8 @@
 
 ## Closed
 
+- **B-118 · The cloud descriptor was refused by Fabric Dashboards** · closed 2026-11-12 · `scripts/cloud.py register` wrote a `peer` block without `residency` and `maxDataClass` and no `runner`; Fabric Dashboards answered `invalid` for `prowl-research.cloud`. The descriptor now carries residency `IE` (Heroku `eu`), `maxDataClass: internal` and `runner.credentialKind: key`, as `frame-agent.cloud` does.
+
 - **B-117 · The cloud dyno crashed on Heroku's default WEB_CONCURRENCY** · closed 2026-11-12 · the Python buildpack sets `WEB_CONCURRENCY=2` on a 512 MB dyno, uvicorn reads it and exits with status 3 ("You must pass the application as an import string"); seen on the first boot of `prowl-research`. `cloud-run` passes `workers=1` (one process holds jobs, run locks and the snapshot thread); the app also carries `WEB_CONCURRENCY=1`.
 
 - **B-116 · The cloud deploy gate could not pass since 0.4.0** · closed 2026-11-12 · `scripts/cloud.py` `gate` runs the suite in an extracted `git archive`, which has no index, and `tests/test_installer.py::test_no_build_output_is_tracked` (B-094) calls `git ls-files` there: every cloud deploy after it was refused ("the commit's suite is not green"), found on the first deploy of `prowl-research` (audit 2026-11-12). The test now skips outside a git checkout; the repository's own run still checks it. Probe: the archive of `0efdf46` with the fix, 857 passed, 1 skipped.
