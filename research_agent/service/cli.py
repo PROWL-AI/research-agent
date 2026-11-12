@@ -164,8 +164,10 @@ def cloud_run(environ=os.environ):
         app = create_app(root, token_value, None, port, build, cloud=CloudSettings(origin=origin, clients=clients_from_env(root, environ)))
         if snapshots is not None:
             threading.Thread(target=keep, name="snapshot", daemon=True).start()
+        # workers=1: one process holds the jobs, the run locks and the snapshot thread. Heroku's Python buildpack sets
+        # WEB_CONCURRENCY=2 by default, which uvicorn reads and then exits with status 3 (2026-11-12, B-117).
         uvicorn.run(app, host="0.0.0.0", port=port, access_log=False, log_level="warning", timeout_graceful_shutdown=8,
-                    proxy_headers=False)
+                    proxy_headers=False, workers=1)
     finally:
         stop.set()
         if snapshots is not None:
