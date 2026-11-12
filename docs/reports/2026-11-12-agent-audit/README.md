@@ -94,7 +94,22 @@ report:
 | PassionCode | Studio `passioncode` | облако `prowl-research`, свой ключ клиента; своя копия, когда PassionCode понадобятся свои ключи провайдеров (B-115) | экземпляр PassionCode (BL-387) |
 | Appvillis | Studio `appvillis`, `esim` | облако `appvillis-prowl-research` (Heroku, команда `telegramcrew`), копия `appvillis-com/appvillis-prowl-research` | облачная копия `https://104-248-136-152.sslip.io/mcp` |
 
-Состояние раскатки ведётся в [`docs/HANDOFF.md`](../../HANDOFF.md) (верхняя запись) и строками B-099, B-111, B-115.
+### Состояние на 2026-11-13
+
+| Где | Prowl Research | Проверка |
+|---|---|---|
+| MacBook | `prowl-research.default` 0.5.0, `ready`; Claude Code: `prowl-research` и `research-agent` Connected | `service_status`, `claude mcp list`, дымовой тест PASS (`pr-bbba08e73fd29941b607`) |
+| облако `prowl-research` | 0.5.0 с B-116 до B-119, `ready`, `degraded: []`, в Fabric Dashboards `prowl-research.cloud` | well-known `status: ready` |
+| Studio `sshlg` | ключ `studio-sshlg`, MCP `prowl-research` Connected | `initialize`, 7 инструментов, 14 ранбуков; учебное задание `pr-21fec45ebc627a9e8158` стартовало по лимиту и `completed` |
+| Studio `passioncode` | ключ `studio-passioncode`, MCP Connected | 7 инструментов, 14 ранбуков |
+| Studio `assessment` | ключ `studio-assessment`, MCP Connected | `claude mcp get` |
+| облако `appvillis-prowl-research` | копия `62c8ce9` (оригинал `5722585`), `degraded`: нет ключа Prowl | well-known: ключ модели подключён после выпуска |
+| Studio `appvillis` | ключ `studio-appvillis`, MCP `appvillis-prowl-research` Connected | `claude mcp get` |
+| Studio `esim` | не подключено: SSH с MacBook не пускает | сообщение studio-agent, тред `9695cc44` |
+
+Личное облако пока ходит в Prowl ключом этого же агента (лимит ключа 5 USD в день, 10 USD всего, B-111). Отдельные
+ключи Prowl для обоих облаков: человеческий шаг (вход в prowl.chat). Research Agent: запрос его проекту, тред
+`96893d02`.
 
 ## 5. Что передано другим
 

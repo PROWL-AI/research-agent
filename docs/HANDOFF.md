@@ -16,9 +16,16 @@ one client key per space in that space's vault, an `http` MCP entry with a heade
 Human gate (B-111): each cloud instance needs its own `prowl_` key, made only from a signed-in prowl.chat session
 (`/api/v1/keys` takes a session, not a key); requested through Observatory's secret window, never in chat.
 
-**Exact next task:** the state of each instance is in the rollout table of the latest commit's report; finish the
-instances whose Prowl key has landed (`scripts/cloud.py config`, then `client add --raw` into each space's vault and
-its MCP entry).
+State 2026-11-13: the rollout table in the report (section 4). Live: `prowl-research.cloud` (spaces sshlg, passioncode,
+assessment connected and probed), `appvillis-prowl-research.cloud` (space appvillis connected; no Prowl key yet), the
+local 0.5.0. Found and fixed on the way: B-116 (the deploy gate could not pass), B-117 (Heroku's WEB_CONCURRENCY),
+B-118 (the remote descriptor), B-119 (an idle transaction blocked one-off commands). Space `esim`: studio-agent thread
+`9695cc44`. Research Agent: its project, thread `96893d02` (state promised by 2026-11-15).
+
+**Exact next task:** once the operator has made the two Prowl keys (B-111), put each into its vault slot
+(`prowl-research-cloud/prod/PROWL_API_KEY`, `appvillis-com-appvillis-prowl-research/prod/PROWL_API_KEY`) and run
+`scripts/cloud.py config --app <app> PROWL_API_KEY` under `use_secret.py run`; then B-107 (the strong model on the map,
+measured) and B-106 (install on a second account).
 
 ## Current entry, 2026-11-04: B-099 cloud gateway, 0.4.0 (supersedes every "Exact next task" below)
 
