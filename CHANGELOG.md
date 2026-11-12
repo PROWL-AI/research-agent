@@ -6,6 +6,10 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- The awaiting-decision notice is no longer pushed when a request is created: the caller usually approves
+  at once, and the operator was asked four times on 2026-11-12 about decisions already made. A request still
+  undecided after `AWAITING_NOTICE_GRACE_SECONDS` (60) is pushed once, from the event read the host polls
+  (`tests/test_awaiting_notice_grace.py`).
 - Rule R28 of the agents database, add and never replace (B-105): what shipped is never changed or deleted.
   `catalog/shipped.lock.json` holds the hash of every runbook at its version and every report template;
   `scripts/check_add_only.py` (the database pattern `add-only-catalog` 1.0.0) refuses an edited or deleted entry and
