@@ -6,6 +6,8 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- The remote descriptor `scripts/cloud.py register` writes passes Fabric Dashboards (B-118): residency, data class and
+  runner in the peer block.
 - The cloud instance runs one worker whatever `WEB_CONCURRENCY` says (B-117): Heroku's buildpack default of 2 made
   uvicorn exit with status 3 on boot.
 - The cloud deploy gate passes again (B-116): a test that asks git what is tracked skips in the extracted archive the

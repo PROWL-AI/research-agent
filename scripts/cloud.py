@@ -93,7 +93,11 @@ def config(app: str, names: list[str], client: httpx.Client, environ=os.environ,
     out("set: " + ", ".join(sorted(names)))
 
 
-def descriptor(origin: str, token_file: Path) -> dict:
+#: Where Heroku's `eu` region keeps the dyno and its database (Dublin): the peer block's residency (B-118).
+HEROKU_EU_RESIDENCY = ("IE",)
+
+
+def descriptor(origin: str, token_file: Path, residency=HEROKU_EU_RESIDENCY) -> dict:
     parts = urlsplit(origin)
     if parts.scheme != "https" or parts.path not in {"", "/"} or parts.query or "@" in parts.netloc or not parts.hostname or "." not in parts.hostname:
         raise SystemExit("origin must be https://<public DNS name> without a path")
@@ -103,7 +107,11 @@ def descriptor(origin: str, token_file: Path) -> dict:
         "placement": "remote", "origin": f"https://{parts.netloc}",
         "auth": {"tokenFile": str(token_file)}, "lifecycle": {"manager": "none"},
         "source": {"repository": "https://github.com/PROWL-AI/research-agent"},
-        "peer": {"endpoint": f"https://{parts.netloc}/mcp", "custody": "organization-managed"},
+        # B-118: Fabric Dashboards refuses a peer without residency and data class, and a service offered to others
+        # without its runner. The data is research briefs and public-web evidence: internal at most.
+        "peer": {"endpoint": f"https://{parts.netloc}/mcp", "custody": "organization-managed",
+                 "residency": list(residency), "maxDataClass": "internal"},
+        "runner": {"credentialKind": "key"},
         "installedAt": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "installedBy": {"by": "person", "role": "operator", "tool": "prowl-research scripts/cloud.py register"},
     }
