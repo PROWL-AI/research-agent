@@ -14,6 +14,8 @@ from research_agent.service.clients import FileClients, PostgresClients, SCOPES
 class SqliteAsPostgres:
     """A DB-API connection that speaks psycopg's `%s` paramstyle over SQLite."""
 
+    alters = 0
+
     def __init__(self):
         self.db = sqlite3.connect(":memory:")
 
@@ -23,6 +25,10 @@ class SqliteAsPostgres:
         class Cursor:
             def execute(self, sql, params=()):
                 sql = sql.replace("%s", "?").replace("BYTEA", "BLOB").replace("TIMESTAMPTZ", "TEXT")
+                if "information_schema.columns" in sql:  # Postgres catalogue; SQLite answers from its pragma
+                    sql = "SELECT 1 FROM pragma_table_info('prowl_research_clients') WHERE name = 'daily_usd'"
+                if sql.startswith("ALTER"):
+                    SqliteAsPostgres.alters += 1
                 if "ADD COLUMN IF NOT EXISTS" in sql:  # Postgres only; SQLite says "duplicate column" instead
                     try:
                         self._cur = db.execute(sql.replace("ADD COLUMN IF NOT EXISTS", "ADD COLUMN"), params)
@@ -121,3 +127,18 @@ def test_scopes_are_the_three_capabilities_groups():
 def test_file_store_is_0600(tmp_path):
     FileClients(tmp_path / "clients.json").add("anna", ["read"])
     assert stat.S_IMODE(os.stat(tmp_path / "clients.json").st_mode) == 0o600
+
+
+def test_reads_never_leave_a_transaction_open_and_the_column_is_added_once():
+    """B-119: the web dyno verified keys inside a transaction it never ended, and the 0.5.0 ALTER of every new process
+    (a one-off `client add`) waited for that transaction forever."""
+    connection = SqliteAsPostgres()
+    clients = PostgresClients(lambda: connection)
+    key = clients.add("anna", ["read"])
+    SqliteAsPostgres.alters = 0
+    assert clients.verify(key)["name"] == "anna"
+    assert not connection.db.in_transaction
+    clients.list()
+    assert not connection.db.in_transaction
+    PostgresClients(lambda: connection).list()  # a second process on the same table
+    assert SqliteAsPostgres.alters == 0, "the column exists: no ALTER, no exclusive lock"
