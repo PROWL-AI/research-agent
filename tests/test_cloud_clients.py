@@ -22,7 +22,15 @@ class SqliteAsPostgres:
 
         class Cursor:
             def execute(self, sql, params=()):
-                self._cur = db.execute(sql.replace("%s", "?").replace("BYTEA", "BLOB").replace("TIMESTAMPTZ", "TEXT"), params)
+                sql = sql.replace("%s", "?").replace("BYTEA", "BLOB").replace("TIMESTAMPTZ", "TEXT")
+                if "ADD COLUMN IF NOT EXISTS" in sql:  # Postgres only; SQLite says "duplicate column" instead
+                    try:
+                        self._cur = db.execute(sql.replace("ADD COLUMN IF NOT EXISTS", "ADD COLUMN"), params)
+                    except sqlite3.OperationalError as exc:
+                        if "duplicate column" not in str(exc):
+                            raise
+                    return self
+                self._cur = db.execute(sql, params)
                 return self
 
             def fetchone(self):
@@ -64,9 +72,9 @@ def test_add_prints_once_and_stores_only_the_hash(clients, tmp_path):
         assert key not in raw and hashlib.sha256(key.encode()).hexdigest() in raw
 
 
-def test_verify_answers_the_name_and_scopes(clients):
+def test_verify_answers_the_name_scopes_and_daily_ceiling(clients):
     key = clients.add("anna", ["read"])
-    assert clients.verify(key) == {"name": "anna", "scopes": ["read"]}
+    assert clients.verify(key) == {"name": "anna", "scopes": ["read"], "dailyUsd": 10.0}
     assert clients.verify(key + "x") is None
     assert clients.verify("") is None
     assert clients.verify("Bearer " + key) is None

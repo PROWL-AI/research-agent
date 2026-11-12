@@ -93,12 +93,29 @@ async def test_a_clients_jobs_are_its_own(client, clients, app):
     assert not r.json()["result"].get("isError")
 
 
-async def test_paid_jobs_still_wait_for_the_operator(client, clients, app, monkeypatch):
+async def test_paid_jobs_above_the_allowance_wait_for_the_operator(client, clients, app, monkeypatch):
     monkeypatch.setenv("PROWL_API_KEY", "p")
     key = clients.add("anna", ["tools.call"])
     r = await client.post("/mcp", json=call("research.tools.call", {"idempotencyKey": "k", "tool": "google_news", "params": {"q": "x"}}), headers=bearer(key))
     job_id = r.json()["result"]["structuredContent"]["job"]["id"]
     assert app.state.store.job(job_id)["status"] == "input_required"
+
+
+@pytest.mark.allowance
+async def test_a_paid_job_within_the_keys_daily_ceiling_starts_on_its_own(client, clients, app, monkeypatch):
+    """B-100: the key's ceiling travels with the client into the job and approves it (the run itself is stubbed)."""
+    monkeypatch.setenv("PROWL_API_KEY", "p")
+
+    async def nothing(job_id):
+        return None
+
+    monkeypatch.setattr(app.state.runtime, "execute", nothing)
+    key = clients.add("anna", ["tools.call"], daily_usd=12)
+    r = await client.post("/mcp", json=call("research.tools.call", {"idempotencyKey": "k", "tool": "google_news", "params": {"q": "x"}}), headers=bearer(key))
+    job = app.state.store.job(r.json()["result"]["structuredContent"]["job"]["id"])
+    assert job["status"] == "working" and job["delegation"]["dailyUsd"] == 12
+    assert job["decision"] | {"at": None} == {"by": "allowance", "principal": "client:anna", "worstCaseUsd": 1.0,
+                                              "spentTodayUsd": 0.0, "ceilingUsd": 12.0, "approved": True, "at": None}
 
 
 async def test_session_cookie_is_host_prefixed_and_secure(client):

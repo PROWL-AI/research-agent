@@ -1,7 +1,7 @@
 """LLM price table: the estimate behind every LLM attempt without a provider cost.
 
 Prices are USD per 1M tokens (input, output), read from the OpenRouter catalog
-(`GET https://openrouter.ai/api/v1/models`) on 2026-10-17. They change: a
+(`GET https://openrouter.ai/api/v1/models`) on 2026-11-12 (first read 2026-10-17). They change: a
 provider-reported `usage.cost` always wins over this table, and a model missing
 here is estimated at the most expensive listed price — never 0, so an unknown
 model cannot slip past `max_llm_usd`.
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-PRICES_READ_AT = "2026-10-17"  # re-read: scripts/check_prices.py (network)
+PRICES_READ_AT = "2026-11-12"  # re-read: scripts/check_prices.py (network)
 
 #: model id → (input USD / 1M tokens, output USD / 1M tokens)
 PRICES: dict[str, tuple[float, float]] = {
@@ -19,8 +19,15 @@ PRICES: dict[str, tuple[float, float]] = {
     "anthropic/claude-haiku-5.5": (0.10, 0.50),
     "google/gemini-3.8-flash": (0.825, 4.125),
     "qwen/qwen3.8-flash": (0.15, 0.47),
-    "deepseek/deepseek-v4.1-flash": (0.04, 0.70),
-    "z-ai/glm-5.3-flash": (0.049, 0.65),
+    # 2026-11-12: routed price rose from 0.04 / 0.70; the old figure under-counted every cheap-tier call
+    "deepseek/deepseek-v4.1-flash": (0.30, 1.20),
+    "z-ai/glm-5.3-flash": (0.0399, 0.0784),
+    # the operator's model map of 2026-11-06 (wiki synthesis/llm-models.md): without them a switch to the map would
+    # be priced at UNKNOWN_PRICE and stop runs early with budget_llm
+    "moonshotai/kimi-k3.1-pro": (0.2375, 8.7856),
+    "anthropic/claude-sonnet-5.5": (2.0, 10.0),
+    "z-ai/glm-5.3": (0.0699, 1.4),
+    "google/gemini-3.1-pro-preview": (2.0, 12.0),
     # previous defaults, kept so old configurations estimate correctly
     "google/gemini-2.5-flash": (0.30, 2.50),
     "anthropic/claude-sonnet-4.5": (3.0, 15.0),

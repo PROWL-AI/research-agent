@@ -19,6 +19,7 @@ from research_agent.service.delegation import require_owner
 from research_agent.llm import LLMClient, LLMError
 from research_agent.prowl_client import ProwlClient, ToolCallError
 from research_agent.runbook import get_runbook, list_runbooks
+from . import allowance
 from .store import Store, Conflict, digest, now
 
 SECRET = re.compile(r"(?i)(authorization|password|api[_-]?key|access[_-]?token|secret|cookie)")
@@ -256,8 +257,14 @@ class Runtime:
                 Config.from_env(require_llm=request["kind"] == "research")
             except ConfigError as exc:
                 raise ValueError("Provider credentials are not connected. Use the tutorial or configure the supervised service through Observatory.") from exc
-        return self.store.create(request, key, child_trace(trace), delegation=delegation, run_dir=run_dir, via=via,
-                                 chain_owner=chain_owner)[0]
+        job, created = self.store.create(request, key, child_trace(trace), delegation=delegation, run_dir=run_dir, via=via,
+                                         chain_owner=chain_owner)
+        if created:
+            # B-100: the caller's daily allowance approves a job that fits it; above it the job waits for the operator.
+            granted = allowance.verdict(self.store, job)
+            if granted is not None:
+                job = self.decide(job["id"], job["proposal"]["digest"], True, by=granted)
+        return job
 
     def _check_resumable(self, request, delegation=None):
         """B-039: a resume continues an ENDED, unfinished research job's run and
@@ -290,8 +297,8 @@ class Runtime:
                 raise ValueError(f"run {run_dir} is already being continued by job {other['id']}")
         return run_dir
 
-    def decide(self, job_id, proposal_digest, approve):
-        job = self.store.decide(job_id, proposal_digest, approve)
+    def decide(self, job_id, proposal_digest, approve, by=None):
+        job = self.store.decide(job_id, proposal_digest, approve, by=by)
         if approve:
             task = asyncio.create_task(self.execute(job_id), name=job_id)
             self.tasks[job_id] = task
