@@ -102,7 +102,9 @@ async def test_paid_jobs_above_the_allowance_wait_for_the_operator(client, clien
     # B-125: the approval link opens the cloud instance's own page, never the local service's.
     r = await client.post("/mcp", json=call("fabric.job.get", {"id": job_id}), headers=bearer(key))
     (request,) = r.json()["result"]["structuredContent"]["job"]["inputRequests"].values()
-    assert request["params"]["url"].startswith("fabric-dashboards://service/prowl-research.cloud?path=")
+    from research_agent.service.identity import SERVICE_ID
+
+    assert request["params"]["url"].startswith(f"fabric-dashboards://service/{SERVICE_ID}.cloud?path=")
 
 
 @pytest.mark.allowance
