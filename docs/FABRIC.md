@@ -112,6 +112,7 @@ A research job (`fabric.job.get`) and the run checkpoint it drives (`research.ar
 | the service shut down mid-run | `interrupted` | — | `partial` / `cancelled` |
 | an exception escaped the run | `failed`, error `execution-failed` + `data.terminalCode` | none | `failed` / `error` |
 | the service process crashed | `working` until restart recovery marks it `interrupted` | — | `running` until reconciliation under the run lock marks it `interrupted` (resumable) |
+| a write met a full disk (B-114) | `failed`, error `disk_low` + `data.terminalCode`; the disk watch creates a resume of the run, decided by the service, once 2 GiB are free | none | the checkpoint as the write left it, continued by the resume without paying again for a recorded step |
 
 The terminal code sits in `error.data`, the one open slot of the pinned interop error schema (`code`, `message`, `data`, nothing else); a job stored by a build before B-075 (release `1e9f1f182625` and earlier) had it beside `code` and is served in the new shape (B-075, checked by `scripts/verify-fabric-contract.py`). Tool and tutorial jobs that return report `succeeded`. Envelope outcomes are the contract's set (`succeeded`, `partial`, `failed`, `cancelled`, `blocked`); the service reaches only the first two in an envelope: every other end is a typed job error.
 
