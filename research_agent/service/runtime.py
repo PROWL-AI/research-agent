@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import asyncio
+import errno
 import json
 import math
 import re
 import secrets
+import shutil
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -224,9 +226,28 @@ def refuse_known_limits(request):
             raise LimitRefused(f"{request['tool']} does not take {', '.join(broken)} (a known provider limit)")
 
 
+#: B-114 (research template 1.6.0, lesson `full-disk-pauses-and-resumes`): under this much free disk a job's run does
+#: not start; a margin above it the service continues a run a full disk stopped, without a person.
+JOB_FLOOR_BYTES = 1 << 30
+RESUME_MARGIN_BYTES = 1 << 30
+DISK_POLL_SECONDS = 5.0
+
+
+def out_of_space(exc: BaseException | None) -> bool:
+    """ENOSPC anywhere in the exception's chain: the run's write met a full disk."""
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        if isinstance(exc, OSError) and exc.errno == errno.ENOSPC:
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
+
+
 class Runtime:
-    def __init__(self, store: Store):
+    def __init__(self, store: Store, free_bytes=None):
         self.store = store
+        self.free_bytes = free_bytes or (lambda: shutil.disk_usage(store.root).free)
         manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
         self.producer = {k: manifest["provider"][k] for k in ("id", "revision", "contentHash")}
         self.tasks = {}
@@ -323,6 +344,13 @@ class Runtime:
         try:
             # Admission to execution is FIFO by creation time. Queue wait counts toward deadline.
             initial = self.store.job(job_id)
+            # A full disk pauses the job in the queue (its deadline has not started) instead of failing it (B-114).
+            told = False
+            while initial["request"]["kind"] != "tutorial" and self.free_bytes() < JOB_FLOOR_BYTES:
+                if not told:
+                    self.store.note(job_id, "job.disk_wait", "Мало места на диске: запрос ждёт в очереди, пока место не освободится.")
+                    told = True
+                await asyncio.sleep(DISK_POLL_SECONDS)
             async with asyncio.timeout(initial["config"]["timeout_minutes"] * 60):
                 while True:
                     working = [j for j in self.store.jobs() if j["status"] == "working"]
@@ -351,7 +379,40 @@ class Runtime:
             # sent, so the reader gets the reason rather than "inspect call receipts".
             self.store.transition(job_id, "failed", "failed", error={"code": "request-rejected", "message": str(exc)[:300]})
         except Exception as exc:
+            if out_of_space(exc):
+                # The run's checkpoint keeps what was recorded and paid; the disk watch continues it (B-114).
+                self.store.transition(job_id, "failed", "failed", error=self._with_terminal(job_id, {"code": "disk_low", "message": "The disk was full; the run is kept and continues by itself once space is free."}))
+                return
             self.store.transition(job_id, "failed", "failed", error=self._with_terminal(job_id, {"code": "execution-failed", "message": type(exc).__name__ + ": inspect call receipts and provider health; no automatic retry."}))
+
+    def resume_disk_low(self) -> list[str]:
+        """Continue every research job a full disk stopped, once the disk is a margin above the floor: a resume of the
+        same run under the same principal (nothing already paid goes out again, B-039), decided by the service.
+        Answers the new jobs' ids."""
+        if self.stopping or self.free_bytes() < JOB_FLOOR_BYTES + RESUME_MARGIN_BYTES:
+            return []
+        started = []
+        jobs = self.store.jobs()
+        resumed = {(j["request"].get("resumeJobId")) for j in jobs}
+        for job in jobs:
+            if (job["status"] != "failed" or (job.get("error") or {}).get("code") != "disk_low"
+                    or job["request"].get("kind") != "research" or job["id"] in resumed):
+                continue
+            request = {k: v for k, v in job["request"].items() if k != "resumeJobId"} | {"resumeJobId": job["id"]}
+            try:
+                new = self.create(request, "disk-resume:" + job["id"], delegation=job.get("delegation"), via=job.get("via", "mcp"))
+                if new["status"] == "input_required":
+                    new = self.decide(new["id"], new["proposal"]["digest"], True,
+                                      by={"by": "service", "reason": "disk_low resume", "resumes": job["id"]})
+                started.append(new["id"])
+            except (ValueError, Conflict) as exc:
+                self.store.note(job["id"], "job.disk_resume_refused", "Продолжение после нехватки места не создано: " + str(exc)[:200])
+        return started
+
+    async def disk_watch(self, every: float = 30.0):
+        while not self.stopping:
+            await asyncio.sleep(every)
+            self.resume_disk_low()
 
     def _with_terminal(self, job_id, error):
         """A research job's error carries the run checkpoint's terminal_code, so the
