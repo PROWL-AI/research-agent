@@ -181,7 +181,7 @@ MUTANTS = [
     ("installer-drops-build-output", "scripts/install-fabric-service.py",
      "            shutil.rmtree(path)\n", "            pass\n", ["tests/test_installer.py"]),
     ("approval-link-opens-in-fabric-dashboards", "research_agent/service/protocol.py",
-     "    return f\"fabric-dashboards://service/{DASHBOARD_SERVICE}?path={quote(page, safe='')}\"\n",
+     "    return f\"fabric-dashboards://service/{service}?path={quote(page, safe='')}\"\n",
      "    return \"http://127.0.0.1:18764\" + page\n", ["tests/test_service.py"]),
     ("verified-label-away-from-citation", "research_agent/agent/report_checks.py",
      "        if cited and all(claims[ref].status.value != \"verified\" for ref in cited):\n",

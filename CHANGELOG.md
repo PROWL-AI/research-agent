@@ -4,6 +4,11 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.5 (2026-11-13)
+
+- A cloud instance's approval link opens its own page in Fabric Dashboards (`<id>.cloud`), not the local service's
+  (B-125); an organization's copy names its own id.
+
 ## 0.6.4 (2026-11-13)
 
 - A research job's deadline covers its runbook's time budget plus 15 minutes for the report (B-124). The service's

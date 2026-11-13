@@ -111,17 +111,20 @@ def interop_error(error):
     return {**rest, "data": {**rest.get("data", {}), "terminalCode": error["terminalCode"]}}
 
 
-#: The registered Fabric service key (id.instance) Fabric Dashboards opens this service by.
-DASHBOARD_SERVICE = "prowl-research.default"
+#: The registered Fabric service key (id.instance) Fabric Dashboards opens this service by: `<id>.default` on a
+#: machine, `<id>.cloud` for a cloud instance (`scripts/cloud.py register` writes that descriptor; B-125: the cloud's
+#: approval link named the local service, which is another service or none).
+DASHBOARD_SERVICE = f"{SERVICE_ID}.default"
+CLOUD_DASHBOARD_SERVICE = f"{SERVICE_ID}.cloud"
 
 
-def dashboard_open_link(page: str) -> str:
+def dashboard_open_link(page: str, service: str = DASHBOARD_SERVICE) -> str:
     """The Fabric Dashboards link to a page of this dashboard (operator rule 2026-10-24: agent pages open only
     in Fabric Dashboards, never in a browser). No token or login code: the host authenticates."""
-    return f"fabric-dashboards://service/{DASHBOARD_SERVICE}?path={quote(page, safe='')}"
+    return f"fabric-dashboards://service/{service}?path={quote(page, safe='')}"
 
 
-def job_view(job):
+def job_view(job, service: str = DASHBOARD_SERVICE):
     view = {k: job[k] for k in ["id", "status", "updatedAt"]}
     view["statusMessage"] = job["phase"]
     if job["status"] == "working":
@@ -134,7 +137,7 @@ def job_view(job):
         # A URL elicitation prevents an untrusted caller from supplying its own
         # assertion that a human approved. Host login stays outside MCP credentials.
         view["inputRequests"] = {job["proposal"]["digest"]: {"method": "elicitation/create", "params": {"mode": "url", "message": "Operator authentication required. Open this request in Fabric Dashboards and approve or reject the exact proposal.",
-                "url": dashboard_open_link("/dashboard#/requests/" + job["id"])}}}
+                "url": dashboard_open_link("/dashboard#/requests/" + job["id"], service)}}}
     return {"job": view}
 
 
@@ -152,9 +155,10 @@ def artifact(store, job_id, name):
 
 
 class Protocol:
-    def __init__(self, runtime, desk=None):
+    def __init__(self, runtime, desk=None, dashboard_service=DASHBOARD_SERVICE):
         self.runtime = runtime
         self.desk = desk  # the cloud instance's client store; None on the local service (no desk tools)
+        self.dashboard_service = dashboard_service
 
     async def handle(self, body, headers, authorize=None):
         """`authorize(tool)` answers the delegation verdict for one tools/call
@@ -255,7 +259,7 @@ class Protocol:
             # principal (the kit's rule for job tools); refused with the DL-19 code.
             require_owner(rt.store.job(args["id"]), delegation)
             job = rt.cancel(args["id"]) if name.endswith("cancel") else rt.store.job(args["id"])
-            return job_view(job), job.get("traceparent")
+            return job_view(job, self.dashboard_service), job.get("traceparent")
         if name == "research.list_runbooks":
             output = {"runbooks": runbooks()}
         else:
