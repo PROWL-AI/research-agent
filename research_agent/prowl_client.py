@@ -14,9 +14,9 @@ from typing import Any
 import httpx
 from anyio import BrokenResourceError, ClosedResourceError, EndOfStream
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
-from mcp.shared.exceptions import McpError
 from mcp.types import CallToolResult, TextContent
+
+from research_agent.mcp_compat import HTTP_ERRORS, McpError, call_timeout, is_error, open_streams, structured
 
 log = logging.getLogger(__name__)
 
@@ -121,11 +121,8 @@ class ProwlClient:
 
     async def _connect(self) -> None:
         assert self._stack is not None
-        read, write, _ = await self._stack.enter_async_context(
-            streamablehttp_client(
-                self.mcp_url,
-                headers={"Authorization": f"Bearer {self.api_key}"},
-            )
+        read, write = await self._stack.enter_async_context(
+            open_streams(self.mcp_url, {"Authorization": f"Bearer {self.api_key}"})
         )
         session = await self._stack.enter_async_context(ClientSession(read, write))
         await session.initialize()
@@ -162,14 +159,14 @@ class ProwlClient:
                 if session is None:
                     raise ProwlError("prowl reconnect produced no session")
                 meta = self._call_meta()
-                kwargs: dict[str, Any] = {"read_timeout_seconds": _call_timeout()}
+                kwargs: dict[str, Any] = {"read_timeout_seconds": call_timeout(_call_timeout())}
                 if meta:
                     kwargs["meta"] = meta
                 return await session.call_tool(name, arguments or {}, **kwargs)
             except McpError:
                 raise
             except (
-                httpx.HTTPError, ConnectionError, TimeoutError, OSError,
+                httpx.HTTPError, *HTTP_ERRORS, ConnectionError, TimeoutError, OSError,
                 # A torn-down stream surfaces as anyio resource errors, not
                 # httpx ones — without them a fan-out reconnect strands every
                 # sibling call with an untrapped exception.
@@ -252,7 +249,7 @@ class ProwlClient:
             error.stops_run = error_class in STOPPING_ERROR_CLASSES
             raise error
 
-        if result.isError:
+        if is_error(result):
             record.error = _content_text(result)
             error = ToolCallError(f"{prowl_tool}: tool returned error: {record.error[:300]}")
             error.cost_usd = record.cost_usd
@@ -347,8 +344,8 @@ def _content_text(result: CallToolResult) -> str:
 
 
 def _parse_content(result: CallToolResult) -> Any:
-    if result.structuredContent is not None:
-        content = result.structuredContent
+    if structured(result) is not None:
+        content = structured(result)
         if isinstance(content, dict) and set(content) == {"result"}:
             inner = content["result"]
             if isinstance(inner, str):
