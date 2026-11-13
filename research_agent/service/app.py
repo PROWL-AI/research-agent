@@ -18,7 +18,7 @@ from starlette.routing import Route
 from starlette.middleware.base import BaseHTTPMiddleware
 from .delegation import DelegationPolicy, is_loopback, refusal_http
 from .identity import HEADER, SERVICE_ID, SERVICE_NAME
-from .protocol import EFFECTS, Protocol, CAPABILITIES, artifact
+from .protocol import CLOUD_DASHBOARD_SERVICE, DASHBOARD_SERVICE, EFFECTS, Protocol, CAPABILITIES, artifact
 from .runtime import JOB_FLOOR_BYTES, Runtime, runbooks
 from .store import Store, Conflict, now
 from .runtime import run_dir_name
@@ -101,7 +101,8 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
     store.recover()
     rt = Runtime(store)
     rt.origin = cloud.origin if cloud else f"http://127.0.0.1:{port}"
-    proto = Protocol(rt, desk=cloud.clients if cloud else None)
+    proto = Protocol(rt, desk=cloud.clients if cloud else None,
+                     dashboard_service=CLOUD_DASHBOARD_SERVICE if cloud else DASHBOARD_SERVICE)
     started = now()
     build = build or {"digest": code_digest()}
     # The cloud cookie is bound to its https host: no Domain, Path=/, Secure (B-099 REQ-6).
