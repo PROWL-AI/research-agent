@@ -5,7 +5,9 @@
   "runbook/ai-visibility-audit@1.0": "sha256:238e9942ca1ac6b5ffe31fde2746917ada5cd2e63d3478ada3e5f7e743a40226",
   "runbook/channel-economics@1.0": "sha256:92256d2f8e2c3604c0e11ecb270b6f64540943e3f71bc369ecdc6a9754cbc696",
   "runbook/competitor-seo@1.0": "sha256:1ea00684c2605c7089f6aeebef48b9dfc020f197082556d8a72a8a404d4e5199",
+  "runbook/competitor-seo@1.1": "sha256:7cb9cb5ed96e52b2ed01131753e495216ce7fcb68c66d8e1646d1aec24d870c7",
   "runbook/domain-baseline@1.0": "sha256:5009bc3aff0cb7960a1ebc631da067aa967895ba4dd0f4eda46c7bd2d6f34e9a",
+  "runbook/domain-baseline@1.1": "sha256:7e091025f95b8d4d47ef144c302a1cb0e65c03f7e1451449ea88698b15106458",
   "runbook/finance-equity-research@1.0": "sha256:0aac2d9b99c93dbaa7c75bf12ad70384f82ccba153ea850116af49ebd377563f",
   "runbook/growth-signals@1.0": "sha256:2a341ddc0fa194dad3bd26a025e2302c0ef15bb6312f750e9e238af4bec524e9",
   "runbook/idea-validation@1.0": "sha256:002f059990bd71e09421355f7b204f5b85c15d41646b74931e69dff2633841f4",
@@ -14,6 +16,7 @@
   "runbook/reviews-voice@1.0": "sha256:9993ca932c7157b8ebc8cbba61d47078dea77b01c5a8567c4b4cfd7422b4fa52",
   "runbook/saas-competitor-teardown@1.0": "sha256:d07dce75840e9e0cd589f8169d8a82ba7afdb9e851fcc86d924ebde31a4169fb",
   "runbook/seo-site-audit@1.0": "sha256:575e4c774401a79ef69d919583d989bc383785d94962614d0a688116375df53a",
+  "runbook/seo-site-audit@1.1": "sha256:1dc0f2ecd83213f8d845a6c511987ba194aa0c45ee602f9be01d509098a83485",
   "runbook/subscription-app-audit@1.0": "sha256:586b6c2069b0178f7c0c10bebacf63091a5071c45d56bcc0a0ad9547be88a09d",
   "template/base.html.j2": "sha256:669579d1c4ef3179f45783ec57d67e2d06024fe720bf3712c735296dfe62eb55",
   "template/base.v2.html.j2": "sha256:e12c5c4817b29330ea09217d4b81a2b03689cc095abb780b97327e8fb03a6378"
