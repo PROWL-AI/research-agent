@@ -28,10 +28,11 @@
 | B-113 | Runbooks leave Prowl's Moz tools unused (Domain and Page Authority, 29 tools): new versions of `competitor-seo`, `domain-baseline` and `seo-site-audit` beside the shipped 1.0 (R28) | audit 2026-11-12 ([report](../reports/2026-11-12-agent-audit/README.md)) | M | 1 | 2 | 0 | 2 | open | prowl-app `api_tools/moz.py` |
 | B-114 | Research template 1.6.0 leftover: no `disk_low` pause and resume of a running job (`metrics.json` done 2026-11-13) | audit 2026-11-12 ([report](../reports/2026-11-12-agent-audit/README.md)) | S | 1 | 2 | 0 | 2 | open | agents-db `templates/research` |
 | B-115 | A PassionCode copy of the cloud instance with its own provider keys: `scripts/build_team_copy.py` writes only the Appvillis identity (`COPY_ID`, `AUTHOR`, `RENAMED_DOCS`); a `--org` parameter makes it build any organization's copy. Until then the PassionCode space reaches the personal cloud instance with its own client key | audit 2026-11-12 ([report](../reports/2026-11-12-agent-audit/README.md)) | S | 1 | 2 | 0 | 2 | open | B-099 |
-| B-120 | The dashboard shows internal ids and raw JSON (`static/app.js` request list id, the JSON tab, `json(j.request)` and `json(j.config)`; acceptance 30 of research 1.7.1) | audit 2026-11-12 ([report](../reports/2026-11-12-agent-audit/README.md)) | S | 2 | 1 | 0 | 2 | open | SCN-003 |
 `Sev × Blast + age_bonus` (`age_bonus` 1 past 14 days, 2 past 30).
 
 ## Closed
+
+- **B-120 · The dashboard showed internal ids and raw JSON** · closed 2026-11-13 · the request list and the request page no longer carry the job id; inputs and the run's settings are labelled facts; phases read in Russian; the JSON view is the «Технические данные» tab; the overview's «Управление» fact states the allowance rule. Copylot 54a84a58 (0 findings); `node scripts/test-dashboard.mjs` WebKit PASS at 1440, 390 and 360 px, no page errors.
 
 - **B-114 (part) · The agent is measurable (rule R31)** · 2026-11-13 · `metrics.json` declares the research template's four metrics (answered share, verified claim share, failed by the service, cost per answer) with this agent's sources; `scripts/measure_metrics.py` prints agent-measurement/1 records from the job store and the run ledgers. Baseline: verified claim share 0.411 (n 3355 claims, 14 runs). The job metrics have n 3 on the local service and get their baseline from the cloud instances' first 14 days. `tests/test_metrics.py`.
 
