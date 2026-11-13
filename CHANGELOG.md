@@ -4,6 +4,14 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.9 (2026-11-13)
+
+- The cloud's client keys follow the agents database pattern `client-keys` 1.1.0 where its store differs (B-104):
+  stored as HMAC-SHA256 under a pepper (`CLIENT_KEY_PEPPER`, at least 16 bytes; the cloud refuses to open its key
+  store without it), a key stored as a plain SHA-256 before is rewritten once on its next use (no teammate rotates),
+  the owner's names are reserved, and the reason of a refused key (malformed, unknown, revoked) is logged while the
+  caller sees 401.
+
 ## 0.6.8 (2026-11-13)
 
 - The MCP SDK is version 2 (B-112): `mcp>=2.3,<3` with `httpx2`. The Prowl client connects with
