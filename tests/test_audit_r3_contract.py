@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -13,12 +14,8 @@ import pytest
 from mcp.types import CallToolResult, TextContent
 
 import research_agent.mcp_server as srv
-from research_agent.agent.orchestrator import (
-    _UNTRUSTED_CLOSE,
-    _UNTRUSTED_OPEN,
-    Orchestrator,
-    PlanItem,
-)
+from research_agent.agent.untrusted_fence import STANDING_RULE
+from research_agent.agent.orchestrator import Orchestrator, PlanItem
 from research_agent.config import Config
 from research_agent.evidence.ledger import Ledger
 from research_agent.evidence.store import ArtifactStore, Checkpoint
@@ -340,8 +337,8 @@ class TestPromptInjectionIsolation:
 
         call = fake_llm.calls[-1]
         system, user = call["messages"][0]["content"], call["messages"][1]["content"]
-        assert _UNTRUSTED_OPEN in user and _UNTRUSTED_CLOSE in user
-        assert "untrusted scraped data" in system
+        assert re.search(r"<<<BEGIN UNTRUSTED (\w+)>>>[\s\S]*traffic[\s\S]*<<<END UNTRUSTED \1>>>", user)
+        assert STANDING_RULE in system
 
     async def test_extract_claims_prompt_wraps_raw_result(
         self, fake_prowl: FakeProwl, fake_llm: FakeLLM, tmp_path: Path
@@ -356,9 +353,9 @@ class TestPromptInjectionIsolation:
 
         call = fake_llm.calls[-1]
         system, user = call["messages"][0]["content"], call["messages"][1]["content"]
-        assert _UNTRUSTED_OPEN in user and _UNTRUSTED_CLOSE in user
-        assert user.index(_UNTRUSTED_OPEN) < user.index("rows") < user.index(_UNTRUSTED_CLOSE)
-        assert "untrusted scraped data" in system
+        begin = re.search(r"^<<<BEGIN UNTRUSTED (\w+)>>>$", user, re.M)
+        assert begin and begin.start() < user.index("rows") < user.index(f"\n<<<END UNTRUSTED {begin.group(1)}>>>")
+        assert STANDING_RULE in system
 
 
 class TestEnvelopeHygiene:

@@ -4,6 +4,17 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.1 (2026-11-13)
+
+- Text from pages and tools is fenced with the agents database pattern `untrusted-fence` 1.2.1 (B-102): every prompt
+  that quotes a raw draws its own fence token, which the text never contains, so a page carrying the old closing marker
+  can no longer end the fence early; forged fence lines and data tags are neutralised and hidden characters removed
+  before a model reads the text. A suspected injection is recorded as the event `untrusted.suspected` and the raw stays
+  data; a value found only in a raw flagged as an injection is never bound into a later tool call. A quote copied
+  without the hidden characters is still found in the stored raw (basis `visible`).
+- Service tests no longer read the machine's free disk: a full disk under a test run had held a job (B-114) and timed
+  a cancel test out.
+
 ## 0.6.0 (2026-11-13)
 
 - The strong model (planner, writer, repair) is `moonshotai/kimi-k3.1-pro`, the operator's model map (B-107): measured
