@@ -1,6 +1,18 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-13 (late night): 0.6.12 everywhere, domain-baseline 1.1 accepted (supersedes every "Exact next task" below)
+## Current entry, 2026-11-14: audit after 0.6.13, release 0.6.14 (supersedes every "Exact next task" below)
+
+Audit of the domain-baseline 1.1 acceptance (`pr-8ca06955600a3e5fd3be`) and the board (empty): four defects behind its
+skipped steps. B-130 shipped in 0.6.13; B-129 (planner reasoning off), B-131 (domain-baseline 1.2 hands raw HTML to
+the site audit) and B-132 (a transform reads the steps it names) ship in 0.6.14, measured in
+[the report](reports/2026-11-14-planner-and-transforms/README.md). Checks: 950 passed on MCP SDK 2.3.0, 949 on SDK
+1.30.0; `research_agent validate`: all runbooks valid; `scripts/check_add_only.py --base origin/main`: ok.
+
+**Exact next tasks:** (1) after 0.6.14 is deployed everywhere, run the domain-baseline 1.2 acceptance on the Studio
+space `sshlg` and compare skipped steps and minutes with `pr-8ca06955600a3e5fd3be`; (2) B-123, the operator's Heroku
+payment by 2026-11-17 (human gate); (3) the next R31 measurement after 14 days of the clouds.
+
+## Entry, 2026-11-13 (late night): 0.6.12 everywhere, domain-baseline 1.1 accepted (supersedes every "Exact next task" below)
 
 - 0.6.12 (`c50c58d`, tag `v0.6.12`) runs on cloud `prowl-research` (build `e6df621b`), the Appvillis copy (`6bff9ce`,
   build `33a2747a`), the three Studio spaces (18765, 18766, 18767) and the MacBook service; every one answers `ready`,

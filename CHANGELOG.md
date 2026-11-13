@@ -4,6 +4,19 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.14 (2026-11-14)
+
+- The planner writes with reasoning off (B-129): measured on `moonshotai/kimi-k3.1-pro` over three runbooks, a plan
+  took 69 to 165 s instead of 420 to 743 s with the same tool coverage, and the 25-minute run budget no longer loses
+  10 minutes to planning. `RESEARCH_PLANNER_REASONING=on` restores the 0.6.13 escalation.
+- A transform reads the steps its instruction names (B-132), up to 8 of them sharing 32000 characters, in compact
+  JSON; before, it read the last three artifacts at 4000 characters of indented JSON each and could miss its own
+  sources. An instruction that names no step reads as before.
+- `domain-baseline` 1.2 (B-131): the site audit scrapes the homepage's raw HTML with `firecrawl_scrape_page_seo`
+  and hands it to `seo_growth_audit` with `{{output:...}}`; in 1.1 the audit could never run. 1.1 stays in
+  `versions/1.1.md` and runs with `runbook: "domain-baseline@1.1"` (R28).
+  ([measurement](docs/reports/2026-11-14-planner-and-transforms/README.md))
+
 ## 0.6.13 (2026-11-13)
 
 - A Prowl tool result larger than 1 MiB reaches the run again (B-130): MCP SDK 2 caps one server-sent event at 1 MiB
