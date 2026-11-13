@@ -87,6 +87,37 @@ MCP registration: the `prowl-research` entry lives in each agent client's own co
 
 **Dashboard.** The page uses `fabric-dashboard-kit@1.1.5` (DEC-0036): kit chrome and navigation, Fabric's button (`fabric-button.js`, Russian labels on this `lang="ru"` page, B-088), the estate themes and scheme (the host's appearance wins), fluid grids and keyboard-reachable scroll boxes; the well-known document declares the dashboard extension (minWidth 360). Layout probe: `check_dashboard_layout.mjs` (fabric-agent-adapter, `skills/building-fabric-services/scripts/`) 17 rules PASS at 320–1280 px (2026-10-17). On kit 1.1.2 (2026-10-22, B-079): `scripts/test-dashboard.mjs` WebKit PASS at 1440, 390 and 360 px ([receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.2.json); kit 1.1.1: [receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.1.json)). M1 wave B readability checks: WebKit PASS at `5023b06` ([receipt](evidence/fabric-dashboard/raw/webkit-m1-wave-b.json)). Kit 1.1.3 (2026-10-23, B-084): no section link cut at 360 or 390 px, WebKit PASS ([receipt](evidence/fabric-dashboard/raw/webkit-kit-1.1.3.json)).
 
+## A space of a shared Mac (B-106)
+
+On the Mac Studio every operator space is its own macOS account with no GUI login: launchd has no `gui/<uid>` there,
+and every space shares one loopback and one `/Library/LaunchDaemons`. Install from a clean checkout in that account:
+
+```sh
+python3 scripts/install-fabric-service.py --background --port <the space's port> --vault-project prowl-research-agent
+```
+
+The definition goes into the space's background folder (`~/.local/share/project-observatory/background/LaunchAgents/`)
+under its own label `chat.prowl.research.<account>`; Observatory's `observatory-space-daemons` turns it into a system
+daemon that runs as the account (`UserName`), never as root. The installer loads it through studio-agent's door
+`sudo -n /usr/local/libexec/studio-space-service deploy <label>` (DEC-0033). The first time there is no daemon to
+replace: the installer exits 77 and prints the line the administrator (studio-agent) runs once,
+`sudo /usr/bin/python3 -I /usr/local/libexec/observatory-space-daemons apply --user <account> --label <label>`; every
+later install is the space's own. A port another listener holds is refused unless this account's descriptor claims it.
+Start, stop, restart and status: `sudo -n /usr/local/libexec/studio-space-service <verb> <label>`.
+
+Ports: `sshlg` 18765, `passioncode` 18766, `assessment` 18767 (the MacBook keeps 18764). Keys: each space's vault
+folder `prowl-research-agent` holds `PROWL_API_KEY` and its own `RESEARCH_LLM_API_KEY`
+(`prowl-research-studio-<account>`, USD 15 a month).
+
+Claude Code reaches it without a token in its configuration: `scripts/mcp_headers.py` is the entry's `headersHelper`
+and prints the bearer header from the service's agent token, a 0600 file only this account can read. On a loopback other
+accounts share, that file is the owner proof (agents database pattern `fail-closed-door`, guarantee 9, the token-file
+route): another account can open the port but has no token, and `/mcp` refuses a call without one.
+
+```sh
+claude mcp add-json prowl-research '{"type":"http","url":"http://127.0.0.1:<port>/mcp","headersHelper":"/usr/bin/python3 <checkout>/scripts/mcp_headers.py"}' -s user
+```
+
 ## Cloud instance (B-099)
 
 The same service runs as `prowl-research.cloud` on Heroku (`prowl-research-service cloud-run`): placement `remote`,
