@@ -597,7 +597,7 @@ async def test_citation_checks_and_claim_extraction_send_reasoning_off(patched_r
     extract = [r for r in provider.requests if "evidence-ledger claims" in r["messages"][0]["content"]]
     assert extract and all(r.get("reasoning") == {"enabled": False} for r in extract)
     planner = [r for r in provider.requests if r.get("max_tokens") == 8000]
-    assert planner and all("reasoning" not in r for r in planner)
+    assert planner and all(r.get("reasoning") == {"enabled": False} for r in planner)  # B-129
 
 
 class CutCheapStages(Provider):
@@ -687,10 +687,21 @@ async def test_the_planner_writes_with_reasoning_off_by_default(patched_runbooks
     """B-129: off took 69 to 165 s against 420 to 743 s on, with the same tool coverage (2026-11-13)."""
     monkeypatch.delenv("RESEARCH_PLANNER_REASONING", raising=False)
     provider = Provider(cost=0.01, plan_steps=1)
-    await Orchestrator(FakeProwl(), _client(provider), runs_root=tmp_path / "runs").run(
+    llm = LLMClient("https://openrouter.ai/api/v1", "test", "cheap", "strong")
+    llm._client = httpx.AsyncClient(transport=httpx.MockTransport(provider))
+    await Orchestrator(FakeProwl(), llm, runs_root=tmp_path / "runs").run(
         "mini-teardown", BRIEF, run_id="plan-off", max_llm_usd=5.0)
-    planner = [b for b in provider.requests if "response_format" in b and "plan" in b["messages"][-1]["content"].lower()]
-    assert planner and all("reasoning" not in b or b["reasoning"] == {"enabled": False} for b in planner)
+    planner = _planner_budgets(provider)
+    bodies = [b for b in provider.requests if "response_format" in b and "plan" in b["messages"][-1]["content"].lower()]
+    assert planner and all(b["reasoning"] == {"enabled": False} for b in bodies)
+    monkeypatch.setenv("RESEARCH_PLANNER_REASONING", "on")
+    on = Provider(cost=0.01, plan_steps=1)
+    llm_on = LLMClient("https://openrouter.ai/api/v1", "test", "cheap", "strong")
+    llm_on._client = httpx.AsyncClient(transport=httpx.MockTransport(on))
+    await Orchestrator(FakeProwl(), llm_on, runs_root=tmp_path / "runs").run(
+        "mini-teardown", BRIEF, run_id="plan-on", max_llm_usd=5.0)
+    assert all("reasoning" not in b for b in on.requests
+               if "response_format" in b and "plan" in b["messages"][-1]["content"].lower())
 
 
 def test_planner_reasoning_setting(monkeypatch):
