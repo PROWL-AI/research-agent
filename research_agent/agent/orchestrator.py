@@ -853,10 +853,24 @@ class Orchestrator:
             except LLMError as again:
                 if again.retryable or again.finish_reason != "length":
                     raise
-                raise OrchestratorError(
-                    f"planner output truncated at max_tokens={_PLAN_ESCALATED_MAX_TOKENS} after one retry "
-                    f"(first at {_PLAN_MAX_TOKENS}); the plan does not fit the model's output budget"
-                ) from again
+                # B-128: a cut plan is unusable whatever its length, and the larger budget was spent on reasoning
+                # (measured 2026-11-13: moonshotai/kimi-k3.1-pro planning domain-baseline 1.1, 63 calls, cut at
+                # 8000 and at 24000 tokens). The same request once more with reasoning off, as the writer does.
+                log.warning("planner output truncated at max_tokens=%d; retrying with reasoning off",
+                            _PLAN_ESCALATED_MAX_TOKENS)
+                try:
+                    text = await self.llm.complete(
+                        messages, tier="strong", json_mode=True, max_tokens=_PLAN_ESCALATED_MAX_TOKENS,
+                        stage="planner", reasoning=False,
+                    )
+                except LLMError as last:
+                    if last.retryable or last.finish_reason != "length":
+                        raise
+                    raise OrchestratorError(
+                        f"planner output truncated at max_tokens={_PLAN_ESCALATED_MAX_TOKENS} after two retries "
+                        f"(first at {_PLAN_MAX_TOKENS}, last with reasoning off); the plan does not fit the "
+                        "model's output budget"
+                    ) from last
         payload = _parse_json_object(text)
         raw_plan = payload.get("plan") if isinstance(payload, dict) else None
         if not isinstance(raw_plan, list):

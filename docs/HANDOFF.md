@@ -1,6 +1,20 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-13 (end): every Studio space runs its own instance (supersedes every "Exact next task" below)
+## Current entry, 2026-11-13 (night): 0.6.11 and 0.6.12 (supersedes every "Exact next task" below)
+
+- 0.6.11 (`352b6f6`, tag `v0.6.11`): B-108 closed, writer prompt version 2 and the `copy-check` pattern on the report;
+  measured on three saved runs, em dashes 1, 7, 145 to 0, 0, 0
+  ([report](reports/2026-11-13-writer-prompt-v2/README.md)). Deployed to cloud `prowl-research` (build `8aa2120d`) and
+  the Appvillis copy (`fc6c49b`, its suite 935 passed, build `5303fd01`). It also carries the 0.6.10 runbooks (B-113).
+- The domain-baseline 1.1 acceptance on the Studio space `sshlg` (`pr-b9ab0a718e4e2cd97a83`) failed before any tool
+  call: the planner was cut at 8000 and at 24000 tokens. B-128 (0.6.12) asks a third time with reasoning off and
+  ships the longest writer draft instead of raising; B-129 (planning time against the job deadline) is open.
+
+**Exact next tasks:** (1) after 0.6.12 is deployed everywhere, run the domain-baseline 1.1 acceptance again on the
+Studio space `sshlg` and read whether the Moz steps ran; (2) B-129; (3) B-123, the operator's Heroku payment by
+2026-11-17; (4) the next R31 measurement of `verified_claim_share` after 14 days of the clouds.
+
+## Entry, 2026-11-13 (end): every Studio space runs its own instance (supersedes every "Exact next task" below)
 
 B-106 closed: studio-agent loaded the three daemons; `sshlg` 18765, `passioncode` 18766, `assessment` 18767 run 0.6.7
 (`e6161b1`) as system daemons of their accounts, `ready`, `degraded: []`. Each space's Claude Code entry
