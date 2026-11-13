@@ -697,6 +697,7 @@ def _service_with_blocking_prowl(tmp_path, monkeypatch):
 
 
 async def test_service_timeout_has_its_own_code_and_carries_terminal_code(tmp_path, monkeypatch, patched_runbooks):
+    import research_agent.service.runtime as runtime_mod
     from research_agent.service.store import Store
 
     store, rt, prowl = _service_with_blocking_prowl(tmp_path, monkeypatch)
@@ -709,6 +710,8 @@ async def test_service_timeout_has_its_own_code_and_carries_terminal_code(tmp_pa
         return job
 
     monkeypatch.setattr(Store, "job", short_timeout)
+    # B-124 gives a research job its runbook's budget; this test is about what a deadline does, not its length.
+    monkeypatch.setattr(runtime_mod, "deadline_minutes", lambda job: job["config"]["timeout_minutes"])
     try:
         job = rt.create({"kind": "research", "runbook": "mini-teardown", "inputs": BRIEF}, "timeout-live")
         rt.decide(job["id"], job["proposal"]["digest"], True)

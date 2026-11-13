@@ -28,6 +28,8 @@
 
 ## Closed
 
+- **B-124 · A research job ended before its report** · closed in 0.6.4 · the service's wall-clock deadline was `timeout_minutes` (15 by default) while `market-pulse` budgets 20 minutes of tool calls before the report: both acceptance runs of 2026-11-13 (`pr-4970f08d4eb0383bf89e` on the personal cloud, `pr-71cff1b75b7cad5a0999` on the Appvillis copy) ended `timeout` with their evidence in the checkpoint. A research job now gets at least its runbook's `max_minutes` plus 15 (`runtime.deadline_minutes`, `tests/test_job_deadline.py`).
+
 - **B-111 · The clouds' own Prowl keys** · closed 2026-11-13 · by the operator's word of 2026-11-13 (the shared Prowl key for everyone, no limits, quoted in `ania-agent-appvillis` `docs/plans/2026-11-13-keys-costs-catalogue/README.md`), Аня's session copied the shared key into `prowl-research-cloud/prod/PROWL_API_KEY` and `appvillis-com-appvillis-prowl-research/prod/PROWL_API_KEY` and set both apps' config; both well-known documents read `ready`, `degraded: []` (checked from this repository 2026-11-13). Left: one paid research run per cloud as the live acceptance of B-100 and B-107 (HANDOFF).
 
 - **K1 · Client key classes** · closed in 0.6.3 · Аня's spec `specs/K1-keys-without-limits.md` section 1 (DEC-0074): `interactive` keys have no ceiling, `automated` keep theirs, a key without a class is automated, null never reads as 0. `tests/test_key_classes.py`. The copy follows at its next sync.
