@@ -111,7 +111,9 @@ def render_report_html(
         elif value:
             subject_parts.append(str(value))
     subject = ", ".join(subject_parts) or "(no subject)"
-    template = _jinja.get_template("base.html.j2")
+    # base.v2 (B-108, rule R30): the partial banner without an em dash. base.html.j2 stays as shipped (rule R28) so a
+    # report rendered with it can still be rendered the same way.
+    template = _jinja.get_template("base.v2.html.j2")
     return template.render(
         title=f"{runbook} — research report",
         runbook=runbook,

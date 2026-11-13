@@ -155,3 +155,15 @@ class TestChartFenceForms:
         out = substitute_charts(md, ledger)
         assert "<svg" in out
         assert "```chart" not in out
+
+
+def test_the_report_renders_with_template_v2_and_the_shipped_v1_stays(tmp_path):
+    """B-108 (rule R30): the partial banner of base.v2 carries no em dash; base.html.j2 is kept byte for byte (R28)."""
+    from pathlib import Path
+
+    templates = Path(__file__).resolve().parents[1] / "research_agent" / "report" / "templates"
+    v2 = (templates / "base.v2.html.j2").read_text(encoding="utf-8")
+    assert "—" not in v2 and "Partial run: some planned steps were skipped, and the report marks the gaps." in v2
+    assert (templates / "base.html.j2").is_file()
+    source = (Path(__file__).resolve().parents[1] / "research_agent" / "report" / "render.py").read_text()
+    assert 'get_template("base.v2.html.j2")' in source

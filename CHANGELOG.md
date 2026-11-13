@@ -6,6 +6,8 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- Reports render with `base.v2.html.j2`: the partial-run banner reads without an em dash (B-108, rule R30). The shipped
+  `base.html.j2` stays byte for byte (rule R28) and the add-only lock gained the new name.
 - The dashboard's settings carry the agents' daily allowance, and its «Ключи и разрешения» callout, SECURITY.md and
   FABRIC.md describe the 0.5.0 approval rule instead of «every paid job waits» (B-109).
 - A one-off cloud command (`client add`) no longer hangs behind the web dyno (B-119): reads of client keys end their
