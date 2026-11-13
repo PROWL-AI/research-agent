@@ -1,6 +1,31 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-13 (later): 0.6.1 everywhere, Heroku billing gate (supersedes every "Exact next task" below)
+## Current entry, 2026-11-13 (evening): 0.6.2, Studio spaces get their own instance (supersedes every "Exact next task" below)
+
+0.6.2 (`a68c18c`, tag `v0.6.2`, PR #92) builds B-106: `install-fabric-service.py --background --port <port>` installs
+the service as a system daemon of a Studio space (a label per account, the space door `studio-space-service deploy`,
+exit 77 until the administrator's first `apply`), and `scripts/mcp_headers.py` gives Claude Code the bearer header from
+the agent token file. Local `prowl-research.default` runs 0.6.2 (smoke PASS, `pr-b3982622c14b8cea55f8`); both clouds
+run 0.6.1, the same service code (redeploy at the next service change; the MacBook had 1.3 GB free).
+
+Studio, all from `~/DATA/0xDEV/research-agent` at `a68c18c` in each space, keys in the space's vault folder
+`prowl-research-agent` (`PROWL_API_KEY`, the agent's own key; `RESEARCH_LLM_API_KEY`, OpenRouter
+`prowl-research-studio-<space>`, USD 15 a month from account `sshlg`):
+
+| Space | Port | Label | State |
+|---|---|---|---|
+| `sshlg` | 18765 | `chat.prowl.research.sshlg` | installed, `plan` ok, waits for the first `apply` |
+| `passioncode` | 18766 | `chat.prowl.research.passioncode` | installed, `plan` ok, waits for the first `apply` |
+| `assessment` | 18767 | `chat.prowl.research.assessment` | its LLM key being issued, then the same |
+
+The first `apply` is studio-agent's (board thread `7da412ee`, message `b61000ca`). **Exact next task:** when a
+space's daemon answers on `a68c18c` (`curl -s http://127.0.0.1:<port>/.well-known/fabric-service` from that space),
+switch its Claude Code entry from the cloud to it with `claude mcp add-json prowl-research` (type `http`, url
+`http://127.0.0.1:<port>/mcp`, headersHelper `/usr/bin/python3 /Users/<space>/DATA/0xDEV/research-agent/scripts/mcp_headers.py`,
+scope user; remove the cloud entry first), check it is Connected and a tutorial job completes; then close B-106.
+Gates still open: B-123 (Heroku payment by 2026-11-17), B-111 (the clouds' own Prowl keys).
+
+## Entry, 2026-11-13 (later): 0.6.1 everywhere, Heroku billing gate (supersedes every "Exact next task" below)
 
 0.6.1 (`574323b`, tag `v0.6.1`, PR #90) closes B-102: text from pages and tools is fenced with the agents database
 pattern `untrusted-fence` 1.2.1. Installed and checked: local `prowl-research.default` (release `574323b18bbe`, smoke
