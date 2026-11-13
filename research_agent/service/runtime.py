@@ -251,9 +251,9 @@ def out_of_space(exc: BaseException | None) -> bool:
 REPORT_MARGIN_MINUTES = 15
 
 
-def deadline_minutes(job) -> int:
+def deadline_minutes(job) -> float:
     """The job's wall-clock deadline: the service's setting, or longer when the runbook's budget needs it."""
-    setting = int(job["config"]["timeout_minutes"])
+    setting = float(job["config"]["timeout_minutes"])
     request = job["request"]
     if request.get("kind") != "research":
         return setting
@@ -261,7 +261,7 @@ def deadline_minutes(job) -> int:
         budget = get_runbook(request["runbook"]).meta.budget
     except (RunbookError, KeyError):
         return setting
-    return max(setting, int(budget.max_minutes) + REPORT_MARGIN_MINUTES)
+    return max(setting, float(budget.max_minutes) + REPORT_MARGIN_MINUTES)
 
 
 def disk_free(root) -> int:
