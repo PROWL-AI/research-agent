@@ -1,6 +1,21 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-13 (closing): 0.6.7 everywhere (supersedes every "Exact next task" below)
+## Current entry, 2026-11-13 (end): every Studio space runs its own instance (supersedes every "Exact next task" below)
+
+B-106 closed: studio-agent loaded the three daemons; `sshlg` 18765, `passioncode` 18766, `assessment` 18767 run 0.6.7
+(`e6161b1`) as system daemons of their accounts, `ready`, `degraded: []`. Each space's Claude Code entry
+`prowl-research` now points at its own instance (`http://127.0.0.1:<port>/mcp`, headersHelper
+`scripts/mcp_headers.py`), Connected; a tutorial job completed in each; no token and another space's token answer
+401. Updating a space is its own: `python3 scripts/install-fabric-service.py --background --port <port>
+--vault-project prowl-research-agent` from `~/DATA/0xDEV/research-agent` in that space (the door replaces the daemon).
+The Appvillis space keeps the Appvillis cloud copy.
+
+**Exact next tasks:** (1) B-123 is now less urgent: the Studio spaces no longer need the personal Heroku cloud, which
+still serves cross-session callers (seo-content-agent's key) until the operator pays or it is retired; (2) the next R31
+measurement of `verified_claim_share` after 14 days of the clouds; (3) B-108 rest (the writer prompt's dashes, with a
+measured prompt version).
+
+## Entry, 2026-11-13 (closing): 0.6.7 everywhere (supersedes every "Exact next task" below)
 
 0.6.7 (`e6161b1`, tag `v0.6.7`) runs on the local service (smoke PASS, `pr-3a2fe982769038352889`), cloud
 `prowl-research` (build `622cf1bc`) and the Appvillis copy (`68009c4`, its suite 915 passed, build `c820f7a0`). The
