@@ -74,7 +74,9 @@ async def test_version_2_repairs_a_dash_the_draft_wrote(tmp_path, monkeypatch):
     llm = _Queue(draft, "L2: Traffic is 150,000 visits [C1], a steady base.")
     outcome = await write_and_repair(llm, get_runbook("market-pulse"), _ledger(tmp_path), {"market": "x"})
     assert DASH not in outcome.report_md and outcome.lint_after == 0 and outcome.prompt_version == "2"
-    assert "AT-06" in llm.systems[0] and DASH not in llm.systems[0].split("## Evidence ledger")[0]
+    # The template carries no dash; a shipped runbook's own instructions still may (R28), and the lint catches what
+    # the model copies from them.
+    assert "AT-06" in llm.systems[0] and DASH not in llm.systems[0].split("## Runbook output instructions")[0]
 
 
 async def test_version_1_writes_as_it_shipped(tmp_path, monkeypatch):
