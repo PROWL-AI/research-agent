@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import os
 import secrets
 from contextlib import asynccontextmanager
@@ -214,6 +215,10 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
             # Online only a client key reaches the tools; the service token never does (DEC-0024, B-099 R-8).
             client = client_of(request)
             if client is None:
+                # The reason stays in the log (B-104, pattern client-keys guarantee 3); the caller gets 401 whatever it is.
+                value = request.headers.get("authorization", "")
+                reason = cloud.clients.refusal(value[7:]) if value.startswith("Bearer ") else "no-key"
+                logging.getLogger("research_agent.service.clients").info("client key refused: %s", reason)
                 return refused(delegation_refusal("unauthenticated", "no-client-key"))
             message = await body(request)
             data, status = await proto.handle(message, request.headers, authorize=lambda tool: client_verdict(client, tool))
