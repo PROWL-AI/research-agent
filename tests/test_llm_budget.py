@@ -596,8 +596,10 @@ async def test_citation_checks_and_claim_extraction_send_reasoning_off(patched_r
         "mini-teardown", BRIEF, run_id="reasoning", max_llm_usd=5.0)
     extract = [r for r in provider.requests if "evidence-ledger claims" in r["messages"][0]["content"]]
     assert extract and all(r.get("reasoning") == {"enabled": False} for r in extract)
-    planner = [r for r in provider.requests if r.get("max_tokens") == 8000]
+    planner = [r for r in provider.requests if r.get("max_tokens") == 8000 and "response_format" in r]
     assert planner and all(r.get("reasoning") == {"enabled": False} for r in planner)  # B-129
+    writer = [r for r in provider.requests if r.get("max_tokens") == 8000 and "response_format" not in r]
+    assert writer and all("reasoning" not in r for r in writer)  # the writer's first draft keeps its reasoning
 
 
 class CutCheapStages(Provider):
