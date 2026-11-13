@@ -4,6 +4,14 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.12 (2026-11-13)
+
+- A plan or a report draft cut at the model's output limit is asked once more with reasoning off (B-128). The
+  planner used to fail the run after its second cut (the domain-baseline 1.1 acceptance on `moonshotai/kimi-k3.1-pro`,
+  `pr-b9ab0a718e4e2cd97a83`, cut at 8000 and at 24000 tokens); the writer retried only an empty draft and shipped a cut
+  one as it was, and a cut answer to that retry raised and lost the report. Now the third request goes with reasoning
+  off, and if it is cut too the longest draft ships; only no text at all fails.
+
 ## 0.6.11 (2026-11-13)
 
 - The writer writes with prompt version 2 (B-108, rule R30): no em dash in the prompt or its assumption marker, now
