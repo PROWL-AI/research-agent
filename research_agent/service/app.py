@@ -1,5 +1,6 @@
 """Loopback HTTP service, host authentication and operator dashboard API."""
 from __future__ import annotations
+import asyncio
 import hashlib
 import json
 import os
@@ -18,7 +19,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from .delegation import DelegationPolicy, is_loopback, refusal_http
 from .identity import HEADER, SERVICE_ID, SERVICE_NAME
 from .protocol import EFFECTS, Protocol, CAPABILITIES, artifact
-from .runtime import Runtime, runbooks
+from .runtime import JOB_FLOOR_BYTES, Runtime, runbooks
 from .store import Store, Conflict, now
 from .runtime import run_dir_name
 from research_agent import __version__
@@ -109,7 +110,9 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
     async def lifespan(app):
         with store.db:
             store.event("service.started", f"{SERVICE_NAME} запущен.")
+        watch = asyncio.create_task(rt.disk_watch(), name="disk-watch")
         yield
+        watch.cancel()
         with store.db:
             store.event("service.stopping", f"{SERVICE_NAME} завершает работу.")
         await rt.close()
@@ -121,6 +124,8 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
             result.append({"source": "prowl", "reason": "Ключ Prowl не подключён. Доступны локальные данные и обучение."})
         if not (os.environ.get("RESEARCH_LLM_API_KEY") or os.environ.get("OPENROUTER_API_KEY")):
             result.append({"source": "llm", "reason": "Ключ модели не подключён. Исследования недоступны."})
+        if rt.free_bytes() < JOB_FLOOR_BYTES:
+            result.append({"source": "disk", "reason": "Мало места на диске: новые запросы ждут в очереди, пока место не освободится."})
         return result
 
     def health():

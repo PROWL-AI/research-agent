@@ -178,6 +178,11 @@ class Store:
             self.event("job.approved" if approve else "job.cancelled", text, job)
             return job
 
+    def note(self, job_id, kind, text):
+        """An event about a job without changing its state (B-114: waiting on disk, a resume not created)."""
+        with self.db:
+            self.event(kind, text, self.job(job_id))
+
     def transition(self, job_id, status, phase, **fields):
         with self.db:
             job = self.job(job_id)

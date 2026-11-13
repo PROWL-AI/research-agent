@@ -6,6 +6,9 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- A full disk pauses a job instead of failing it (B-114): under 1 GiB free a job waits in the queue; a run stopped by a
+  full disk is `disk_low` and the service continues it by itself once space is back, without paying again for what
+  was recorded.
 - The CLI's messages and the evidence-only report heading read without an em dash (B-108, rule R30).
 - The dashboard reads without internal ids or raw JSON on its first views (B-120): inputs and settings are labelled
   facts, phases are in Russian, the JSON view is the «Технические данные» tab.
