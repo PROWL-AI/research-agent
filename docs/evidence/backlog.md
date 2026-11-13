@@ -31,6 +31,8 @@
 
 ## Closed
 
+- **B-121 · An issuing desk on the cloud instance** · closed 2026-11-13 · research template 1.6.0 and Аня's request on the board (thread a02c2f0c, 2026-11-13: «Дверь выдачи ключей, да»). `client add-desk` (the operator's tool) gives a steward a `keys.issue` key with grants and a maximum daily ceiling; the desk tools `client.issue|rotate|revoke|list` act only on its own keys; a desk key reads no data. Unlike the template's fixed read-only grants, the grants are set by the operator's tool per desk (read only by default): reported to the agents database. `tests/test_issuing_desk.py`, `tests/test_cloud_clients.py::test_a_desk_on_either_store`.
+
 - **B-114 · A full disk pauses a job instead of failing it** · closed 2026-11-13 · research template 1.6.0 (lesson `full-disk-pauses-and-resumes`): under 1 GiB free a job waits in the queue before its deadline starts (event `job.disk_wait`, `degraded[]` source `disk`); a run whose write meets ENOSPC ends `disk_low` with its checkpoint kept, and the service's disk watch (every 30 s) continues it once 2 GiB are free, a resume of the same run under the same principal decided by the service, so nothing recorded is paid again. `tests/test_disk_low.py`.
 
 - **B-120 · The dashboard showed internal ids and raw JSON** · closed 2026-11-13 · the request list and the request page no longer carry the job id; inputs and the run's settings are labelled facts; phases read in Russian; the JSON view is the «Технические данные» tab; the overview's «Управление» fact states the allowance rule. Copylot 54a84a58 (0 findings); `node scripts/test-dashboard.mjs` WebKit PASS at 1440, 390 and 360 px, no page errors.

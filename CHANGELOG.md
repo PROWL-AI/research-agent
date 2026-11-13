@@ -6,6 +6,9 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- An issuing desk on the cloud instance (B-121): `client add-desk` gives a team's key steward a `keys.issue` key; it
+  issues, rotates, revokes and lists only its own keys through the MCP tools `client.issue|rotate|revoke|list`, within
+  the grants and ceiling its desk was given. The tool descriptions now state the allowance rule.
 - A full disk pauses a job instead of failing it (B-114): under 1 GiB free a job waits in the queue; a run stopped by a
   full disk is `disk_low` and the service continues it by itself once space is back, without paying again for what
   was recorded.

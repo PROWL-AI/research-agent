@@ -39,6 +39,22 @@ SCHEMAS = {
  "fabric.job.get": obj({"id": STRING, "inputResponses": {"type": "object"}}, ["id"]),
  "fabric.job.cancel": obj({"id": STRING}, ["id"]),
 }
+#: The issuing desk's tools (B-121), served only by the cloud instance and only to a desk key (scope `keys.issue`).
+CLIENT_NAME = {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"}
+DESK_SCHEMAS = {
+ "client.issue": obj({"name": CLIENT_NAME, "scopes": {"type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": True,
+                                                      "items": {"enum": ["read", "research.run", "tools.call"]}},
+                      "dailyUsd": {"type": "number", "minimum": 10, "maximum": 1000}}, ["name"]),
+ "client.rotate": obj({"name": CLIENT_NAME}, ["name"]),
+ "client.revoke": obj({"name": CLIENT_NAME}, ["name"]),
+ "client.list": obj(),
+}
+DESK_DESCRIPTIONS = {
+ "client.issue": "Issue a client key within this desk's grants and ceiling; the key is in this answer once, put it straight into the holder's vault slot.",
+ "client.rotate": "Rotate a key this desk issued; the new key is in this answer once.",
+ "client.revoke": "Revoke a key this desk issued, for good.",
+ "client.list": "The keys this desk issued: names, scopes, ceilings, prefixes and dates, never a key.",
+}
 CAPABILITIES = list(SCHEMAS)[:5]
 for name in CAPABILITIES:
     SCHEMAS[name] = {"$id": BASE + name + ".input.json", **SCHEMAS[name]}
@@ -61,22 +77,27 @@ def tool_effect(name):
 EFFECTS = {name: tool_effect(name) for name in SCHEMAS}
 
 
-def tools_list():
+def tools_list(desk=False):
     tools = []
     for name, schema in SCHEMAS.items():
         effect = tool_effect(name)
         out = {"type": "object", "oneOf": [{**RESULT_SCHEMA, "properties": {"output": OUTPUTS[name]}}, HANDLE_SCHEMA]} if name in JOBS else OUTPUTS[name] if name in CAPABILITIES else {"type": "object", "required": ["job"]}
         tools.append({"name": name, "description": {
-            "research.run": "Run a research runbook; durable job, operator approval required before paid work.",
-            "research.tools.call": "Call one Prowl data tool with its parameters; durable approval job.",
+            "research.run": "Run a research runbook; durable job that starts within the caller's daily allowance, above it waits for the operator.",
+            "research.tools.call": "Call one Prowl data tool with its parameters; durable job, same allowance rule as research.run.",
             "research.tutorial": "Create a clearly labeled synthetic learning job; never contacts providers.",
             "research.list_runbooks": "List local runbooks, typed inputs and tool budgets.",
             "research.artifact.get": "Read a bounded artifact from this service's job; never arbitrary paths.",
-            "fabric.job.get": "Read job progress/result. Operator decisions are made in the authenticated dashboard.",
+            "fabric.job.get": "Read job progress/result. Decisions above the caller's allowance are the operator's, in the authenticated dashboard.",
             "fabric.job.cancel": "Cancel this job. Completed upstream charges are not reversed."}[name],
             "inputSchema": schema, "outputSchema": out,
             "annotations": {"readOnlyHint": effect == "none" and name != "fabric.job.cancel", "destructiveHint": effect not in {"none", "draft"},
                             "idempotentHint": True, "openWorldHint": effect == "charge"}})
+    if desk:
+        for name, schema in DESK_SCHEMAS.items():
+            tools.append({"name": name, "description": DESK_DESCRIPTIONS[name], "inputSchema": schema,
+                          "annotations": {"readOnlyHint": name == "client.list", "destructiveHint": name == "client.revoke",
+                                          "idempotentHint": name == "client.list", "openWorldHint": False}})
     return tools
 
 
@@ -130,8 +151,9 @@ def artifact(store, job_id, name):
 
 
 class Protocol:
-    def __init__(self, runtime):
+    def __init__(self, runtime, desk=None):
         self.runtime = runtime
+        self.desk = desk  # the cloud instance's client store; None on the local service (no desk tools)
 
     async def handle(self, body, headers, authorize=None):
         """`authorize(tool)` answers the delegation verdict for one tools/call
@@ -173,12 +195,13 @@ class Protocol:
             elif method == "ping":
                 result = {}
             elif method == "tools/list":
-                result = {"tools": tools_list()}
+                result = {"tools": tools_list(desk=self.desk is not None)}
                 if modern:
                     result["resultType"] = "complete"
             elif method == "tools/call":
                 name, args = params.get("name"), params.get("arguments", {})
-                if name not in SCHEMAS:
+                schemas = SCHEMAS | (DESK_SCHEMAS if self.desk is not None else {})
+                if name not in schemas:
                     return self.error(rid, -32602, "Unknown tool"), 400
                 verdict = authorize(name) if authorize is not None else {"ok": True}
                 if not verdict.get("ok"):
@@ -187,7 +210,7 @@ class Protocol:
                         result["resultType"] = "complete"
                     return {"jsonrpc": "2.0", "id": rid, "result": result}, 200
                 try:
-                    Draft202012Validator(SCHEMAS[name]).validate(args)
+                    Draft202012Validator(schemas[name]).validate(args)
                     data, stored_trace = self.call(name, args, meta.get("traceparent"), recorded(verdict))
                     trace = stored_trace or trace
                     result = {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False)}], "structuredContent": data, "isError": False}
@@ -217,6 +240,8 @@ class Protocol:
 
     def call(self, name, args, trace, delegation=None):
         rt = self.runtime
+        if name in DESK_SCHEMAS:
+            return self.desk_call(name, args, delegation), child_trace(trace)
         if name in JOBS:
             req = {k: v for k,v in args.items() if k != "idempotencyKey"}
             req["kind"] = {"research.run": "research", "research.tools.call": "tool", "research.tutorial": "tutorial"}[name]
@@ -237,3 +262,21 @@ class Protocol:
             output = artifact(rt.store, args["id"], args["name"])
         fake_job = {"id": "read-" + __import__('secrets').token_hex(8), "request": {}, "traceparent": child_trace(trace)}
         return rt.envelope(fake_job, output, 0), fake_job["traceparent"]
+
+    def desk_call(self, name, args, delegation):
+        """The issuing desk (B-121): the caller's own client name is the desk; the store refuses anything but a live
+        desk key and anything outside the desk's grants, ceiling and own issued keys."""
+        principal = (delegation or {}).get("principal") or ""
+        if (delegation or {}).get("tier") != "client" or not principal.startswith("client:"):
+            raise Refused("scope-not-granted", "desk-key-required")
+        desk = principal[len("client:"):]
+        if name == "client.list":
+            return {"clients": self.desk.desk_list(desk)}
+        if name == "client.revoke":
+            self.desk.desk_revoke(desk, args["name"])
+            return {"name": args["name"], "revoked": True}
+        key = (self.desk.desk_issue(desk, args["name"], args.get("scopes"), args.get("dailyUsd")) if name == "client.issue"
+               else self.desk.desk_rotate(desk, args["name"]))
+        record = next(c for c in self.desk.desk_list(desk) if c["name"] == args["name"])
+        return {"name": args["name"], "key": key, "scopes": record["scopes"], "dailyUsd": record["dailyUsd"],
+                "prefix": record["prefix"], "shownOnce": True}
