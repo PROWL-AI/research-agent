@@ -123,3 +123,25 @@ def test_the_copy_carries_the_appvillis_prefix(original, copy):
     assert "prowl-research-service client add" in onboarding
     # The original keeps no prefix.
     assert 'SERVICE_ID = "prowl-research"' in (original / "research_agent" / "service" / "identity.py").read_text()
+
+
+def test_a_passioncode_copy_carries_its_own_prefix_name_and_builder(original, copy):
+    """B-115: `--org passioncode` builds the PassionCode copy with its own identity."""
+    (original / "research_agent" / "service").mkdir(parents=True)
+    (original / "research_agent" / "service" / "identity.py").write_text('SERVICE_ID = "prowl-research"\n')
+    (original / "README.md").write_text("# Prowl Research Agent\n")
+    sh(original, "add", "-A")
+    sh(original, "commit", "-qm", "identity")
+    org = builder.ORGS["passioncode"]
+    builder.build("HEAD", copy, out=lambda *_: None, root=original, org=org)
+    identity = (copy / "research_agent" / "service" / "identity.py").read_text()
+    assert 'SERVICE_ID = "passioncode-prowl-research"' in identity and 'SERVICE_NAME = "PassionCode Prowl Research"' in identity
+    assert (copy / "README.md").read_text().startswith("# PassionCode Prowl Research: ")
+    assert sh(copy, "log", "-1", "--format=%ae") == "passioncode-prowl-research@users.noreply.github.com"
+    # The next build finds the last one by this organization's builder, not Appvillis's.
+    assert builder.last_build(copy, org)[0] is not None and builder.last_build(copy)[0] is None
+
+
+def test_an_unknown_organization_is_refused():
+    with pytest.raises(SystemExit):
+        builder.main(["--ref", "HEAD", "--copy", ".", "--org", "nobody"])
