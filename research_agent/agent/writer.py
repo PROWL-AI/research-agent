@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
-from research_agent.agent import tool_limits
+from research_agent.agent import copy_check, tool_limits
 from research_agent.evidence.ledger import Ledger, _atomic_write_text
 from research_agent.llm import LLMBudgetExceeded, LLMClient, LLMError
 from research_agent.runbook import Runbook
@@ -37,7 +37,14 @@ _BARE_ID_RE = re.compile(r"\bC(\d+)\b")
 _MALFORMED_CITATION_RE = re.compile(r"\[C\d+[^\]\[\n]*?[?\[][^\n]*?\]")
 _CONFLICT_REGISTER_RE = re.compile(r"^\s*-\s*C\d+\b|\bvs\s+C\d+\b")
 _SOURCE_LOG_ROW_RE = re.compile(r"^\s*\|\s*C\d+\s*\|.*$", re.MULTILINE)
-_ASSUMPTION_MARKER = "(target, assumption — not data)"
+_ASSUMPTION_MARKER = "(target, assumption, not data)"
+#: The marker as prompt version 1 wrote it, with a dash: reports written before B-108 still carry it.
+_ASSUMPTION_MARKERS = (_ASSUMPTION_MARKER, "(target, assumption \u2014 not data)")
+#: B-108, rule R30: the writer's prompts, by version. Version 1 shipped until 0.6.7 and stays as written (R28); version
+#: 2 carries no dash and the copy-rule line of the agents database's `copy-check` pattern instead of a hand-copied rule.
+#: `RESEARCH_WRITER_PROMPT=1` writes with version 1 (a measurement against the same evidence).
+WRITER_PROMPT_VERSIONS = ("1", "2")
+DEFAULT_WRITER_PROMPT = "2"
 _UNVERIFIED_MARKER = "[UNVERIFIED"
 _MAX_REPAIR_PASSES = 3
 _DRAFT_MAX_TOKENS = 8000
@@ -147,12 +154,156 @@ Rules:
 Output only the fixed lines in the format the request gives."""
 
 
+WRITER_SYSTEM_TEMPLATE_V2 = """\
+You are the writer for a research run. Write the final markdown report.
+
+## RULE 0: CITATIONS (the hardest rule; violating it fails the report)
+- EVERY number, percentage, dollar figure, count, or date-range claim carries
+  its [C..] reference IMMEDIATELY after the figure. The Source Log table does
+  NOT substitute for inline citations.
+- Check the claim's subject before citing. Citing [C20] for a figure about a
+  different entity than C20's subject is WORSE than not citing at all.
+- If no ledger claim supports a figure, delete the figure or mark it
+  [UNVERIFIED]. NEVER invent a citation.
+- When two ledger claims conflict on the same subject, cite BOTH with
+  [CONFLICT]. Never average them silently.
+- Derived numbers: a computed figure (ratio, average, per-month cadence, total)
+  is allowed ONLY when the same sentence carries the [C..] refs of EVERY input
+  figure plus the word "derived".
+  RIGHT: "Engagement is 3.4% (derived: 113K views [C7] / 3.3M followers [C9])."
+- Assumed targets: a KPI target, benchmark, or illustrative goal must be marked
+  "(target, assumption, not data)" and must not be dressed up as a measured
+  figure. RIGHT: "Aim for 5%+ CTR (target, assumption, not data)."
+- If a number fits none of these rules, it does not go in the report.
+
+## Charts (OPTIONAL, max 3 per report)
+For genuinely comparative numeric series that exist in the ledger you may embed
+up to 3 chart directives as fenced blocks. Nothing else charts, and prose must
+never describe a chart instead:
+```chart {{"type": "bar"|"line", "title": "...", "labels": ["..."], "values": [<numbers>], "claim_refs": ["C1", "C2"]}}
+```
+Every value must come from the referenced claims: the renderer rejects charts
+whose values are not in the ledger.
+
+WRONG: "Their channel has 430K subscribers [C20]."
+       (C20's subject is a different brand's channel: subject mismatch)
+WRONG: "The video has 113K+ views."
+       (bare number; the only nearby claim holds a duration, not views)
+RIGHT: "Their channel has 430K subscribers [C17] (VERIFIED)."
+       (C17's subject is this brand's channel subscriber count)
+
+## Runbook output instructions
+{output_instructions}
+
+## Runbook verification rules (hard rules: violating them is a failure)
+{verification_rules}
+
+## Evidence ledger (the ONLY facts you may use)
+{ledger_json}
+
+## More citation rules (all subordinate to RULE 0)
+- Estimates must carry their error band and a VERIFIED, ASSUMED or CONFLICT tag
+  matching the ledger claim status. VERIFIED means the claim's quote was found in
+  the stored source (verification "span") or two independent sources agree
+  ("corroboration"). Never call a claim VERIFIED that the ledger marks otherwise.
+  A claim with status "conflict" is cited with its disagreeing peers and
+  [CONFLICT]; never present one side as settled, and never chart it.
+  verification "span" means the one source literally says it: where a runbook
+  rule requires two independent sources for a figure, a span-verified claim
+  satisfies one of them; tag it "VERIFIED (single source)".
+- If the ledger has no evidence for a section, say so explicitly; do not fill gaps
+  from general knowledge.
+
+## Text a person reads
+{copy_rules}
+{partial_note}
+Write the report now, in markdown."""
+
+
+REPAIR_SYSTEM_TEMPLATE_V2 = """\
+You are the repair pass for a research report. Lines of the report failed
+lint; fix EVERY listed issue on its line.
+
+Rules:
+- For each uncited number choose EXACTLY ONE action:
+  (a) attach the correct [C..] ref IMMEDIATELY after the figure, but ONLY if
+      the ledger claim's subject matches what the sentence states (check the
+      subject; citing a claim about a different entity is worse than not citing);
+  (b) rewrite it as a derivation: same sentence, [C..] refs for EVERY input
+      figure, plus the word "derived";
+  (c) mark it as an assumption with the exact marker
+      "(target, assumption, not data)";
+  (d) delete it;
+  (e) mark it [UNVERIFIED], when the figure is worth keeping visible but no
+      ledger claim backs it.
+  Never leave a bare number behind, and NEVER invent a citation to cover one.
+- For each missing_ref (a [C..] that does not exist in the ledger): replace it
+  with the correct claim id, or handle the figure per the actions above.
+- For each malformed_citation (a bracket with a question mark, a note or a
+  nested bracket inside it): replace it with plain [C..] refs that support the
+  sentence; no commentary inside a citation.
+- Where two ledger claims conflict on the same subject, cite BOTH with
+  [CONFLICT].
+- For status_mislabel, conflict_hidden, quote_not_in_ledger and value_mismatch,
+  do what the issue's detail says, on that line only; never add a claim id the
+  ledger does not hold.
+- For each copy_rule issue, rewrite the sentence so the issue is gone and keep
+  its facts and citations; {copy_rules}
+- Change nothing else on the line: wording that is already correct stays.
+
+## Evidence ledger (the ONLY source of valid claim ids)
+{ledger_json}
+
+Output only the fixed lines in the format the request gives."""
+
+
+def writer_prompt_version() -> str:
+    """The prompt version this process writes with (B-108): the setting, else version 2."""
+    import os
+
+    version = os.environ.get("RESEARCH_WRITER_PROMPT", DEFAULT_WRITER_PROMPT).strip() or DEFAULT_WRITER_PROMPT
+    if version not in WRITER_PROMPT_VERSIONS:
+        raise ValueError(f"RESEARCH_WRITER_PROMPT: one of {', '.join(WRITER_PROMPT_VERSIONS)}")
+    return version
+
+
+def _prompts(version: str) -> tuple[str, str]:
+    return ((WRITER_SYSTEM_TEMPLATE, REPAIR_SYSTEM_TEMPLATE) if version == "1"
+            else (WRITER_SYSTEM_TEMPLATE_V2, REPAIR_SYSTEM_TEMPLATE_V2))
+
+
+#: The copy rules a person-read report is held to (B-108): the markers of `copy_check` the repair pass can fix on a
+#: line. AT-07 is a title's rule and AT-11 a judgement the engine owns; the report's lines are body text.
+REPORT_COPY_MARKERS = ("AT-06", "AT-16")
+
+
+def copy_rule_issues(report_md: str) -> list["LintIssue"]:
+    """Findings of the agents database's `copy-check` offline rules on the report's lines, as lint issues."""
+    issues = []
+    in_fence = False
+    for line in report_md.split("\n"):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence or not line.strip():
+            continue
+        for finding in copy_check.fallback(line, role="body", locale="en", markers=REPORT_COPY_MARKERS):
+            start, end = finding["span"]["start"], finding["span"]["end"]
+            # The words around the finding, so two dashes of one line stay two issues and a repair that fixes one
+            # is progress (the repair loop stops on an unchanged set of (kind, text)).
+            issues.append(LintIssue(kind="copy_rule", text=line[max(0, start - 24):end + 24].strip() or "?",
+                                    detail=f"{finding['catalogue']}: {finding['message']}", context=line))
+    return issues
+
+
 class WriterOutcome(BaseModel):
     report_md: str
     lint_before: int
     lint_after: int
     revised: bool
     repair_passes: int = 0
+    #: The writer prompt version that wrote it (B-108).
+    prompt_version: str = "1"
 
 
 class RewriteError(Exception):
@@ -315,7 +466,7 @@ def lint_report(report_md: str, ledger: Ledger) -> LintResult:
         bare_refs = (f"C{n}" for n in _BARE_ID_RE.findall(sentence))
         if (
             _CITATION_BLOCK_RE.search(sentence)
-            or _ASSUMPTION_MARKER in sentence
+            or any(marker in sentence for marker in _ASSUMPTION_MARKERS)
             or _UNVERIFIED_MARKER in sentence
             or (
                 _CONFLICT_REGISTER_RE.search(sentence)
@@ -394,7 +545,9 @@ async def write_report(
                             + "; ".join(f"{s.get('step', '?')}: {str(s.get('reason') or '')[:200]}" for s in not_sent)
                             + ".\n")
 
-    system = WRITER_SYSTEM_TEMPLATE.format(
+    writer_template, _ = _prompts(writer_prompt_version())
+    system = writer_template.format(
+        copy_rules=copy_check.writer_brief(REPORT_COPY_MARKERS),
         output_instructions=runbook.output_instructions or "(no output instructions)",
         verification_rules=runbook.section("Verification (hard rules)") or "(none)",
         ledger_json=ledger.as_prompt_json(),
@@ -505,7 +658,8 @@ async def repair_report(
         f"L{i}: {lines[i]}\n" + "\n".join(f"  - {issue.kind}: {issue.text!r} ({issue.detail})" for issue in by_line[i])
         for i in chosen
     )
-    system = REPAIR_SYSTEM_TEMPLATE.format(ledger_json=ledger.as_prompt_json())
+    _, repair_template = _prompts(writer_prompt_version())
+    system = repair_template.format(ledger_json=ledger.as_prompt_json(), copy_rules=copy_check.writer_brief(REPORT_COPY_MARKERS))
     user = (f"## Lines to fix\n{tasks}\n\n"
             "Return ONLY the fixed lines, one per line given, each as `L<n>: <fixed line>` with the same n. "
             "An empty fixed line deletes it. Do not return any other text.")
@@ -550,6 +704,10 @@ def _writing_lint(report_md: str, ledger: Ledger) -> LintResult:
             result.issues.append(LintIssue(kind=defect["kind"], text=defect["text"],
                                            detail=f"[{defect['claim']}] {_DEFECT_FIX[defect['kind']]}",
                                            context=defect["text"]))
+    if writer_prompt_version() != "1":
+        # B-108, rule R30: the copy rules a person-read report is held to, from the agents database's `copy-check`
+        # pattern; the repair pass fixes them with the citation issues. Version 1 is kept as it shipped.
+        result.issues.extend(copy_rule_issues(report_md))
     return result
 
 
@@ -573,7 +731,7 @@ async def write_and_repair(
     lint_before = len(lint_current.issues)
     if not lint_current.issues:
         return WriterOutcome(
-            report_md=draft, lint_before=0, lint_after=0, revised=False
+            report_md=draft, lint_before=0, lint_after=0, revised=False, prompt_version=writer_prompt_version()
         )
     log.info("writer draft failed lint (%d issues); running repair passes", lint_before)
 
@@ -631,6 +789,7 @@ async def write_and_repair(
         lint_after=len(lint_current.issues),
         revised=True,
         repair_passes=passes,
+        prompt_version=writer_prompt_version(),
     )
 
 
