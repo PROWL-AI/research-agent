@@ -15,6 +15,7 @@
   "runbook/saas-competitor-teardown@1.0": "sha256:d07dce75840e9e0cd589f8169d8a82ba7afdb9e851fcc86d924ebde31a4169fb",
   "runbook/seo-site-audit@1.0": "sha256:575e4c774401a79ef69d919583d989bc383785d94962614d0a688116375df53a",
   "runbook/subscription-app-audit@1.0": "sha256:586b6c2069b0178f7c0c10bebacf63091a5071c45d56bcc0a0ad9547be88a09d",
-  "template/base.html.j2": "sha256:669579d1c4ef3179f45783ec57d67e2d06024fe720bf3712c735296dfe62eb55"
+  "template/base.html.j2": "sha256:669579d1c4ef3179f45783ec57d67e2d06024fe720bf3712c735296dfe62eb55",
+  "template/base.v2.html.j2": "sha256:e12c5c4817b29330ea09217d4b81a2b03689cc095abb780b97327e8fb03a6378"
  }
 }
