@@ -7,7 +7,9 @@ never set incrementally from the claim that happened to arrive last:
 * **conflict** — the group's valued claims carry two or more distinct
   normalized (value, unit) pairs. Every valued claim in the group is in
   conflict, whatever arrives later; a valueless claim neither corroborates nor
-  resolves one.
+  resolves one. Points of a series are not a conflict (B-127): when every valued
+  claim of the group names its period (a date, a week, a month, a quarter, a
+  year) and the periods differ, each period is its own group.
 * **verified** — either the claim's quote was found in its stored raw and its
   value occurs inside that quote (``verification.method == "span"``), or two
   or more agreeing valued claims carry distinct *known* independence keys
@@ -362,6 +364,12 @@ class Ledger:
         group = self._groups.get(subject_key, [])
         if not group:
             return
+        parts = _by_period(group)
+        for part in parts if parts is not None else [group]:
+            self._resolve(subject_key, part, announce=announce)
+
+    def _resolve(self, subject_key: str, group: list[Claim], *, announce: bool) -> None:
+        """The statuses of one group: a subject's claims, or one period of a series (B-127)."""
         valued = [c for c in group if c.value is not None]
         norm = {c.id: _norm_pair(c.value, c.unit) for c in valued}
         disagree = any(not _agree(norm[x.id], norm[y.id]) for i, x in enumerate(valued) for y in valued[i + 1:])
@@ -419,6 +427,34 @@ class Ledger:
         # pass — indent, nulls and source_url cost hundreds of KB at a few
         # hundred claims and buy the writer nothing it cites.
         return json.dumps(self.compact_rows(), ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+
+
+_MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+_MONTH = rf"(?:{'|'.join(_MONTHS)})[a-z]*\.?"
+#: A period a claim names: an ISO date or month, a month with its day or year, a quarter, a year (B-127).
+_PERIOD_RE = re.compile(
+    rf"\b(?:\d{{4}}-\d{{2}}(?:-\d{{2}})?|q[1-4]\s*\d{{4}}|{_MONTH}\s+\d{{1,4}}|\d{{1,2}}\s+{_MONTH}|(?:19|20)\d{{2}})\b",
+    re.IGNORECASE)
+
+
+def _period(text: str | None) -> str | None:
+    """The period a claim's text names, as a comparable key, or None when it names none."""
+    words = [w for m in _PERIOD_RE.finditer(text or "") for w in m.group(0).lower().replace(".", "").split()]
+    return " ".join(w[:3] if w[:3] in _MONTHS else w for w in words) or None
+
+
+def _by_period(group: list[Claim]) -> list[list[Claim]] | None:
+    """The group split by period when it is a series (every valued claim names a period, two or more differ);
+    None otherwise. Valueless claims form their own part."""
+    valued = [c for c in group if c.value is not None]
+    periods = {c.id: _period(c.claim) for c in valued}
+    if len(valued) < 2 or any(p is None for p in periods.values()) or len(set(periods.values())) < 2:
+        return None
+    parts: dict[str, list[Claim]] = {}
+    for claim in valued:
+        parts.setdefault(periods[claim.id], []).append(claim)
+    rest = [c for c in group if c.value is None]
+    return list(parts.values()) + ([rest] if rest else [])
 
 
 def _alone(claim: Claim) -> tuple[ClaimStatus, str, str]:

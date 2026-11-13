@@ -76,3 +76,44 @@ def test_ledger_persists_and_reloads(tmp_path):
     assert reloaded.claims[0].id == "C1"
     third = reloaded.add(claim="y", subject="s2", value=2, source_tool="t")
     assert third.id == "C2"
+
+
+# ── B-127: points of a series are not a conflict ─────────────────────────────────────────────────────────────────────
+# The acceptance run of 2026-11-13 (pr-9a55099f6972307f0a5b) put 90 of 192 claims in conflict: every week of a Google
+# Trends series shared one subject, so its values disagreed.
+
+SUBJECT = "Google Trends interest for 'AI market research'"
+
+
+def _point(ledger, week, value, quote=True):
+    text = f"Google Trends interest for 'AI market research' was {value} in the week of {week}."
+    return ledger.add(claim=text, subject=SUBJECT, value=value, unit="index", source_tool="google_trends",
+                      quote=f"{value}" + " interest" if quote else None, quote_span=(0, 5) if quote else None)
+
+
+def test_the_weeks_of_a_series_are_points_not_a_conflict(tmp_path):
+    ledger = Ledger(tmp_path / "ledger.json")
+    points = [_point(ledger, "Nov 7–13, 2021", 0), _point(ledger, "Jun 7–13, 2026", 100), _point(ledger, "Mar 1–7, 2026", 65)]
+    assert {c.status for c in points} == {ClaimStatus.verified}
+
+
+def test_two_values_for_the_same_week_still_conflict(tmp_path):
+    ledger = Ledger(tmp_path / "ledger.json")
+    points = [_point(ledger, "Jun 7–13, 2026", 100), _point(ledger, "Jun 7–13, 2026", 80), _point(ledger, "Mar 1–7, 2026", 65)]
+    assert [c.status for c in points] == [ClaimStatus.conflict, ClaimStatus.conflict, ClaimStatus.verified]
+
+
+def test_a_claim_that_names_no_period_keeps_the_old_rule(tmp_path):
+    ledger = Ledger(tmp_path / "ledger.json")
+    dated = _point(ledger, "Jun 7–13, 2026", 100)
+    undated = ledger.add(claim="interest is 40", subject=SUBJECT, value=40, unit="index", source_tool="google_trends")
+    assert dated.status == undated.status == ClaimStatus.conflict
+
+
+def test_the_period_survives_a_reload(tmp_path):
+    path = tmp_path / "ledger.json"
+    ledger = Ledger(path)
+    _point(ledger, "Nov 7–13, 2021", 0)
+    _point(ledger, "Jun 7–13, 2026", 100)
+    ledger.save()
+    assert {c.status for c in Ledger.load(path).claims} == {ClaimStatus.verified}
