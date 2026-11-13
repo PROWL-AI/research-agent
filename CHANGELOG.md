@@ -6,6 +6,8 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- A runbook runs at an exact version: `research.run` with `runbook: "market-pulse@1.0"` takes the current text or the
+  shipped one kept in `versions/` (B-110, rule R28).
 - Reports render with `base.v2.html.j2`: the partial-run banner reads without an em dash (B-108, rule R30). The shipped
   `base.html.j2` stays byte for byte (rule R28) and the add-only lock gained the new name.
 - The dashboard's settings carry the agents' daily allowance, and its «Ключи и разрешения» callout, SECURITY.md and
