@@ -152,3 +152,65 @@ def test_no_build_output_is_tracked():
         pytest.skip("not a git checkout")
     tracked = subprocess.run(["git", "ls-files", "build", "*.egg-info"], cwd=root, capture_output=True, text=True, check=True)
     assert tracked.stdout == ""
+
+
+# ── B-106: a space of a shared Mac with no GUI login ─────────────────────────────────────────────────────────────────
+
+
+def test_a_space_daemon_has_its_own_label_home_path_and_no_stdout_file(tmp_path):
+    inst = _installer()
+    payload = {"Label": inst.LABEL, "ProgramArguments": ["/py"], "StandardOutPath": "/x", "StandardErrorPath": "/x",
+               "EnvironmentVariables": {"PATH": "/usr/bin:/bin", "FABRIC_SERVICE_SUPERVISOR": "launchd"}}
+    doc = inst.background_definition(payload, inst.background_label("passioncode"), tmp_path)
+    assert doc["Label"] == "chat.prowl.research.passioncode"  # one /Library/LaunchDaemons for every space
+    assert "StandardOutPath" not in doc and "StandardErrorPath" not in doc
+    env = doc["EnvironmentVariables"]
+    assert env["HOME"] == str(tmp_path) and env["OBSERVATORY_VAULT_ONLY"] == "1"
+    assert env["PATH"].startswith("/opt/homebrew/bin:") and env["PATH"].endswith(f"{tmp_path}/.local/bin")
+    assert env["FABRIC_SERVICE_SUPERVISOR"] == "launchd"
+    assert payload["Label"] == inst.LABEL  # the caller's payload is not changed
+
+
+def test_the_first_apply_line_names_the_account_and_the_label():
+    inst = _installer()
+    line = inst.first_apply_line("sshlg", "chat.prowl.research.sshlg")
+    assert line == ("sudo /usr/bin/python3 -I /usr/local/libexec/observatory-space-daemons apply "
+                    "--user sshlg --label chat.prowl.research.sshlg")
+
+
+class _Run:
+    def __init__(self, code, out=""):
+        self.code, self.out, self.argv = code, out, None
+
+    def __call__(self, argv, **kw):
+        import subprocess
+
+        self.argv = argv
+        return subprocess.CompletedProcess(argv, self.code, self.out, "")
+
+
+@pytest.mark.parametrize("code, outcome", [(0, "loaded"), (3, "first-apply")])
+def test_the_space_door_loads_a_changed_definition_or_asks_for_the_first_apply(code, outcome):
+    inst = _installer()
+    run = _Run(code, "done")
+    assert inst.door_deploy("chat.prowl.research.sshlg", run=run) == (outcome, "done")
+    assert run.argv == ["sudo", "-n", "/usr/local/libexec/studio-space-service", "deploy", "chat.prowl.research.sshlg"]
+
+
+@pytest.mark.parametrize("code", [2, 4, 5])
+def test_a_refusal_of_the_space_door_stops_the_install(code):
+    inst = _installer()
+    with pytest.raises(RuntimeError, match=f"exit {code}"):
+        inst.door_deploy("chat.prowl.research.sshlg", run=_Run(code, "plan-refused: x"))
+
+
+def test_a_port_another_listener_holds_is_seen():
+    import socket
+
+    inst = _installer()
+    with socket.socket() as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        port = server.getsockname()[1]
+        assert inst.port_answers(port) is True
+    assert inst.port_answers(port) is False
