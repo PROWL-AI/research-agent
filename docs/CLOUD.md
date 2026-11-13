@@ -39,7 +39,11 @@ heroku run -a appvillis-prowl-research -- prowl-research-service client rotate a
 heroku run -a appvillis-prowl-research -- prowl-research-service client revoke anna
 ```
 
-`add` and `rotate` print the key once; only its SHA-256 is stored (`research_agent/service/clients.py`). Scopes:
+`add` and `rotate` print the key once; only its HMAC-SHA256 under the pepper `CLIENT_KEY_PEPPER` is stored
+(`research_agent/service/clients.py`, B-104): the app refuses to open its key store without a pepper of at least 16
+bytes, a key stored as a plain SHA-256 before 0.6.9 is rewritten under the pepper on its next use, and the names
+`owner`, `root`, `operator`, `system`, `admin`, `service` and `host` are refused. The pepper lives in Observatory
+(`<folder>/prod/CLIENT_KEY_PEPPER`) and reaches the app with `scripts/cloud.py config --app <app> CLIENT_KEY_PEPPER`. Scopes:
 
 | Scope | Capabilities |
 |---|---|

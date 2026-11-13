@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 import httpx
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from research_agent.mcp_compat import is_error, open_streams, structured
 
 
 async def main():
@@ -15,7 +15,7 @@ async def main():
         token = (root / "host.token").read_text().strip()
         return httpx.get(origin + "/fabric/v1/usage", headers={"Authorization": "Bearer " + token}, timeout=10).json()["days"]
     role = (Path.home() / ".config/agentgateway/secrets/roles/prowl").read_text().strip()
-    async with streamablehttp_client("http://127.0.0.1:47845/mcp/prowl-research", headers={"x-agw-key": role}) as (r, w, _):
+    async with open_streams("http://127.0.0.1:47845/mcp/prowl-research", {"x-agw-key": role}) as (r, w):
         async with ClientSession(r, w) as mcp:
             await mcp.initialize()
             # One key per smoke run: a fixed key returned an earlier smoke's completed job,
@@ -38,14 +38,14 @@ async def main():
                 },
                 meta={"traceparent": "00-" + "a1" * 16 + "-" + "b2" * 8 + "-01"},
             )
-            assert not result.isError
-            job_id = result.structuredContent["job"]["id"]
+            assert not is_error(result)
+            job_id = structured(result)["job"]["id"]
             # B-100 (0.5.0): the free tutorial starts on the caller's allowance, no operator session needed.
-            pending = (await mcp.call_tool("fabric.job.get", {"id": job_id})).structuredContent["job"]
+            pending = structured(await mcp.call_tool("fabric.job.get", {"id": job_id}))["job"]
             assert pending["status"] in {"working", "completed"}, pending["status"]
             for _ in range(40):
                 result = await mcp.call_tool("fabric.job.get", {"id": job_id})
-                job = result.structuredContent["job"]
+                job = structured(result)["job"]
                 if job["status"] == "completed":
                     break
                 await asyncio.sleep(0.2)

@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from research_agent.mcp_compat import Server
 
 from research_agent.agent.orchestrator import (
     InputError,
@@ -65,7 +65,7 @@ if not getattr(logging.getLogRecordFactory(), "_research_trace", False):
     _trace_record_factory._research_trace = True  # type: ignore[attr-defined]
     logging.setLogRecordFactory(_trace_record_factory)
 
-mcp = FastMCP("prowl-research-agent")
+mcp = Server("prowl-research-agent")
 
 _TASKS: dict[str, asyncio.Task] = {}
 

@@ -9,6 +9,7 @@ same interface for tests and for a cloud run without a database."""
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -39,7 +40,37 @@ def _now() -> str:
 
 
 def _hash(key: str) -> str:
+    """The plain SHA-256 keys were stored under before 0.6.9 (B-104); kept to recognise them once."""
     return hashlib.sha256(key.encode()).hexdigest()
+
+
+#: B-104 (agents database pattern `client-keys` 1.1.0, guarantees 1 and 2): a key is stored as HMAC-SHA256 under a
+#: pepper held outside the store (`CLIENT_KEY_PEPPER`), so the store alone cannot test guesses. A pepper under 16 bytes
+#: stops the store. A key stored as a plain SHA-256 before is recognised once and rewritten under the pepper.
+PEPPER_MIN_BYTES = 16
+PEPPERED = "h1:"
+#: Names a client may never take (pattern guarantee 9): they read as the owner in a log or a principal.
+RESERVED_NAMES = frozenset({"owner", "root", "operator", "system", "admin", "service", "host"})
+#: Why a key was refused, for the log only; the caller sees 401 whatever it is (pattern guarantee 3).
+REFUSAL_REASONS = ("malformed", "unknown", "revoked")
+
+
+class Digests:
+    """How keys are stored: peppered when a pepper is given, else the plain SHA-256 (the local file store's tests)."""
+
+    def __init__(self, pepper: str | None = None):
+        if pepper is not None and len(pepper.encode()) < PEPPER_MIN_BYTES:
+            raise ValueError(f"CLIENT_KEY_PEPPER: at least {PEPPER_MIN_BYTES} bytes")
+        self.pepper = pepper.encode() if pepper else None
+
+    def of(self, key: str) -> str:
+        if self.pepper is None:
+            return _hash(key)
+        return PEPPERED + hmac.new(self.pepper, key.encode(), hashlib.sha256).hexdigest()
+
+    def legacy(self, key: str) -> str | None:
+        """The plain digest a key may still be stored under, when the store is peppered."""
+        return _hash(key) if self.pepper is not None else None
 
 
 def _new_key() -> str:
@@ -49,6 +80,8 @@ def _new_key() -> str:
 def _check(name: str, scopes) -> list[str]:
     if not isinstance(name, str) or not NAME.match(name):
         raise ValueError("client name: lowercase letters, digits, '.', '_', '-', up to 64 characters")
+    if name in RESERVED_NAMES:
+        raise ValueError(f"client name {name!r} is reserved")
     scopes = list(dict.fromkeys(scopes or []))
     if not scopes or any(s not in SCOPES for s in scopes):
         raise ValueError("scopes: one or more of " + ", ".join(SCOPES))
@@ -158,8 +191,9 @@ class DeskMixin:
 class FileClients(DeskMixin):
     """Clients in one 0600 JSON file."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, pepper: str | None = None):
         self.path = Path(path)
+        self.digests = Digests(pepper)
 
     def _load(self) -> dict:
         try:
@@ -183,7 +217,7 @@ class FileClients(DeskMixin):
     def _insert(self, name: str, record: dict) -> None:
         data = self._load()
         key = record.pop("key")
-        data[name] = {"sha256": _hash(key), "prefix": key[:12], "createdAt": _now(), "revokedAt": None, **record}
+        data[name] = {"sha256": self.digests.of(key), "prefix": key[:12], "createdAt": _now(), "revokedAt": None, **record}
         self._write(data)
 
     def add(self, name: str, scopes, daily_usd: float | None = None, key_class: str | None = None) -> str:
@@ -193,7 +227,7 @@ class FileClients(DeskMixin):
         if name in data:
             raise ValueError(f"client {name} exists; rotate it or choose another name")
         key = _new_key()
-        data[name] = {"sha256": _hash(key), "scopes": scopes, "prefix": key[:12], "createdAt": _now(), "revokedAt": None,
+        data[name] = {"sha256": self.digests.of(key), "scopes": scopes, "prefix": key[:12], "createdAt": _now(), "revokedAt": None,
                       "dailyUsd": daily_usd, "keyClass": key_class}
         self._write(data)
         return key
@@ -203,7 +237,7 @@ class FileClients(DeskMixin):
         if name not in data or data[name]["revokedAt"]:
             raise KeyError(f"no active client {name}")
         key = _new_key()
-        data[name].update(sha256=_hash(key), prefix=key[:12])
+        data[name].update(sha256=self.digests.of(key), prefix=key[:12])
         self._write(data)
         return key
 
@@ -229,15 +263,34 @@ class FileClients(DeskMixin):
                  "dailyUsd": _ceiling_of(c.get("keyClass"), c.get("dailyUsd")), "keyClass": c.get("keyClass") or DEFAULT_CLASS,
                  "issuedBy": c.get("issuedBy")} for n, c in sorted(self._load().items())]
 
+    def _find(self, key) -> tuple[str | None, dict | None]:
+        """(name, record) the key is stored under, rewriting a plain digest under the pepper on the way (B-104)."""
+        wanted, legacy = self.digests.of(key), self.digests.legacy(key)
+        data = self._load()
+        for name, c in data.items():
+            if secrets.compare_digest(c["sha256"], wanted):
+                return name, c
+            if legacy is not None and secrets.compare_digest(c["sha256"], legacy):
+                c["sha256"] = wanted
+                self._write(data)
+                return name, c
+        return None, None
+
+    def refusal(self, key) -> str | None:
+        """Why `verify` refuses this key (one of REFUSAL_REASONS), for the log; None when it would pass."""
+        if not _usable(key):
+            return "malformed"
+        _, c = self._find(key)
+        return "unknown" if c is None else ("revoked" if c["revokedAt"] else None)
+
     def verify(self, key) -> dict | None:
         if not _usable(key):
             return None
-        wanted = _hash(key)
-        for name, c in self._load().items():
-            if not c["revokedAt"] and secrets.compare_digest(c["sha256"], wanted):
-                return {"name": name, "scopes": c["scopes"], "dailyUsd": _ceiling_of(c.get("keyClass"), c.get("dailyUsd")),
-                        "keyClass": c.get("keyClass") or DEFAULT_CLASS}
-        return None
+        name, c = self._find(key)
+        if c is None or c["revokedAt"]:
+            return None
+        return {"name": name, "scopes": c["scopes"], "dailyUsd": _ceiling_of(c.get("keyClass"), c.get("dailyUsd")),
+                "keyClass": c.get("keyClass") or DEFAULT_CLASS}
 
 
 class PostgresClients(DeskMixin):
@@ -258,9 +311,10 @@ class PostgresClients(DeskMixin):
                     # the floor there and reads it as no ceiling.
                     ("key_class", "TEXT"))
 
-    def __init__(self, connect: Callable):
+    def __init__(self, connect: Callable, pepper: str | None = None):
         self.connect = connect
         self._ready = False
+        self.digests = Digests(pepper)
 
     def _db(self):
         connection = self.connect()
@@ -294,7 +348,7 @@ class PostgresClients(DeskMixin):
         with db.cursor() as cur:
             cur.execute("INSERT INTO prowl_research_clients(name, sha256, scopes, prefix, created_at, revoked_at, daily_usd, issued_by,"
                         " grants, max_daily_usd, key_class) VALUES (%s,%s,%s,%s,%s,NULL,%s,%s,%s,%s,%s)",
-                        (name, _hash(key), json.dumps(record["scopes"]), key[:12], _now(),
+                        (name, self.digests.of(key), json.dumps(record["scopes"]), key[:12], _now(),
                          DAILY_FLOOR_USD if record["dailyUsd"] is None else record["dailyUsd"], record["issuedBy"],
                          json.dumps(record["grants"]) if record["grants"] else None, record["maxDailyUsd"],
                          record.get("keyClass") or DEFAULT_CLASS))
@@ -309,7 +363,7 @@ class PostgresClients(DeskMixin):
                 raise ValueError(f"client {name} exists; rotate it or choose another name")
             key = _new_key()
             cur.execute("INSERT INTO prowl_research_clients(name, sha256, scopes, prefix, created_at, revoked_at, daily_usd, key_class)"
-                        " VALUES (%s,%s,%s,%s,%s,NULL,%s,%s)", (name, _hash(key), json.dumps(scopes), key[:12], _now(),
+                        " VALUES (%s,%s,%s,%s,%s,NULL,%s,%s)", (name, self.digests.of(key), json.dumps(scopes), key[:12], _now(),
                                                                DAILY_FLOOR_USD if daily_usd is None else daily_usd, key_class))
         db.commit()
         return key
@@ -320,7 +374,7 @@ class PostgresClients(DeskMixin):
             if not cur.execute("SELECT 1 FROM prowl_research_clients WHERE name=%s AND revoked_at IS NULL", (name,)).fetchone():
                 raise KeyError(f"no active client {name}")
             key = _new_key()
-            cur.execute("UPDATE prowl_research_clients SET sha256=%s, prefix=%s WHERE name=%s", (_hash(key), key[:12], name))
+            cur.execute("UPDATE prowl_research_clients SET sha256=%s, prefix=%s WHERE name=%s", (self.digests.of(key), key[:12], name))
         db.commit()
         return key
 
@@ -353,25 +407,47 @@ class PostgresClients(DeskMixin):
         return [{"name": r[0], "scopes": json.loads(r[1]), "prefix": r[2], "createdAt": r[3], "revokedAt": r[4],
                  "dailyUsd": _ceiling_of(r[7], r[5]), "keyClass": r[7] or DEFAULT_CLASS, "issuedBy": r[6]} for r in rows]
 
+    def _find(self, key):
+        """The row the key is stored under (name, scopes, daily_usd, key_class, revoked_at), rewriting a plain digest
+        under the pepper on the way (B-104)."""
+        wanted, legacy = self.digests.of(key), self.digests.legacy(key)
+        db = self._db()
+        query = "SELECT name, scopes, daily_usd, key_class, revoked_at FROM prowl_research_clients WHERE sha256=%s"
+        with db.cursor() as cur:
+            row = cur.execute(query, (wanted,)).fetchone()
+            if row is None and legacy is not None:
+                row = cur.execute(query, (legacy,)).fetchone()
+                if row is not None:
+                    cur.execute("UPDATE prowl_research_clients SET sha256=%s WHERE sha256=%s", (wanted, legacy))
+        db.commit()  # the web dyno verifies every request: never leave it idle in a transaction (B-119)
+        return row
+
+    def refusal(self, key) -> str | None:
+        """Why `verify` refuses this key (one of REFUSAL_REASONS), for the log; None when it would pass."""
+        if not _usable(key):
+            return "malformed"
+        row = self._find(key)
+        return "unknown" if row is None else ("revoked" if row[4] else None)
+
     def verify(self, key) -> dict | None:
         if not _usable(key):
             return None
-        db = self._db()
-        with db.cursor() as cur:
-            row = cur.execute("SELECT name, scopes, daily_usd, key_class FROM prowl_research_clients WHERE sha256=%s"
-                              " AND revoked_at IS NULL", (_hash(key),)).fetchone()
-        db.commit()  # the web dyno verifies every request: never leave it idle in a transaction (B-119)
-        if row is None:
+        row = self._find(key)
+        if row is None or row[4]:
             return None
         return {"name": row[0], "scopes": json.loads(row[1]), "dailyUsd": _ceiling_of(row[3], row[2]),
                 "keyClass": row[3] or DEFAULT_CLASS}
 
 
 def from_env(root: Path, environ=os.environ):
-    """Postgres when `DATABASE_URL` is set (Heroku), else a 0600 file in the data root."""
+    """Postgres when `DATABASE_URL` is set (Heroku), else a 0600 file in the data root. The cloud's store needs
+    `CLIENT_KEY_PEPPER` (B-104): without it the store refuses to open rather than keep plain digests."""
     url = environ.get("DATABASE_URL")
+    pepper = environ.get("CLIENT_KEY_PEPPER") or None
     if not url:
-        return FileClients(Path(root) / "clients.json")
+        return FileClients(Path(root) / "clients.json", pepper)
+    if pepper is None:
+        raise RuntimeError("CLIENT_KEY_PEPPER is not set: the cloud's client keys need a pepper (B-104)")
     import psycopg  # the `[cloud]` extra
 
     state = {}
@@ -381,4 +457,4 @@ def from_env(root: Path, environ=os.environ):
             state["c"] = psycopg.connect(url, autocommit=False)
         return state["c"]
 
-    return PostgresClients(connect)
+    return PostgresClients(connect, pepper)

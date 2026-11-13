@@ -5,6 +5,8 @@ import json
 import pytest
 from mcp.types import CallToolResult, TextContent
 
+from research_agent.mcp_compat import call_timeout
+
 from research_agent.prowl_client import ProwlClient, ProwlError
 
 
@@ -189,7 +191,7 @@ class TestCallTimeout:
 
         await client._rpc("prowl_get_wallet", {})
 
-        assert client._session.calls[0]["read_timeout_seconds"] == timedelta(seconds=180)
+        assert client._session.calls[0]["read_timeout_seconds"] == call_timeout(timedelta(seconds=180))
 
     async def test_env_overrides_read_timeout(self, monkeypatch):
         from datetime import timedelta
@@ -200,7 +202,7 @@ class TestCallTimeout:
 
         await client._rpc("prowl_get_wallet", {})
 
-        assert client._session.calls[0]["read_timeout_seconds"] == timedelta(seconds=42)
+        assert client._session.calls[0]["read_timeout_seconds"] == call_timeout(timedelta(seconds=42))
 
     async def test_invalid_env_falls_back_to_default(self, monkeypatch):
         from datetime import timedelta
@@ -211,7 +213,7 @@ class TestCallTimeout:
 
         await client._rpc("prowl_get_wallet", {})
 
-        assert client._session.calls[0]["read_timeout_seconds"] == timedelta(seconds=180)
+        assert client._session.calls[0]["read_timeout_seconds"] == call_timeout(timedelta(seconds=180))
 
 
 class TestStreamClosureRetry:

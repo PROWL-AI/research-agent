@@ -47,9 +47,19 @@ async def test_list_runbooks_needs_no_keys(wired):
     assert any(i["name"] == "competitors" for i in entry["inputs"])
 
 
+def _unpack(result):
+    """(content blocks, structured content) of a server's call_tool answer: SDK 1 answers a tuple or the blocks,
+    SDK 2 a CallToolResult (B-112)."""
+    if isinstance(result, tuple):
+        return result
+    if hasattr(result, "content"):
+        return result.content, getattr(result, "structured_content", None)
+    return result, None
+
+
 async def test_list_runbooks_via_fastmcp_call_tool(wired):
     result = await srv.mcp.call_tool("research.list_runbooks", {})
-    blocks, structured = result if isinstance(result, tuple) else (result, None)
+    blocks, structured = _unpack(result)
     payload = structured["result"] if structured else json.loads(blocks[0].text)
     assert any(rb["name"] == "mini-teardown" for rb in payload)
 
@@ -229,11 +239,11 @@ async def test_status_and_report_serialize_through_fastmcp(wired, fake_llm):
     await srv.research_run("mini-teardown", {"competitors": ["a.com"]}, run_id="mcp-ser", wait=True)
     for tool in ("research.get_status", "research.get_report"):
         result = await srv.mcp.call_tool(tool, {"run_id": "mcp-ser"})
-        blocks, structured = result if isinstance(result, tuple) else (result, None)
+        blocks, structured = _unpack(result)
         payload = structured["result"] if structured and "result" in structured else (
             structured or json.loads(blocks[0].text))
         assert payload["run_id"] == "mcp-ser"
     status = await srv.mcp.call_tool("research.get_status", {"run_id": "mcp-ser"})
-    blocks, structured = status if isinstance(status, tuple) else (status, None)
+    blocks, structured = _unpack(status)
     body = structured.get("result", structured) if structured else json.loads(blocks[0].text)
     assert isinstance(body["counters"], dict) and body["counters"]["data_calls"] == 1
