@@ -4,6 +4,12 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.13 (2026-11-13)
+
+- A Prowl tool result larger than 1 MiB reaches the run again (B-130): MCP SDK 2 caps one server-sent event at 1 MiB
+  by default and SDK 1 had no cap, so since 0.6.8 a Lighthouse audit of a real page was refused by our own client
+  ("Server-sent event exceeded the 1048576 byte limit"). The client now asks for 32 MiB, still a bound.
+
 ## 0.6.12 (2026-11-13)
 
 - A plan or a report draft cut at the model's output limit is asked once more with reasoning off (B-128). The

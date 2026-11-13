@@ -1,6 +1,25 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-13 (night): 0.6.11 and 0.6.12 (supersedes every "Exact next task" below)
+## Current entry, 2026-11-13 (late night): 0.6.12 everywhere, domain-baseline 1.1 accepted (supersedes every "Exact next task" below)
+
+- 0.6.12 (`c50c58d`, tag `v0.6.12`) runs on cloud `prowl-research` (build `e6df621b`), the Appvillis copy (`6bff9ce`,
+  build `33a2747a`), the three Studio spaces (18765, 18766, 18767) and the MacBook service; every one answers `ready`,
+  `degraded: []` (read from `/.well-known/fabric-service`). The MacBook service had no model key in its vault folder;
+  the OpenRouter door issued `prowl-research-macbook` (account `sshlg`, $15 a month, project `prowl-research`) into
+  `prowl-research-agent/prod/RESEARCH_LLM_API_KEY`.
+- domain-baseline 1.1 acceptance on the Studio space `sshlg`, `pr-8ca06955600a3e5fd3be`: `moz_site_metrics`,
+  `moz_brand_authority` and `moz_ranking_keywords_count` completed and the report cites them; 0 em dashes; lint 10 to
+  0; tool spend $1.47, LLM $1.29. B-128 fired live (the plan cut at 8000 and 24000, then planned with reasoning off in
+  56 s). The run ended `partial` at `max_minutes=25` (48 of 71 steps): planning took 10 of the 25 minutes (B-129).
+- B-130 (0.6.13, this change): SDK 2's 1 MiB event cap refused the Lighthouse result; raised to 32 MiB.
+
+**Exact next tasks:** (1) deploy 0.6.13 everywhere as 0.6.12 was (clouds through `scripts/cloud.py deploy` from the
+Studio space with the Heroku token on stdin, the Appvillis copy through `scripts/build_team_copy.py`, the spaces with
+`install-fabric-service.py --background`, the MacBook with `install-fabric-service.py`); (2) B-129: measure planning
+with reasoning off from the first call against the current two-step escalation; (3) B-123, the operator's Heroku
+payment by 2026-11-17; (4) the next R31 measurement after 14 days of the clouds.
+
+## Entry, 2026-11-13 (night): 0.6.11 and 0.6.12 (supersedes every "Exact next task" below)
 
 - 0.6.11 (`352b6f6`, tag `v0.6.11`): B-108 closed, writer prompt version 2 and the `copy-check` pattern on the report;
   measured on three saved runs, em dashes 1, 7, 145 to 0, 0, 0
