@@ -145,7 +145,7 @@ def _cmd_list_runbooks() -> int:
     print(
         "\nbudgets cap tool calls; the run's own LLM spend is capped by max_llm_usd "
         "(--max-llm-usd, RESEARCH_MAX_LLM_USD, a resumed run's recorded cap, the runbook, else 5; "
-        "checked before each call) — see stats.llm_budget"
+        "checked before each call); see stats.llm_budget"
     )
     return 0
 
@@ -417,7 +417,7 @@ def _cmd_prune(older_than: str, keep_last: int, yes: bool) -> int:
 
     runs_root = _runs_root()
     if not runs_root.is_dir():
-        print("no runs/ directory — nothing to prune")
+        print("no runs/ directory: nothing to prune")
         return 0
 
     now = datetime.now(timezone.utc)
@@ -482,7 +482,7 @@ def _cmd_prune(older_than: str, keep_last: int, yes: bool) -> int:
         finally:
             lock.release()
     if not yes and candidates:
-        print(f"\ndry-run: {len(candidates)} run(s) would be deleted — re-run with --yes to delete")
+        print(f"\ndry-run: {len(candidates)} run(s) would be deleted; re-run with --yes to delete")
     else:
         print(f"\n{deleted if yes else len(candidates)} run(s) {'deleted' if yes else 'to prune'}")
     return 0
