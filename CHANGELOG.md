@@ -4,6 +4,14 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.8 (2026-11-13)
+
+- The MCP SDK is version 2 (B-112): `mcp>=2.3,<3` with `httpx2`. The Prowl client connects with
+  `streamable_http_client` and an `httpx2` client (30 s connect, 300 s read), the local stdio server is `MCPServer`
+  (it answers `server/discover` of protocol 2026-07-28 as the cloud service already did), and the result fields of
+  either SDK are read through `research_agent/mcp_compat.py`, so an environment that still has SDK 1 keeps working.
+  Probed live: the client on SDK 2 read the Prowl wallet from prowl.chat.
+
 ## 0.6.7 (2026-11-13)
 
 - The points of a series are no longer a conflict (B-127): when every valued claim of a subject names its period and
