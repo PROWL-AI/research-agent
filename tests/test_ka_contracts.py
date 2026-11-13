@@ -1050,7 +1050,7 @@ class _TimeoutOnceClient:
     reports it (McpError 408); later dispatches answer."""
 
     def __new__(cls):
-        from mcp.shared.exceptions import McpError
+        from research_agent.mcp_compat import McpError
         from mcp.types import CallToolResult, ErrorData
 
         from research_agent.prowl_client import ProwlClient

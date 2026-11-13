@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 import httpx
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from research_agent.mcp_compat import open_streams
 
 
 async def main():
@@ -15,7 +15,7 @@ async def main():
         token = (root / "host.token").read_text().strip()
         return httpx.get(origin + "/fabric/v1/usage", headers={"Authorization": "Bearer " + token}, timeout=10).json()["days"]
     role = (Path.home() / ".config/agentgateway/secrets/roles/prowl").read_text().strip()
-    async with streamablehttp_client("http://127.0.0.1:47845/mcp/prowl-research", headers={"x-agw-key": role}) as (r, w, _):
+    async with open_streams("http://127.0.0.1:47845/mcp/prowl-research", {"x-agw-key": role}) as (r, w):
         async with ClientSession(r, w) as mcp:
             await mcp.initialize()
             # One key per smoke run: a fixed key returned an earlier smoke's completed job,

@@ -364,7 +364,7 @@ async def test_a_job_created_before_a_limit_is_refused_at_dispatch_with_its_reas
 async def test_an_outcome_unknown_resend_sends_what_the_earlier_attempt_sent(lookup_runbook, tmp_path, monkeypatch):
     """The re-send reuses its key and the server matches key with params: a value first sent as
     'gb' (before its limit was known) is re-sent as 'gb', never as the new spelling 'GB'."""
-    from mcp.shared.exceptions import McpError
+    from research_agent.mcp_compat import McpError
     from mcp.types import CallToolResult, ErrorData
 
     from research_agent.prowl_client import ProwlClient
@@ -405,7 +405,7 @@ async def test_a_dispatched_step_is_resent_not_relabelled_by_a_rule_learned_sinc
                                                                                    monkeypatch, value):
     """An outcome_unknown step was sent: a limit or template rule that lands before the resume
     re-sends it under its key rather than calling it "not sent"."""
-    from mcp.shared.exceptions import McpError
+    from research_agent.mcp_compat import McpError
     from mcp.types import CallToolResult, ErrorData
 
     from research_agent.prowl_client import ProwlClient
@@ -454,7 +454,7 @@ class _TimeoutOnce:
 
     @staticmethod
     def make():
-        from mcp.shared.exceptions import McpError
+        from research_agent.mcp_compat import McpError
         from mcp.types import CallToolResult, ErrorData
 
         from research_agent.prowl_client import ProwlClient
