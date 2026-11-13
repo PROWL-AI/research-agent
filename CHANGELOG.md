@@ -6,6 +6,8 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- `scripts/configure_service.py` changes a running service's settings through its own API (login code, session, the
+  form's revision check): the operator's settings change needs no click, on the local service and on a cloud one.
 - A writer draft that comes back empty because reasoning took the whole output budget is asked once more with
   reasoning off, instead of losing the report (B-122).
 - An issuing desk on the cloud instance (B-121): `client add-desk` gives a team's key steward a `keys.issue` key; it
