@@ -20,7 +20,7 @@ from research_agent.config import Config, ConfigError, resolve_llm_cap
 from research_agent.service.delegation import require_owner
 from research_agent.llm import LLMClient, LLMError
 from research_agent.prowl_client import ProwlClient, ToolCallError
-from research_agent.runbook import get_runbook, list_runbooks
+from research_agent.runbook import RunbookError, get_runbook, list_runbooks
 from . import allowance
 from .store import Store, Conflict, digest, now
 
@@ -244,6 +244,26 @@ def out_of_space(exc: BaseException | None) -> bool:
     return False
 
 
+#: B-124: a research job's deadline covers its runbook's own time budget (`budget.max_minutes`, when the orchestrator
+#: stops calling tools) plus the report written after it. The service's `timeout_minutes` (15 by default) used to cut
+#: every 20-minute runbook before its report: both acceptance runs of 2026-11-13 ended `timeout` with their evidence
+#: gathered and no report.
+REPORT_MARGIN_MINUTES = 15
+
+
+def deadline_minutes(job) -> int:
+    """The job's wall-clock deadline: the service's setting, or longer when the runbook's budget needs it."""
+    setting = int(job["config"]["timeout_minutes"])
+    request = job["request"]
+    if request.get("kind") != "research":
+        return setting
+    try:
+        budget = get_runbook(request["runbook"]).meta.budget
+    except (RunbookError, KeyError):
+        return setting
+    return max(setting, int(budget.max_minutes) + REPORT_MARGIN_MINUTES)
+
+
 def disk_free(root) -> int:
     """Free bytes on the volume that holds the service's data (B-114)."""
     return shutil.disk_usage(root).free
@@ -356,7 +376,7 @@ class Runtime:
                     self.store.note(job_id, "job.disk_wait", "Мало места на диске: запрос ждёт в очереди, пока место не освободится.")
                     told = True
                 await asyncio.sleep(DISK_POLL_SECONDS)
-            async with asyncio.timeout(initial["config"]["timeout_minutes"] * 60):
+            async with asyncio.timeout(deadline_minutes(initial) * 60):
                 while True:
                     working = [j for j in self.store.jobs() if j["status"] == "working"]
                     active = sum(j["phase"] == "executing" for j in working)
