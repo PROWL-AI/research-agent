@@ -167,3 +167,15 @@ def test_the_report_renders_with_template_v2_and_the_shipped_v1_stays(tmp_path):
     assert (templates / "base.html.j2").is_file()
     source = (Path(__file__).resolve().parents[1] / "research_agent" / "report" / "render.py").read_text()
     assert 'get_template("base.v2.html.j2")' in source
+
+
+def test_messages_people_read_carry_no_em_dash():
+    """B-108 (rule R30): the CLI's messages and the evidence-only report heading read without an em dash."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1] / "research_agent"
+    for path, needle in [(root / "agent" / "writer.py", "PARTIAL, evidence only"), (root / "config.py", "PROWL_API_KEY is not set: "),
+                         (root / "__main__.py", "nothing to prune")]:
+        text = path.read_text(encoding="utf-8")
+        line = next(x for x in text.splitlines() if needle in x)
+        assert "—" not in line, line

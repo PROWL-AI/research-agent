@@ -193,7 +193,7 @@ def ledger_only_report(runbook: Runbook, ledger: Ledger, reason: str,
     A person reads this listing, so its source coverage is each limit's
     `statement` (tool_limits.statements), never the writer's instruction (B-077)."""
     lines = [
-        f"# {runbook.meta.name} — PARTIAL: evidence only",
+        f"# {runbook.meta.name}: PARTIAL, evidence only",
         "",
         f"The LLM budget ran out before the report could be written ({reason}). "
         "Below is the evidence ledger as gathered; no synthesis, no conclusions. "

@@ -100,7 +100,7 @@ class Config:
         prowl_api_key = env.get("PROWL_API_KEY", "").strip()
         if require_prowl and not prowl_api_key:
             raise ConfigError(
-                "PROWL_API_KEY is not set — get a key at https://prowl.chat and export it"
+                "PROWL_API_KEY is not set: get a key at https://prowl.chat and export it"
             )
 
         llm_api_key = (
@@ -109,7 +109,7 @@ class Config:
         )
         if require_llm and not llm_api_key:
             raise ConfigError(
-                "no LLM key found — set RESEARCH_LLM_API_KEY or OPENROUTER_API_KEY"
+                "no LLM key found: set RESEARCH_LLM_API_KEY or OPENROUTER_API_KEY"
             )
 
         model_strong = env.get("RESEARCH_LLM_MODEL_STRONG", DEFAULT_LLM_MODEL_STRONG).strip() or DEFAULT_LLM_MODEL_STRONG
