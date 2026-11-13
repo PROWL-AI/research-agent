@@ -275,3 +275,25 @@ class TestStreamClosureRetry:
         assert result is not None
         assert isinstance(client._session, StubSession)
         assert client._session.calls[0]["name"] == "prowl_get_wallet"
+
+
+async def test_one_sse_event_may_carry_more_than_the_sdk_default(monkeypatch):
+    """B-130: SDK 2 refused a Lighthouse result over 1 MiB ("Server-sent event exceeded the 1048576 byte limit",
+    acceptance pr-8ca06955600a3e5fd3be); the client asks for the larger, still bounded, cap."""
+    from contextlib import asynccontextmanager
+
+    from research_agent import mcp_compat
+
+    if mcp_compat.SDK != 2:
+        pytest.skip("SDK 1 has no event cap")
+    seen = {}
+
+    @asynccontextmanager
+    async def fake(url, **kwargs):
+        seen.update(kwargs)
+        yield ("read", "write", None)
+
+    monkeypatch.setattr(mcp_compat, "streamable_http_client", fake)
+    async with mcp_compat.open_streams("https://prowl.invalid/mcp", {}) as streams:
+        assert streams == ("read", "write")
+    assert seen["max_sse_event_size"] == mcp_compat.MAX_SSE_EVENT_BYTES > 1024 * 1024

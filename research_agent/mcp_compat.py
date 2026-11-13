@@ -31,6 +31,10 @@ except ImportError:  # SDK 1
 #: The read deadline of a long tool call: Prowl's research and SERP tools can take minutes.
 CONNECT_TIMEOUT_S = 30.0
 READ_TIMEOUT_S = 300.0
+#: B-130: SDK 2 caps one SSE event at 1 MiB and SDK 1 had no cap; a Lighthouse audit of a real page is larger
+#: (domain-baseline 1.1 acceptance `pr-8ca06955600a3e5fd3be`, 2026-11-13: "Server-sent event exceeded the 1048576
+#: byte limit"). One tool result per event, so the cap stays, at a size a provider's answer fits in.
+MAX_SSE_EVENT_BYTES = 32 * 1024 * 1024
 
 
 @asynccontextmanager
@@ -38,7 +42,7 @@ async def open_streams(url: str, headers: dict[str, str]) -> AsyncIterator[tuple
     """(read, write) streams of a streamable HTTP connection, whichever SDK is installed."""
     if SDK == 2:
         async with httpx2.AsyncClient(headers=headers, timeout=httpx2.Timeout(CONNECT_TIMEOUT_S, read=READ_TIMEOUT_S)) as http:
-            async with streamable_http_client(url, http_client=http) as streams:
+            async with streamable_http_client(url, http_client=http, max_sse_event_size=MAX_SSE_EVENT_BYTES) as streams:
                 yield streams[0], streams[1]
     else:
         async with streamablehttp_client(url, headers=headers) as streams:
