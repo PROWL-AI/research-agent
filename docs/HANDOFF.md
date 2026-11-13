@@ -1,5 +1,25 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-13: 0.6.0 everywhere (supersedes every "Exact next task" below)
+
+Installed and checked: local `prowl-research.default` 0.6.0 (`04fdcac`, smoke PASS), cloud `prowl-research` and the
+Appvillis copy (`3244b07`) deployed; strong model `moonshotai/kimi-k3.1-pro` and cheap `deepseek/deepseek-v4.1-flash`
+set on all three through `scripts/configure_service.py` (the local service had run on `anthropic/claude-sonnet-4.5` and
+`google/gemini-2.5-flash` from old settings). Keys on the Appvillis copy: `studio-appvillis`, `seo-content-agent`
+(300 USD a day, the operator's DEC-0018), `esim-vm` (in Аня's slot), Аня's desk `ania` (`keys.issue`, grants read,
+research.run, tools.call, up to 300 USD a key). Board: Аня thread `a02c2f0c` (desk tools sent), Research Agent thread
+`96893d02` (its state promised by 2026-11-15), the agents database took both feedback records.
+
+Closed since the last entry: B-107 (measured, [report](reports/2026-11-13-strong-model-measure/README.md)), B-108 (part),
+B-109, B-110, B-114, B-120, B-121, B-122. Open: B-111 (the two clouds' own Prowl keys, a sign-in at prowl.chat), B-106,
+B-112 (SDK 2 migration plan in the row), B-113, B-115, the rest of B-108 (the writer prompt's dashes, a measured new
+prompt version).
+
+**Exact next task:** when the operator has made the two Prowl keys (B-111), put each into its slot
+(`prowl-research-cloud/prod/PROWL_API_KEY`, `appvillis-com-appvillis-prowl-research/prod/PROWL_API_KEY`), run
+`scripts/cloud.py config --app <app> PROWL_API_KEY` under `use_secret.py run`, tell seo-content-agent (cross-session)
+and Аня (thread `a02c2f0c`); then one paid research run per cloud as the live acceptance of B-100 and B-107.
+
 ## Current entry, 2026-11-12: audit, 0.5.0 allowance, rollout to every instance (supersedes every "Exact next task" below)
 
 Operator, 2026-11-12, this session (Fabric task `afcbab45`): audit this agent and the personal Research Agent against
