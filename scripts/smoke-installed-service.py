@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 import httpx
 from mcp import ClientSession
-from research_agent.mcp_compat import open_streams
+from research_agent.mcp_compat import is_error, open_streams, structured
 
 
 async def main():
@@ -38,14 +38,14 @@ async def main():
                 },
                 meta={"traceparent": "00-" + "a1" * 16 + "-" + "b2" * 8 + "-01"},
             )
-            assert not result.isError
-            job_id = result.structuredContent["job"]["id"]
+            assert not is_error(result)
+            job_id = structured(result)["job"]["id"]
             # B-100 (0.5.0): the free tutorial starts on the caller's allowance, no operator session needed.
-            pending = (await mcp.call_tool("fabric.job.get", {"id": job_id})).structuredContent["job"]
+            pending = structured(await mcp.call_tool("fabric.job.get", {"id": job_id}))["job"]
             assert pending["status"] in {"working", "completed"}, pending["status"]
             for _ in range(40):
                 result = await mcp.call_tool("fabric.job.get", {"id": job_id})
-                job = result.structuredContent["job"]
+                job = structured(result)["job"]
                 if job["status"] == "completed":
                     break
                 await asyncio.sleep(0.2)
