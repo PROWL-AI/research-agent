@@ -4,6 +4,13 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.4 (2026-11-13)
+
+- A research job's deadline covers its runbook's time budget plus 15 minutes for the report (B-124). The service's
+  `timeout_minutes` (15 by default) cut every 20-minute runbook before its report: both acceptance runs of 2026-11-13
+  ended `timeout` with their evidence gathered. The setting still wins when it is longer; tool calls and the tutorial
+  keep it.
+
 ## 0.6.3 (2026-11-13)
 
 - Client keys of the cloud instance have a class (K1, the operator's word of 2026-11-13): `interactive` for a person
