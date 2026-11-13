@@ -6,6 +6,8 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- `metrics.json` and `scripts/measure_metrics.py` (B-114, rule R31): the research template's metrics, measured from local
+  files; the first baseline is a verified claim share of 0.411 over 3355 claims of 14 runs.
 - A runbook runs at an exact version: `research.run` with `runbook: "market-pulse@1.0"` takes the current text or the
   shipped one kept in `versions/` (B-110, rule R28).
 - Reports render with `base.v2.html.j2`: the partial-run banner reads without an em dash (B-108, rule R30). The shipped
