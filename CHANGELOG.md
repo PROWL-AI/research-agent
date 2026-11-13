@@ -4,6 +4,14 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.10 (2026-11-13)
+
+- `competitor-seo`, `domain-baseline` and `seo-site-audit` 1.1 use Prowl's Moz tools (B-113): Moz Domain Authority,
+  Spam Score and Brand Authority beside DataForSEO and Majestic, `moz_v2_link_intersect` as the third index of the
+  link gap (a prospect in two of three is on the shortlist), the pages that earn a competitor's links, Page Authority
+  per audited page. Their text carries no em dash, which the writer copied into reports (B-108). The 1.0 texts stay in
+  `versions/1.0.md` and run with `runbook: "<name>@1.0"` (R28).
+
 ## 0.6.9 (2026-11-13)
 
 - The cloud's client keys follow the agents database pattern `client-keys` 1.1.0 where its store differs (B-104):
