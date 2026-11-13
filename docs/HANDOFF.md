@@ -1,6 +1,22 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-13 (late): live acceptance of B-100 and B-107 done; 0.6.6 (supersedes every "Exact next task" below)
+## Current entry, 2026-11-13 (closing): 0.6.7 everywhere (supersedes every "Exact next task" below)
+
+0.6.7 (`e6161b1`, tag `v0.6.7`) runs on the local service (smoke PASS, `pr-3a2fe982769038352889`), cloud
+`prowl-research` (build `622cf1bc`) and the Appvillis copy (`68009c4`, its suite 915 passed, build `c820f7a0`). The
+three Studio definitions name `e6161b1` and still wait for studio-agent's first `apply` (thread `7da412ee`).
+Since the acceptance entry below: B-127 closed (the points of a series were read as a conflict; the personal
+acceptance ledger reloaded: verified 0.31 to 0.68, conflicts 90 to 15), and B-126 deployed (0.6.6).
+
+Lesson for the copy sync: a pipe into `tail` hid a red suite once (the copy's `main` took a failing commit, the deploy
+gate refused it, fixed in PR #100). Every chain that gates on a suite runs under `set -o pipefail`.
+
+**Exact next tasks:** (1) when a Studio daemon answers, switch that space's entry to it and close B-106; (2) B-123,
+the operator's Heroku payment by 2026-11-17; (3) the next R31 measurement of `verified_claim_share` over the clouds'
+first 14 days, which replaces the 0.411 baseline measured under the old conflict rule; (4) B-108 rest, the writer
+prompt's dashes, with a measured prompt version.
+
+## Entry, 2026-11-13 (late): live acceptance of B-100 and B-107 done; 0.6.6 (supersedes every "Exact next task" below)
 
 Acceptance on both clouds, one `market-pulse` run each through the Studio spaces' client keys:
 
