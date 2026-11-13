@@ -18,6 +18,9 @@ from research_agent.service.store import Store
 
 from test_cloud_clients import SqliteAsPostgres
 
+#: The allowance is off in other test modules (conftest); here it is the subject.
+pytestmark = pytest.mark.allowance
+
 RESEARCH = {"kind": "research", "runbook": "market-pulse", "inputs": {"market": "eSIM"}}
 
 
