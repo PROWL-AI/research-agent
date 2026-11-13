@@ -4,6 +4,11 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.6 (2026-11-13)
+
+- A `bing_news` step with a `time_period` the provider refuses (`month`, `year`) is not sent, and the planner is told
+  the ten periods it takes (B-126); the writer is told a Bing News result covers 30 days at most.
+
 ## 0.6.5 (2026-11-13)
 
 - A cloud instance's approval link opens its own page in Fabric Dashboards (`<id>.cloud`), not the local service's

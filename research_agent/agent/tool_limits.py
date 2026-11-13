@@ -40,7 +40,28 @@ _TIKTOK_ADS_COUNTRIES = frozenset({
     "LV", "LI", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "CH", "TR", "GB",
 })
 
+#: SearchApi's Bing News `time_period` (the refusal of 2026-11-13 lists these; the engine's schema enumerates the same
+#: ten). There is no month or year window: a pulse over months reads Bing News for its last 30 days at most.
+_BING_NEWS_PERIODS = frozenset({
+    "last_minute", "last_5_minutes", "last_15_minutes", "last_30_minutes", "last_hour", "last_4_hours",
+    "last_6_hours", "last_24_hours", "last_7_days", "last_30_days",
+})
+
 LIMITS: dict[str, dict[str, ArgumentLimit]] = {
+    "bing_news": {
+        "time_period": ArgumentLimit(
+            allowed=_BING_NEWS_PERIODS,
+            note=("Bing News `time_period` takes only last_minute, last_5_minutes, last_15_minutes, last_30_minutes, "
+                  "last_hour, last_4_hours, last_6_hours, last_24_hours, last_7_days or last_30_days; `month`, `year` "
+                  "and longer windows are refused. For a window of months pass last_30_days or leave it out."),
+            source=("B-126: both acceptance runs of 2026-11-13 (pr-4970f08d4eb0383bf89e, pr-71cff1b75b7cad5a0999) "
+                    "sent `month` and got HTTP 400 \"Unsupported value `month` in time_period parameter\""),
+            coverage=("`bing_news` results cover at most the last 30 days: never read them as a count over a longer "
+                      "window, and say so where the pulse window is longer."),
+            statement="Bing News: at most the last 30 days; a longer window is not available from this source.",
+            statement_ru="Bing News: не больше последних 30 дней; более длинного окна у этого источника нет.",
+        ),
+    },
     "tiktok_ads_library": {
         "country": ArgumentLimit(
             allowed=_TIKTOK_ADS_COUNTRIES,
