@@ -48,3 +48,13 @@ async def open_streams(url: str, headers: dict[str, str]) -> AsyncIterator[tuple
 def call_timeout(value: timedelta) -> Any:
     """A tool call's read deadline as the installed SDK takes it."""
     return value.total_seconds() if SDK == 2 else value
+
+
+def structured(result: Any) -> Any:
+    """A tool result's structured content (`structuredContent` in SDK 1, `structured_content` in SDK 2)."""
+    return getattr(result, "structured_content", None) if SDK == 2 else getattr(result, "structuredContent", None)
+
+
+def is_error(result: Any) -> bool:
+    """Whether a tool result is an error (`isError` in SDK 1, `is_error` in SDK 2)."""
+    return bool(getattr(result, "is_error", None) if SDK == 2 else getattr(result, "isError", None))

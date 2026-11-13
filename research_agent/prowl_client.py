@@ -16,7 +16,7 @@ from anyio import BrokenResourceError, ClosedResourceError, EndOfStream
 from mcp import ClientSession
 from mcp.types import CallToolResult, TextContent
 
-from research_agent.mcp_compat import HTTP_ERRORS, McpError, call_timeout, open_streams
+from research_agent.mcp_compat import HTTP_ERRORS, McpError, call_timeout, is_error, open_streams, structured
 
 log = logging.getLogger(__name__)
 
@@ -249,7 +249,7 @@ class ProwlClient:
             error.stops_run = error_class in STOPPING_ERROR_CLASSES
             raise error
 
-        if result.isError:
+        if is_error(result):
             record.error = _content_text(result)
             error = ToolCallError(f"{prowl_tool}: tool returned error: {record.error[:300]}")
             error.cost_usd = record.cost_usd
@@ -344,8 +344,8 @@ def _content_text(result: CallToolResult) -> str:
 
 
 def _parse_content(result: CallToolResult) -> Any:
-    if result.structuredContent is not None:
-        content = result.structuredContent
+    if structured(result) is not None:
+        content = structured(result)
         if isinstance(content, dict) and set(content) == {"result"}:
             inner = content["result"]
             if isinstance(inner, str):
