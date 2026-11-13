@@ -6,6 +6,8 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- `scripts/configure_service.py` changes a running service's settings through its own API (login code, session, the
+  form's revision check): the operator's settings change needs no click, on the local service and on a cloud one.
 - An issuing desk on the cloud instance (B-121): `client add-desk` gives a team's key steward a `keys.issue` key; it
   issues, rotates, revokes and lists only its own keys through the MCP tools `client.issue|rotate|revoke|list`, within
   the grants and ceiling its desk was given. The tool descriptions now state the allowance rule.
