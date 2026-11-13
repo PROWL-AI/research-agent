@@ -105,9 +105,8 @@ replace: the installer exits 77 and prints the line the administrator (studio-ag
 later install is the space's own. A port another listener holds is refused unless this account's descriptor claims it.
 Start, stop, restart and status: `sudo -n /usr/local/libexec/studio-space-service <verb> <label>`.
 
-Ports: `sshlg` 18765, `passioncode` 18766, `assessment` 18767 (the MacBook keeps 18764). Keys: each space's vault
-folder `prowl-research-agent` holds `PROWL_API_KEY` and its own `RESEARCH_LLM_API_KEY`
-(`prowl-research-studio-<account>`, USD 15 a month).
+Each space has its own port (the default 18764 stays with a machine's main account) and its own keys in its vault
+folder: `PROWL_API_KEY` and its own `RESEARCH_LLM_API_KEY`. Which space runs on which port is in the handoff.
 
 Claude Code reaches it without a token in its configuration: `scripts/mcp_headers.py` is the entry's `headersHelper`
 and prints the bearer header from the service's agent token, a 0600 file only this account can read. On a loopback other
