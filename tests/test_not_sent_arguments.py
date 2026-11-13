@@ -94,6 +94,16 @@ def test_the_tiktok_country_limit_refuses_us_and_takes_all_and_europe():
     assert tool_limits.refused("meta_ad_library", {"country": "US"}) == []  # no limit known: sent
 
 
+def test_the_bing_news_window_refuses_month_and_takes_its_ten_periods():
+    """B-126: both acceptance runs of 2026-11-13 paid for `time_period: month` refused with HTTP 400."""
+    assert tool_limits.refused("bing_news", {"q": "eSIM", "time_period": "month"}) == ["time_period='month'"]
+    for ok in ("last_30_days", "last_7_days", "LAST_24_HOURS"):
+        assert tool_limits.refused("bing_news", {"q": "eSIM", "time_period": ok}) == []
+    assert tool_limits.refused("bing_news", {"q": "eSIM"}) == []
+    assert tool_limits.canonical("bing_news", {"time_period": "LAST_30_DAYS"})["time_period"] == "last_30_days"
+    assert "30 days" in tool_limits.coverage_notes(["bing_news"])[0]
+
+
 def test_the_planner_is_told_the_limits_of_its_runbook_tools():
     notes = tool_limits.planner_notes(["meta_ad_library", "tiktok_ads_library"])
     assert notes.startswith("- `tiktok_ads_library` `country`:") and "`all`" in notes

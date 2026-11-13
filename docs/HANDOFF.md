@@ -1,6 +1,29 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-13 (night): 0.6.3, key classes K1, B-111 closed (supersedes every "Exact next task" below)
+## Current entry, 2026-11-13 (late): live acceptance of B-100 and B-107 done; 0.6.6 (supersedes every "Exact next task" below)
+
+Acceptance on both clouds, one `market-pulse` run each through the Studio spaces' client keys:
+
+| Cloud | First job | Continued | Outcome | Report | Claims (verified) | Cost of the continued job |
+|---|---|---|---|---|---|---|
+| `prowl-research` | `pr-4970f08d4eb0383bf89e`: started on the key's allowance, ended `timeout` at 15 min | `pr-9a55099f6972307f0a5b` | partial (`budget_minutes`), report discloses what is missing | 182 lines | 192 (59) | 0.41 USD |
+| Appvillis copy | `pr-71cff1b75b7cad5a0999`: the same | `pr-39af2ae7ed0b615b3267` | succeeded, every planned step | 193 lines | 298 (92) | 0.36 USD |
+
+- B-100 holds: a job within the key's ceiling started at once (`by: allowance`); the continuation above the 10 USD
+  ceiling of an automated key waited, and was approved through the service's API with its token (dashboard parity,
+  `by: operator`).
+- B-107 holds: both reports were written by `moonshotai/kimi-k3.1-pro` (6 and 7 strong calls), extraction by
+  `deepseek/deepseek-v4.1-flash`.
+- Found and fixed the same day: B-124 (0.6.4, the deadline cut the report), B-125 (0.6.5, the cloud's approval link
+  named the local service), B-126 (0.6.6, Bing News `time_period: month` refused). Open: B-127 (verified share 0.31
+  against the 0.411 baseline), B-108 rest (6 and 25 em dashes from the writer). Reports and ledgers stay in the Studio
+  spaces (`~/DATA/_worktrees/accept-personal` in `sshlg`, `~/accept-appvillis` in `appvillis`), not in this repository.
+
+Both clouds run 0.6.5 (`ready`, `degraded: []`); 0.6.6 changes only the planner's limits and deploys with the next
+service change. **Exact next task:** B-127 from the two ledgers; meanwhile the Studio daemons' first `apply` (studio-agent,
+thread `7da412ee`, definitions at `43d9845`) and B-123 (Heroku payment by 2026-11-17) stay open.
+
+## Entry, 2026-11-13 (night): 0.6.3, key classes K1, B-111 closed (supersedes every "Exact next task" below)
 
 0.6.3 (`a3cc834`, tag `v0.6.3`, PR #94) builds Аня's spec K1 section 1 (DEC-0074 of `ania-agent-appvillis`, the
 operator's word of 2026-11-13): a cloud client key is `interactive` (no daily ceiling, its paid job starts at once,
