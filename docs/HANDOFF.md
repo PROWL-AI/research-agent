@@ -1,6 +1,20 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-13: 0.6.0 everywhere (supersedes every "Exact next task" below)
+## Current entry, 2026-11-13 (later): 0.6.1 everywhere, Heroku billing gate (supersedes every "Exact next task" below)
+
+0.6.1 (`574323b`, tag `v0.6.1`, PR #90) closes B-102: text from pages and tools is fenced with the agents database
+pattern `untrusted-fence` 1.2.1. Installed and checked: local `prowl-research.default` (release `574323b18bbe`, smoke
+PASS, job `pr-e5ad5d018d6b05e9dbc9`), cloud `prowl-research` (Heroku build `060ab013`, well-known 0.6.1 `ready`,
+`degraded: []`), Appvillis copy (`3a48fad`, its suite 882 passed, build `e48cbfaf`, 0.6.1, degraded only by the missing
+Prowl key, B-111). Studio `sshlg`, `passioncode`, `assessment`, `appvillis`: MCP Connected (`claude mcp list`).
+B-099 closed (its state was stale). Research Agent (thread `96893d02`) confirmed its plan: the PassionCode copy's state by
+2026-11-18 18:00 UTC.
+
+New gate B-123: Heroku marks the personal account delinquent and will suspend it on 2026-11-17 17:18 CET; that takes the
+personal cloud and with it research on three Studio spaces. Payment is the operator's (notified through the
+communicator). **Exact next task:** B-106, the install on the Studio itself, which needs no Heroku; then B-111 as below.
+
+## Entry, 2026-11-13: 0.6.0 everywhere (supersedes every "Exact next task" below)
 
 Installed and checked: local `prowl-research.default` 0.6.0 (`04fdcac`, smoke PASS), cloud `prowl-research` and the
 Appvillis copy (`3244b07`) deployed; strong model `moonshotai/kimi-k3.1-pro` and cheap `deepseek/deepseek-v4.1-flash`
