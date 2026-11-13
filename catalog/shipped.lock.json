@@ -8,6 +8,7 @@
   "runbook/competitor-seo@1.1": "sha256:7cb9cb5ed96e52b2ed01131753e495216ce7fcb68c66d8e1646d1aec24d870c7",
   "runbook/domain-baseline@1.0": "sha256:5009bc3aff0cb7960a1ebc631da067aa967895ba4dd0f4eda46c7bd2d6f34e9a",
   "runbook/domain-baseline@1.1": "sha256:7e091025f95b8d4d47ef144c302a1cb0e65c03f7e1451449ea88698b15106458",
+  "runbook/domain-baseline@1.2": "sha256:7982cbe1f470489c4c172b3929a8ec2de3fbb836cd48f7da77cc50e5fb2ac853",
   "runbook/finance-equity-research@1.0": "sha256:0aac2d9b99c93dbaa7c75bf12ad70384f82ccba153ea850116af49ebd377563f",
   "runbook/growth-signals@1.0": "sha256:2a341ddc0fa194dad3bd26a025e2302c0ef15bb6312f750e9e238af4bec524e9",
   "runbook/idea-validation@1.0": "sha256:002f059990bd71e09421355f7b204f5b85c15d41646b74931e69dff2633841f4",

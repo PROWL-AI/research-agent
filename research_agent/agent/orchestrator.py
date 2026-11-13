@@ -67,6 +67,12 @@ log = logging.getLogger(__name__)
 _RAW_SNIPPET_CHARS = 12_000
 _TRANSFORM_CONTEXT_CHARS = 4_000
 _TRANSFORM_CONTEXT_ARTIFACTS = 3
+#: B-132: a transform reads the artifacts of the steps its instruction names, these many at most, sharing this many
+#: characters (each at least _TRANSFORM_CONTEXT_CHARS). Measured on domain-baseline 1.1 (`pr-8ca06955600a3e5fd3be`):
+#: `select_competitors` named four steps, saw the last three at 4000 characters of indented JSON each, missed the
+#: homepage and every competitor domain, and 8 later steps were not sent.
+_TRANSFORM_NAMED_ARTIFACTS = 8
+_TRANSFORM_NAMED_TOTAL_CHARS = 32_000
 #: Each transform is an LLM call outside every budget — the planner does not
 #: get to spawn them without bound.
 _MAX_TRANSFORM_STEPS = 25
@@ -230,6 +236,39 @@ def build_steps(
             instruction=item.instruction, on_error_skip=item.on_error_skip,
         ))
     return steps
+
+
+
+def _compact_json(text: str) -> str:
+    """A stored raw artifact without its indentation (B-132): the same JSON in about half the characters, so a
+    transform's window holds data instead of whitespace. Text that is not JSON is returned as it is."""
+    try:
+        return json.dumps(json.loads(text), ensure_ascii=False, separators=(",", ":"), default=str)
+    except (ValueError, TypeError):
+        return text
+
+
+def _transform_sources(instruction: str, steps: list[Any]) -> tuple[list[Any], int]:
+    """The data artifacts a transform reads and the characters of each (B-132).
+
+    The steps its instruction names come first, the latest of them when there are more than
+    _TRANSFORM_NAMED_ARTIFACTS, topped up with the most recent others to _TRANSFORM_CONTEXT_ARTIFACTS; they share
+    _TRANSFORM_NAMED_TOTAL_CHARS. An instruction that names no step reads the last _TRANSFORM_CONTEXT_ARTIFACTS at
+    _TRANSFORM_CONTEXT_CHARS each, as before. Plan order: raw names are step ids, so directory order says nothing."""
+    done = [s for s in steps if s.kind == "data" and s.raw_ref and s.state in (COMPLETED, RAW_SAVED)]
+    text = instruction.lower()
+
+    def named(step: Any) -> bool:
+        return any(re.search(rf"(?<![a-z0-9_]){re.escape(name)}(?![a-z0-9_])", text)
+                   for name in {step.step.lower(), plan_bindings.slug(step.step)} if name)
+
+    chosen = [s for s in done if named(s)][-_TRANSFORM_NAMED_ARTIFACTS:]
+    if not chosen:
+        return done[-_TRANSFORM_CONTEXT_ARTIFACTS:], _TRANSFORM_CONTEXT_CHARS
+    need = _TRANSFORM_CONTEXT_ARTIFACTS - len(chosen)
+    if need > 0:
+        chosen = sorted(chosen + [s for s in done if s not in chosen][-need:], key=done.index)
+    return chosen, max(_TRANSFORM_CONTEXT_CHARS, _TRANSFORM_NAMED_TOTAL_CHARS // len(chosen))
 
 
 def validate_plan(
@@ -1099,7 +1138,7 @@ class Orchestrator:
         inputs = plan_bindings.brief_texts(checkpoint.brief)
         # A value grounded only in a raw flagged as an injection never drives a later tool call (B-102). What is
         # scanned is the opening a transform reads of each artifact.
-        verdicts = [scan(t[:_TRANSFORM_CONTEXT_CHARS]).verdict for t in texts]
+        verdicts = [scan(_compact_json(t)[:_TRANSFORM_NAMED_TOTAL_CHARS]).verdict for t in texts]
         flagged = [t for t, v in zip(texts, verdicts) if v == INJECTION]
         clean = [t for t, v in zip(texts, verdicts) if v != INJECTION]
         kept, rejected = plan_bindings.grounded(candidates, names, clean + inputs)
@@ -1115,16 +1154,11 @@ class Orchestrator:
         instruction = record.instruction or (
             json.dumps(record.arguments, ensure_ascii=False) if record.arguments else record.step
         )
-        # The most recent data artifacts in plan order (raw names are step ids,
-        # so directory order says nothing about recency).
-        recent = [
-            s for s in checkpoint.steps
-            if s.kind == "data" and s.raw_ref and s.state in (COMPLETED, RAW_SAVED)
-        ][-_TRANSFORM_CONTEXT_ARTIFACTS:]
+        chosen, chars = _transform_sources(instruction, checkpoint.steps)
         context_parts = []
-        for s in recent:
+        for s in chosen:
             try:
-                snippet = store.read_artifact(s.raw_ref)[:_TRANSFORM_CONTEXT_CHARS]
+                snippet = _compact_json(store.read_artifact(s.raw_ref))[:chars]
             except OSError as exc:
                 log.warning("transform context: %s unreadable: %s", s.raw_ref, exc)
                 continue
