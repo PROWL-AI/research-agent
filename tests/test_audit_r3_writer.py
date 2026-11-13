@@ -206,6 +206,32 @@ class TestWriterDraftTruncation:
         assert draft == "# Clean report\n\nNo numbers here."
         assert seen == [None, None, False]
 
+    async def test_a_cut_answer_with_reasoning_off_ships_instead_of_raising(self, patched_runbooks, tmp_path):
+        """B-128: the reasoning-off retry of two empty drafts came back cut (accept-teardown-20261021b, version 1
+        control, 2026-11-13) and the rewrite raised; its text now ships as a partial report."""
+        from research_agent.agent import writer
+        from research_agent.runbook import get_runbook
+
+        llm = _QueueLLM([
+            LLMError("cut", retryable=False, finish_reason="length", content=None),
+            LLMError("cut", retryable=False, finish_reason="length", content=None),
+            LLMError("cut", retryable=False, finish_reason="length", content="# Report\n\nmost of it"),
+        ])
+        draft = await writer.write_report(
+            llm, get_runbook("mini-teardown"), _one_claim_ledger(tmp_path), {"competitors": ["a.com"]},
+        )
+        assert draft.startswith("# Report\n\nmost of it") and "truncated" in draft
+
+    async def test_three_empty_drafts_still_raise(self, patched_runbooks, tmp_path):
+        from research_agent.agent import writer
+        from research_agent.runbook import get_runbook
+
+        llm = _QueueLLM([LLMError("cut", retryable=False, finish_reason="length", content=None)] * 3)
+        with pytest.raises(LLMError):
+            await writer.write_report(
+                llm, get_runbook("mini-teardown"), _one_claim_ledger(tmp_path), {"competitors": ["a.com"]},
+            )
+
     async def test_non_length_error_still_propagates(self, patched_runbooks, tmp_path):
         from research_agent.agent import writer
         from research_agent.runbook import get_runbook

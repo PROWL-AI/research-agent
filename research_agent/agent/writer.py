@@ -600,34 +600,27 @@ async def write_report(
         truncated = (exc.content or "").strip()
         if exc.retryable or exc.finish_reason != "length":
             raise
-        if not truncated:
-            # B-122: the larger budget went to reasoning and not one word of the report came back (measured
-            # 2026-11-13: moonshotai/kimi-k3.1-pro on the 90-step teardown, both drafts empty at finish=length).
-            # The same request once more with reasoning off, as the repair pass already does (B-062): only the
-            # case that lost the report today takes this path, so a model whose drafts arrive is unchanged.
-            log.warning("writer draft empty at max_tokens=%d: reasoning took the budget; retrying with reasoning off",
-                        _DRAFT_ESCALATED_MAX_TOKENS)
-            return await llm.complete(
-                messages, tier="strong", max_tokens=_DRAFT_ESCALATED_MAX_TOKENS, temperature=0.3,
-                stage="writer", reasoning=False,
-            )
-        # B-128: a draft cut at the ceiling has spent part of its budget on reasoning too (measured 2026-11-13:
-        # moonshotai/kimi-k3.1-pro, accept-subscription-20261021b, shipped partial with 4 lint issues). One more
-        # request with reasoning off; whatever comes back, the longer draft ships, never a shorter one.
-        log.warning("writer draft still truncated at max_tokens=%d; retrying with reasoning off",
-                    _DRAFT_ESCALATED_MAX_TOKENS)
+        # B-122 and B-128: the larger budget went to reasoning, and the draft came back empty (moonshotai/kimi-k3.1-pro
+        # on the 90-step teardown) or cut (the same model, accept-subscription-20261021b, shipped partial with 4 lint
+        # issues). The same request once more with reasoning off, as the repair pass does (B-062); if that is cut too,
+        # the longest draft ships, never a shorter one, and only no text at all loses the report.
+        log.warning("writer draft %s at max_tokens=%d; retrying with reasoning off",
+                    "cut" if truncated else "empty", _DRAFT_ESCALATED_MAX_TOKENS)
         try:
             return await llm.complete(
                 messages, tier="strong", max_tokens=_DRAFT_ESCALATED_MAX_TOKENS, temperature=0.3,
                 stage="writer", reasoning=False,
             )
         except LLMBudgetExceeded:
-            pass
+            if not truncated:
+                raise
         except LLMError as last:
             if last.retryable or last.finish_reason != "length":
                 raise
             if len((last.content or "").strip()) > len(truncated):
                 truncated = (last.content or "").strip()
+            if not truncated:
+                raise
         # Still truncated: ship the partial draft (lint and repair can only
         # improve it) rather than lose the run's evidence.
         log.warning(
