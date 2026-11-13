@@ -522,13 +522,13 @@ async def test_a_plan_truncated_at_the_ceiling_fails_the_run_with_a_named_reason
     with pytest.raises(OrchestratorError, match="planner output truncated"):
         await Orchestrator(FakeProwl(), _client(provider), runs_root=tmp_path / "runs").run(
             "mini-teardown", BRIEF, run_id="plan-ceiling", max_llm_usd=5.0)
-    assert len(_planner_budgets(provider)) == 3  # two retries, the last with reasoning off, never a loop
+    assert len(_planner_budgets(provider)) == 2  # one retry, never a loop (B-129: reasoning is off from the first)
     checkpoint = ArtifactStore(tmp_path / "runs" / "plan-ceiling").load_checkpoint()
     assert checkpoint.status == "failed" and checkpoint.terminal_code == "error"
     assert "planner" in checkpoint.stop_reason and "max_tokens=24000" in checkpoint.stop_reason
 
 
-async def test_a_plan_cut_twice_is_asked_once_more_with_reasoning_off(patched_runbooks, tmp_path):
+async def test_a_plan_cut_twice_is_asked_once_more_with_reasoning_off(patched_runbooks, tmp_path, monkeypatch):
     """B-128: kimi-k3.1-pro cut the domain-baseline 1.1 plan at 8000 and at 24000 tokens (2026-11-13); the third
     request goes with reasoning off, and a plan that arrives then runs."""
     from research_agent.agent.orchestrator import _PLAN_ESCALATED_MAX_TOKENS
@@ -538,6 +538,7 @@ async def test_a_plan_cut_twice_is_asked_once_more_with_reasoning_off(patched_ru
             self.cut_below = 10**9 if len(_planner_budgets(self)) < 2 else 0
             return super().__call__(request)
 
+    monkeypatch.setenv("RESEARCH_PLANNER_REASONING", "on")  # the 0.6.13 escalation, kept for measurements
     provider = CutTwice(cut_below=10**9, cost=0.01, plan_steps=1)
     llm = _client(provider)
     seen = []
@@ -680,3 +681,25 @@ async def test_an_extraction_cut_at_both_budgets_keeps_its_complete_claims(patch
     checkpoint = ArtifactStore(tmp_path / "runs" / "salvage").load_checkpoint()
     assert [s.state for s in checkpoint.steps] == ["completed"]
     assert result.terminal_code == "completed" and result.stats["claims"] == 1
+
+
+async def test_the_planner_writes_with_reasoning_off_by_default(patched_runbooks, tmp_path, monkeypatch):
+    """B-129: off took 69 to 165 s against 420 to 743 s on, with the same tool coverage (2026-11-13)."""
+    monkeypatch.delenv("RESEARCH_PLANNER_REASONING", raising=False)
+    provider = Provider(cost=0.01, plan_steps=1)
+    await Orchestrator(FakeProwl(), _client(provider), runs_root=tmp_path / "runs").run(
+        "mini-teardown", BRIEF, run_id="plan-off", max_llm_usd=5.0)
+    planner = [b for b in provider.requests if "response_format" in b and "plan" in b["messages"][-1]["content"].lower()]
+    assert planner and all("reasoning" not in b or b["reasoning"] == {"enabled": False} for b in planner)
+
+
+def test_planner_reasoning_setting(monkeypatch):
+    from research_agent.agent.orchestrator import planner_reasoning
+
+    monkeypatch.delenv("RESEARCH_PLANNER_REASONING", raising=False)
+    assert planner_reasoning() is False
+    monkeypatch.setenv("RESEARCH_PLANNER_REASONING", "on")
+    assert planner_reasoning() is None
+    monkeypatch.setenv("RESEARCH_PLANNER_REASONING", "maybe")
+    with pytest.raises(ValueError):
+        planner_reasoning()
