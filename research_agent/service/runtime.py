@@ -244,10 +244,15 @@ def out_of_space(exc: BaseException | None) -> bool:
     return False
 
 
+def disk_free(root) -> int:
+    """Free bytes on the volume that holds the service's data (B-114)."""
+    return shutil.disk_usage(root).free
+
+
 class Runtime:
     def __init__(self, store: Store, free_bytes=None):
         self.store = store
-        self.free_bytes = free_bytes or (lambda: shutil.disk_usage(store.root).free)
+        self.free_bytes = free_bytes or (lambda: disk_free(store.root))
         manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
         self.producer = {k: manifest["provider"][k] for k in ("id", "revision", "contentHash")}
         self.tasks = {}

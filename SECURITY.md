@@ -8,3 +8,12 @@ The boundary protects against remote pages and accidental cross-service access, 
 ## Cloud instance (B-099)
 
 `prowl-research-service cloud-run` is the one mode meant for an Internet origin, behind a TLS-terminating router. It answers only requests whose `Host` is its `PUBLIC_ORIGIN` and whose `X-Forwarded-Proto` is `https`; the well-known document answers `401` with no body without the service token. `/mcp` accepts only client keys (`prc_`, stored as SHA-256, scoped, revocable one by one); the service token is refused there. Each client's jobs carry its principal and are invisible to other clients. A paid job starts on its own only within its key's daily ceiling (at least 10 USD per UTC day); above it, it waits for the operator's approval. Provider keys live only in the platform's config vars; operator scripts set them by name and print names only. Details: [docs/CLOUD.md](docs/CLOUD.md).
+
+## Untrusted text in prompts (B-102)
+
+Pages and tool results are data. Every prompt that quotes one wraps it in a fence whose token is drawn per call and
+never occurs in the text (the agents database pattern `untrusted-fence` 1.2.1, vendored in
+`research_agent/agent/untrusted_fence.py`); forged fence lines are neutralised and hidden characters removed first. A
+suspected injection is logged as `untrusted.suspected` and changes no decision except one: a value that only a raw
+flagged as an injection states is never bound into a later tool call. Nothing here makes a model immune; the boundary is
+that claims still need a quote found in the stored raw.

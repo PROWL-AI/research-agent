@@ -302,3 +302,13 @@ def _allowance_off_unless_asked(request, monkeypatch):
     from research_agent.service import allowance
 
     monkeypatch.setattr(allowance, "verdict", lambda store, job: None)
+
+
+@pytest.fixture(autouse=True)
+def _disk_roomy_unless_asked(request, monkeypatch):
+    """B-114 holds a job while the volume has under 1 GB free. Service tests must not read this machine's disk: a full
+    disk under a test run held a job and timed a cancel test out (2026-11-13, 0.3 GB free). The disk tests pass their
+    own `free_bytes`."""
+    from research_agent.service import runtime
+
+    monkeypatch.setattr(runtime, "disk_free", lambda root: 1 << 40)
