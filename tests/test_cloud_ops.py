@@ -80,3 +80,8 @@ def test_register_writes_a_remote_descriptor(tmp_path):
     assert data["peer"]["custody"] == "organization-managed"
     assert data["peer"]["residency"] == ["IE"] and data["peer"]["maxDataClass"] == "internal"
     assert data["runner"] == {"credentialKind": "key"}
+
+
+def test_the_client_key_pepper_is_a_config_var_of_this_service():
+    """B-104: the cloud refuses to open its key store without it, so the operator's script must be able to set it."""
+    assert "CLIENT_KEY_PEPPER" in cloud.CONFIG_NAMES
