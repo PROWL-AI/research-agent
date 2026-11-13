@@ -7,7 +7,7 @@ description: >-
   with light competitor context for calibration. Use for first-touch domain
   research, lead qualification, or onboarding a new analysis subject before
   any deeper runbook.
-version: "1.1"
+version: "1.2"
 inputs:
   - { name: domain, type: "domain", required: true, doc: "The single domain to x-ray." }
   - { name: market, type: "string", required: false, doc: "Product category / niche, used for SERP, trend and AI-visibility queries." }
@@ -49,6 +49,7 @@ tools:
   - exa_similar_search
   - seo_growth_audit
   - firecrawl_scrape_website
+  - firecrawl_scrape_page_seo
   - firecrawl_map_domain
   - firecrawl_search
   - crawl_funnel_path
@@ -76,7 +77,7 @@ tools:
   - moz_site_metrics
   - moz_brand_authority
   - moz_ranking_keywords_count
-budget: { max_tool_calls: 63, max_usd: 2.00, max_minutes: 25 }
+budget: { max_tool_calls: 64, max_usd: 2.00, max_minutes: 25 }
 outputs: { report_template: domain-baseline, formats: [markdown, html] }
 ---
 
@@ -131,7 +132,10 @@ budget; steps 1-3 and 12 are never optional.
    /plans, /packages on 404). Transform: product, offer, pricing model,
    positioning claims. If a page fails (JS-heavy, blocked), state the failure
    in the report, never skip silently.
-4. **Technical SEO audit**: `seo_growth_audit` on the homepage +
+4. **Technical SEO audit**: `firecrawl_scrape_page_seo` on the homepage (raw
+   HTML + `seo_data` in one call), then `seo_growth_audit` with
+   `html_content="{{output:<that scrape step>}}"` and `page_url` the homepage:
+   the audit reads raw HTML only, never markdown or a transform's summary +
    `dataforseo_onpage_task_post` (max_crawl_pages=100) +
    `dataforseo_onpage_lighthouse` (on_error=skip).
 5. **On-page results**: `dataforseo_onpage_summary` (from $step4.task_id) +
