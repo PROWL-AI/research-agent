@@ -143,6 +143,31 @@ class TestWriterDraftTruncation:
             writer._DRAFT_MAX_TOKENS, writer._DRAFT_ESCALATED_MAX_TOKENS,
         ]
 
+    async def test_both_drafts_empty_retries_once_with_reasoning_off(self, patched_runbooks, tmp_path):
+        """B-122: reasoning took the whole budget of both drafts and no word came back (kimi-k3.1-pro on a
+        90-step teardown, 2026-11-13): the same request goes once more with reasoning off."""
+        from research_agent.agent import writer
+        from research_agent.runbook import get_runbook
+
+        seen = []
+
+        class Recording(_QueueLLM):
+            async def complete(self, messages, tier="cheap", json_mode=False, **kwargs):
+                seen.append(kwargs.get("reasoning"))
+                return await super().complete(messages, tier, json_mode, **kwargs)
+
+        llm = Recording([
+            LLMError("cut", retryable=False, finish_reason="length", content=None),
+            LLMError("cut", retryable=False, finish_reason="length", content=None),
+            "# Clean report\n\nNo numbers here.",
+        ])
+        draft = await writer.write_report(
+            llm, get_runbook("mini-teardown"), _one_claim_ledger(tmp_path),
+            {"competitors": ["a.com"]},
+        )
+        assert draft == "# Clean report\n\nNo numbers here."
+        assert seen == [None, None, False]
+
     async def test_non_length_error_still_propagates(self, patched_runbooks, tmp_path):
         from research_agent.agent import writer
         from research_agent.runbook import get_runbook

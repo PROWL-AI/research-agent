@@ -445,8 +445,19 @@ async def write_report(
         return first_truncated + "\n\n*(Report truncated: the LLM budget did not allow a longer draft.)*"
     except LLMError as exc:
         truncated = (exc.content or "").strip()
-        if exc.retryable or exc.finish_reason != "length" or not truncated:
+        if exc.retryable or exc.finish_reason != "length":
             raise
+        if not truncated:
+            # B-122: the larger budget went to reasoning and not one word of the report came back (measured
+            # 2026-11-13: moonshotai/kimi-k3.1-pro on the 90-step teardown, both drafts empty at finish=length).
+            # The same request once more with reasoning off, as the repair pass already does (B-062): only the
+            # case that lost the report today takes this path, so a model whose drafts arrive is unchanged.
+            log.warning("writer draft empty at max_tokens=%d: reasoning took the budget; retrying with reasoning off",
+                        _DRAFT_ESCALATED_MAX_TOKENS)
+            return await llm.complete(
+                messages, tier="strong", max_tokens=_DRAFT_ESCALATED_MAX_TOKENS, temperature=0.3,
+                stage="writer", reasoning=False,
+            )
         # Still truncated at the ceiling: ship the partial draft (lint and
         # repair can only improve it) rather than lose the run's evidence.
         log.warning(

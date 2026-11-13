@@ -6,6 +6,8 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- A writer draft that comes back empty because reasoning took the whole output budget is asked once more with
+  reasoning off, instead of losing the report (B-122).
 - An issuing desk on the cloud instance (B-121): `client add-desk` gives a team's key steward a `keys.issue` key; it
   issues, rotates, revokes and lists only its own keys through the MCP tools `client.issue|rotate|revoke|list`, within
   the grants and ceiling its desk was given. The tool descriptions now state the allowance rule.
