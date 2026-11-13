@@ -43,7 +43,8 @@ Other environment knobs (all optional):
 
 - `PROWL_MCP_URL` — Prowl MCP endpoint (default `https://prowl.chat/mcp`).
 - `RESEARCH_LLM_MODEL_STRONG` — the strong-tier model (planning, writing,
-  repair; default `xiaomi/mimo-v2.6-pro`); `RESEARCH_LLM_MODEL` covers the cheap
+  repair; default `moonshotai/kimi-k3.1-pro` since 0.6.0, measured against `xiaomi/mimo-v2.6-pro` in
+  [the 2026-11-13 report](docs/reports/2026-11-13-strong-model-measure/README.md)); `RESEARCH_LLM_MODEL` covers the cheap
   tier (claim extraction, transforms, citation checks; default
   `deepseek/deepseek-v4.1-flash`); `RESEARCH_JUDGE_MODEL` the eval judge (default
   `anthropic/claude-haiku-5.5` — another vendor than the default writer, so a

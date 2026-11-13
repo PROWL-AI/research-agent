@@ -14,7 +14,9 @@ DEFAULT_LLM_BASE_URL = "https://openrouter.ai/api/v1"
 #: tier (planner, writer) the strongest listed model, and the judge a model of a
 #: DIFFERENT vendor, so a report is not graded by the family that wrote it.
 DEFAULT_LLM_MODEL = "deepseek/deepseek-v4.1-flash"
-DEFAULT_LLM_MODEL_STRONG = "xiaomi/mimo-v2.6-pro"
+#: B-107 (2026-11-13): the operator's model map puts planning and decisions on Kimi K3.1 Pro; the paired rewrite of
+#: three acceptance runs scored it 0.76 against Mimo's 0.52 (docs/reports/2026-11-13-strong-model-measure).
+DEFAULT_LLM_MODEL_STRONG = "moonshotai/kimi-k3.1-pro"
 DEFAULT_JUDGE_MODEL = "anthropic/claude-haiku-5.5"
 #: The run's LLM spend ceiling when neither the caller, the environment
 #: (RESEARCH_MAX_LLM_USD) nor the runbook sets one — never unlimited.

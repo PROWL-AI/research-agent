@@ -4,8 +4,11 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
-## Unreleased
+## 0.6.0 (2026-11-13)
 
+- The strong model (planner, writer, repair) is `moonshotai/kimi-k3.1-pro`, the operator's model map (B-107): measured
+  against `xiaomi/mimo-v2.6-pro` on the same three runs' evidence, 0.76 against 0.52 on the judge, no defect against 11
+  ([report](docs/reports/2026-11-13-strong-model-measure/README.md)). A service keeps the model its settings name.
 - `scripts/configure_service.py` changes a running service's settings through its own API (login code, session, the
   form's revision check): the operator's settings change needs no click, on the local service and on a cloud one.
 - A writer draft that comes back empty because reasoning took the whole output budget is asked once more with
