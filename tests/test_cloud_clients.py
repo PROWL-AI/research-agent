@@ -80,7 +80,7 @@ def test_add_prints_once_and_stores_only_the_hash(clients, tmp_path):
 
 def test_verify_answers_the_name_scopes_and_daily_ceiling(clients):
     key = clients.add("anna", ["read"])
-    assert clients.verify(key) == {"name": "anna", "scopes": ["read"], "dailyUsd": 10.0}
+    assert clients.verify(key) == {"name": "anna", "scopes": ["read"], "dailyUsd": 10.0, "keyClass": "automated"}
     assert clients.verify(key + "x") is None
     assert clients.verify("") is None
     assert clients.verify("Bearer " + key) is None
@@ -148,7 +148,7 @@ def test_a_desk_on_either_store(clients):
     """B-121 on both stores: the desk issues within its grants and sees only its own keys."""
     clients.add_desk("ania", ["read", "research.run"], 20)
     key = clients.desk_issue("ania", "team-bot", ["research.run"], 12)
-    assert clients.verify(key) == {"name": "team-bot", "scopes": ["research.run"], "dailyUsd": 12.0}
+    assert clients.verify(key) == {"name": "team-bot", "scopes": ["research.run"], "dailyUsd": 12.0, "keyClass": "automated"}
     clients.add("other", ["read"])
     assert [c["name"] for c in clients.desk_list("ania")] == ["team-bot"]
     with pytest.raises(KeyError):

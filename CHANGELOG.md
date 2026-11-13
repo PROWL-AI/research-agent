@@ -4,6 +4,13 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.3 (2026-11-13)
+
+- Client keys of the cloud instance have a class (K1, the operator's word of 2026-11-13): `interactive` for a person
+  or an agent a person calls has no daily ceiling, its paid job starts at once and its decision records who spent;
+  `automated` (the default, and every key issued before) keeps its ceiling. `client add --class`, `client.issue` with
+  `class`; a missing ceiling reads as `null`, never 0 ([CLOUD.md](docs/CLOUD.md), scenario CORE-26).
+
 ## 0.6.2 (2026-11-13)
 
 - The service installs on a space of a shared Mac with no GUI login, the Mac Studio (B-106): `install-fabric-service.py

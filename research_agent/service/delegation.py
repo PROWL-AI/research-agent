@@ -156,4 +156,6 @@ def recorded(verdict: dict[str, Any]) -> dict[str, Any] | None:
             "kid": verdict.get("kid"), "tier": verdict.get("tier")}
     if verdict.get("dailyUsd") is not None:
         kept["dailyUsd"] = verdict["dailyUsd"]  # a cloud client's own ceiling (B-100)
+    if verdict.get("keyClass"):
+        kept["keyClass"] = verdict["keyClass"]  # interactive: no ceiling (K1)
     return kept
