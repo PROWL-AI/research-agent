@@ -217,6 +217,7 @@
 | CORE-23 | Состояние облака переживает перезапуск | B-099 | PASS@ba65158 |
 | CORE-24 | Платное задание агента в пределах его дневного лимита стартует без человека | B-100 | UNVERIFIED |
 | CORE-25 | Стюард команды выдаёт ключи сам через дверь выдачи | B-121 | UNVERIFIED |
+| CORE-26 | Ключ человека (класс interactive) без дневного лимита: задание стартует сразу | K1 | UNVERIFIED |
 
 ### CORE-01: Запуск до терминального состояния (CLI, stdio MCP)
 - **Status:** PASS@583f1d1
@@ -523,3 +524,15 @@
 - **Failure outcome:** область сверх разрешённых, лимит вне границ, занятое имя: отказ с причиной, ключ не создан; чужой ключ или ключ оператора: «unknown-client»; ключ двери на инструменте данных и обычный ключ на инструменте двери: `scope-not-granted`.
 - **Wave:** B-121
 - **Coverage:** `tests/test_issuing_desk.py`, `tests/test_cloud_clients.py::test_a_desk_on_either_store`
+
+### CORE-26: Ключ человека (класс interactive) без дневного лимита: задание стартует сразу
+- **Status:** UNVERIFIED
+- **Actor:** человек организации или агент, которого человек вызвал сам, с ключом класса `interactive`; оператор и стюард выдают ключ
+- **Trigger:** вызывающий создаёт платное `research.run` или `research.tools.call`
+- **Preconditions:** ключ выдан `client add --class interactive` или `client.issue` с `class: interactive` (без `dailyUsd`)
+- **Steps:**
+  1. Создать платное задание, в том числе после трат за сутки выше 1000 USD.
+- **Expected result:** задание сразу `working`; решение `{"by": "allowance", "principal": "client:<имя>", "keyClass": "interactive", "ceilingUsd": null, ...}`; в журнале «Запуск по ключу без лимита: трата записана на вызывающего». Ключ `automated` с той же тратой ждёт решения оператора сверх своего лимита (CORE-24); ключ без класса ведёт себя как `automated`. В `client list` и `client.list` лимит такого ключа `null`, никогда 0.
+- **Failure outcome:** `dailyUsd` вместе с классом `interactive` или неизвестный класс: отказ, ключ не создан; `client limit` для такого ключа: отказ.
+- **Wave:** K1 (DEC-0074 Ани)
+- **Coverage:** `tests/test_key_classes.py`

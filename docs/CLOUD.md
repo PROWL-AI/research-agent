@@ -55,6 +55,13 @@ least 10 USD per UTC day, 10 by default (the operator's word recorded in the age
 in-20261112-996c34): `client add <name> --daily-usd 25`, `client limit <name> --daily-usd 25`. `--raw` prints only
 the key, for a pipe straight into the holder's vault slot.
 
+Key classes (K1, the operator's word of 2026-11-13, DEC-0074 of the Appvillis keys plan): a key for a person, or for an
+agent a person calls in that moment, is `--class interactive` and has no ceiling: its paid jobs start at once, whatever
+they cost, and each decision keeps who spent (`client:<name>`) and the class. A pipeline's or a schedule's key is
+`--class automated` (the default) and keeps its ceiling as above. A key issued before classes reads as automated
+until it is reissued. A missing ceiling reads as `null` in `client list` and the desk's `client.list`, never 0;
+`client limit` on an interactive key is refused.
+
 ## Issuing desk
 
 A team's key steward (for the Appvillis copy, the organization agent Аня) holds a desk key and issues the team's keys
