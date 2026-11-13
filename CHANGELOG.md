@@ -4,6 +4,13 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.7 (2026-11-13)
+
+- The points of a series are no longer a conflict (B-127): when every valued claim of a subject names its period and
+  the periods differ, each period is its own group, and the extractor names the period in a series point's subject.
+  The personal acceptance run's ledger, reloaded: verified 59 of 192 (0.31) became 131 of 192 (0.68), conflicts 90
+  became 15.
+
 ## 0.6.6 (2026-11-13)
 
 - A `bing_news` step with a `time_period` the provider refuses (`month`, `year`) is not sent, and the planner is told
