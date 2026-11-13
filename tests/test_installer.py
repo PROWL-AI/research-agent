@@ -161,8 +161,8 @@ def test_a_space_daemon_has_its_own_label_home_path_and_no_stdout_file(tmp_path)
     inst = _installer()
     payload = {"Label": inst.LABEL, "ProgramArguments": ["/py"], "StandardOutPath": "/x", "StandardErrorPath": "/x",
                "EnvironmentVariables": {"PATH": "/usr/bin:/bin", "FABRIC_SERVICE_SUPERVISOR": "launchd"}}
-    doc = inst.background_definition(payload, inst.background_label("passioncode"), tmp_path)
-    assert doc["Label"] == "chat.prowl.research.passioncode"  # one /Library/LaunchDaemons for every space
+    doc = inst.background_definition(payload, inst.background_label("team-a"), tmp_path)
+    assert doc["Label"] == "chat.prowl.research.team-a"  # one /Library/LaunchDaemons for every space
     assert "StandardOutPath" not in doc and "StandardErrorPath" not in doc
     env = doc["EnvironmentVariables"]
     assert env["HOME"] == str(tmp_path) and env["OBSERVATORY_VAULT_ONLY"] == "1"
@@ -173,9 +173,9 @@ def test_a_space_daemon_has_its_own_label_home_path_and_no_stdout_file(tmp_path)
 
 def test_the_first_apply_line_names_the_account_and_the_label():
     inst = _installer()
-    line = inst.first_apply_line("sshlg", "chat.prowl.research.sshlg")
+    line = inst.first_apply_line("space-b", "chat.prowl.research.space-b")
     assert line == ("sudo /usr/bin/python3 -I /usr/local/libexec/observatory-space-daemons apply "
-                    "--user sshlg --label chat.prowl.research.sshlg")
+                    "--user space-b --label chat.prowl.research.space-b")
 
 
 class _Run:
@@ -193,15 +193,15 @@ class _Run:
 def test_the_space_door_loads_a_changed_definition_or_asks_for_the_first_apply(code, outcome):
     inst = _installer()
     run = _Run(code, "done")
-    assert inst.door_deploy("chat.prowl.research.sshlg", run=run) == (outcome, "done")
-    assert run.argv == ["sudo", "-n", "/usr/local/libexec/studio-space-service", "deploy", "chat.prowl.research.sshlg"]
+    assert inst.door_deploy("chat.prowl.research.space-b", run=run) == (outcome, "done")
+    assert run.argv == ["sudo", "-n", "/usr/local/libexec/studio-space-service", "deploy", "chat.prowl.research.space-b"]
 
 
 @pytest.mark.parametrize("code", [2, 4, 5])
 def test_a_refusal_of_the_space_door_stops_the_install(code):
     inst = _installer()
     with pytest.raises(RuntimeError, match=f"exit {code}"):
-        inst.door_deploy("chat.prowl.research.sshlg", run=_Run(code, "plan-refused: x"))
+        inst.door_deploy("chat.prowl.research.space-b", run=_Run(code, "plan-refused: x"))
 
 
 def test_a_port_another_listener_holds_is_seen():
