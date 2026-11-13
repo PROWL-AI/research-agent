@@ -26,7 +26,7 @@ class SqliteAsPostgres:
             def execute(self, sql, params=()):
                 sql = sql.replace("%s", "?").replace("BYTEA", "BLOB").replace("TIMESTAMPTZ", "TEXT")
                 if "information_schema.columns" in sql:  # Postgres catalogue; SQLite answers from its pragma
-                    sql = "SELECT 1 FROM pragma_table_info('prowl_research_clients') WHERE name = 'daily_usd'"
+                    sql = "SELECT 1 FROM pragma_table_info('prowl_research_clients') WHERE name = ?"
                 if sql.startswith("ALTER"):
                     SqliteAsPostgres.alters += 1
                 if "ADD COLUMN IF NOT EXISTS" in sql:  # Postgres only; SQLite says "duplicate column" instead
@@ -142,3 +142,14 @@ def test_reads_never_leave_a_transaction_open_and_the_column_is_added_once():
     assert not connection.db.in_transaction
     PostgresClients(lambda: connection).list()  # a second process on the same table
     assert SqliteAsPostgres.alters == 0, "the column exists: no ALTER, no exclusive lock"
+
+
+def test_a_desk_on_either_store(clients):
+    """B-121 on both stores: the desk issues within its grants and sees only its own keys."""
+    clients.add_desk("ania", ["read", "research.run"], 20)
+    key = clients.desk_issue("ania", "team-bot", ["research.run"], 12)
+    assert clients.verify(key) == {"name": "team-bot", "scopes": ["research.run"], "dailyUsd": 12.0}
+    clients.add("other", ["read"])
+    assert [c["name"] for c in clients.desk_list("ania")] == ["team-bot"]
+    with pytest.raises(KeyError):
+        clients.desk_rotate("ania", "other")

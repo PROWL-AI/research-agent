@@ -49,7 +49,9 @@ DASHBOARD_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "
 #: Which client-key scope each capability needs in the cloud (B-099 M3). The
 #: fabric.job.* tools act on the caller's own jobs only (require_owner).
 SCOPE_OF = {"research.list_runbooks": "read", "research.artifact.get": "read", "research.tutorial": "read",
-            "research.run": "research.run", "research.tools.call": "tools.call"}
+            "research.run": "research.run", "research.tools.call": "tools.call",
+            # the issuing desk (B-121): only a desk key, and a desk key reaches nothing else
+            "client.issue": "keys.issue", "client.rotate": "keys.issue", "client.revoke": "keys.issue", "client.list": "keys.issue"}
 
 
 @dataclass(frozen=True)
@@ -99,7 +101,7 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
     store.recover()
     rt = Runtime(store)
     rt.origin = cloud.origin if cloud else f"http://127.0.0.1:{port}"
-    proto = Protocol(rt)
+    proto = Protocol(rt, desk=cloud.clients if cloud else None)
     started = now()
     build = build or {"digest": code_digest()}
     # The cloud cookie is bound to its https host: no Domain, Path=/, Secure (B-099 REQ-6).
@@ -147,6 +149,8 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
 
     def client_verdict(client, tool):
         needed = SCOPE_OF.get(tool)
+        if needed is None and "keys.issue" in client["scopes"] and tool.startswith("research."):
+            needed = "read"  # a desk key reads no data (B-121)
         if needed is not None and needed not in client["scopes"]:
             return {"ok": False, "code": "scope-not-granted", "detail": "client-key-scope"}
         who = "client:" + client["name"]

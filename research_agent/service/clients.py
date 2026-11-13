@@ -49,6 +49,13 @@ def _check(name: str, scopes) -> list[str]:
     return scopes
 
 
+#: The issuing desk (research template 1.6.0, B-121): a team's key steward holds a desk key with this scope. It calls
+#: only the desk tools, issues keys within the grants and the ceiling the operator's tool gave the desk (read keys and
+#: the floor by default), and sees, rotates and revokes only the keys it issued itself, never a desk key.
+DESK_SCOPE = "keys.issue"
+DESK_DEFAULT_GRANTS = ("read",)
+
+
 def _ceiling(daily_usd) -> float:
     try:
         value = float(daily_usd)
@@ -63,7 +70,66 @@ def _usable(key) -> bool:
     return isinstance(key, str) and key.startswith(PREFIX) and 20 < len(key) < 200
 
 
-class FileClients:
+class DeskMixin:
+    """The desk on top of a store's own primitives: `_get(name)`, `_insert(name, record)` and `_set(name, **fields)`.
+    A record carries `issuedBy` (the desk that issued it, or None for the operator's tool) and, for a desk key,
+    `grants` and `maxDailyUsd`."""
+
+    def add_desk(self, name: str, grants=DESK_DEFAULT_GRANTS, max_daily_usd: float = DAILY_FLOOR_USD) -> str:
+        """The operator's own tool gives a steward a desk key; `grants` and `max_daily_usd` bound what it may issue."""
+        grants = _check(name, grants)
+        max_daily_usd = _ceiling(max_daily_usd)
+        if self._get(name) is not None:
+            raise ValueError(f"client {name} exists; rotate it or choose another name")
+        key = _new_key()
+        self._insert(name, {"key": key, "scopes": [DESK_SCOPE], "dailyUsd": DAILY_FLOOR_USD, "issuedBy": None,
+                            "grants": grants, "maxDailyUsd": max_daily_usd})
+        return key
+
+    def _desk(self, desk: str) -> dict:
+        record = self._get(desk)
+        if record is None or record["revokedAt"] or DESK_SCOPE not in record["scopes"]:
+            raise KeyError("not-a-desk")
+        return record
+
+    def _issued(self, desk: str, name: str) -> dict:
+        record = self._get(name)
+        if record is None or record.get("issuedBy") != desk:
+            raise KeyError("unknown-client")  # another desk's or the operator's key reads as unknown
+        return record
+
+    def desk_issue(self, desk: str, name: str, scopes=None, daily_usd: float | None = None) -> str:
+        d = self._desk(desk)
+        scopes = _check(name, scopes or ["read"])
+        if not set(scopes) <= set(d["grants"]):
+            raise ValueError("scopes: this desk may give " + ", ".join(d["grants"]))
+        daily_usd = _ceiling(DAILY_FLOOR_USD if daily_usd is None else daily_usd)
+        if daily_usd > d["maxDailyUsd"]:
+            raise ValueError(f"daily ceiling: this desk may give at most {d['maxDailyUsd']:g} USD per UTC day")
+        if self._get(name) is not None:
+            raise ValueError(f"client {name} exists; choose another name")
+        key = _new_key()
+        self._insert(name, {"key": key, "scopes": scopes, "dailyUsd": daily_usd, "issuedBy": desk, "grants": None,
+                            "maxDailyUsd": None})
+        return key
+
+    def desk_rotate(self, desk: str, name: str) -> str:
+        self._desk(desk)
+        if self._issued(desk, name)["revokedAt"]:
+            raise KeyError("unknown-client")
+        return self.rotate(name)
+
+    def desk_revoke(self, desk: str, name: str) -> None:
+        self._desk(desk)
+        self._issued(desk, name)
+        self.revoke(name)
+
+    def desk_list(self, desk: str) -> list[dict]:
+        self._desk(desk)
+        return [c for c in self.list() if c.get("issuedBy") == desk]
+
+
+class FileClients(DeskMixin):
     """Clients in one 0600 JSON file."""
 
     def __init__(self, path: Path):
@@ -83,6 +149,16 @@ class FileClients:
             json.dump(data, stream, indent=1, sort_keys=True)
         os.replace(temp, self.path)
         self.path.chmod(0o600)
+
+    def _get(self, name: str) -> dict | None:
+        record = self._load().get(name)
+        return None if record is None else {"name": name, **record}
+
+    def _insert(self, name: str, record: dict) -> None:
+        data = self._load()
+        key = record.pop("key")
+        data[name] = {"sha256": _hash(key), "prefix": key[:12], "createdAt": _now(), "revokedAt": None, **record}
+        self._write(data)
 
     def add(self, name: str, scopes, daily_usd: float = DAILY_FLOOR_USD) -> str:
         scopes, daily_usd = _check(name, scopes), _ceiling(daily_usd)
@@ -121,7 +197,7 @@ class FileClients:
 
     def list(self) -> list[dict]:
         return [{"name": n, "scopes": c["scopes"], "prefix": c["prefix"], "createdAt": c["createdAt"], "revokedAt": c["revokedAt"],
-                 "dailyUsd": c.get("dailyUsd", DAILY_FLOOR_USD)} for n, c in sorted(self._load().items())]
+                 "dailyUsd": c.get("dailyUsd", DAILY_FLOOR_USD), "issuedBy": c.get("issuedBy")} for n, c in sorted(self._load().items())]
 
     def verify(self, key) -> dict | None:
         if not _usable(key):
@@ -133,7 +209,7 @@ class FileClients:
         return None
 
 
-class PostgresClients:
+class PostgresClients(DeskMixin):
     """Clients in table `prowl_research_clients`; `connect` returns a DB-API connection
     with psycopg's `%s` paramstyle."""
 
@@ -143,8 +219,10 @@ class PostgresClients:
     #: Added in 0.5.0 (B-100): a key created before carries the floor. Run only when the column is missing: an ALTER
     #: waits for an exclusive lock, so every new process would queue behind the web dyno's connection (B-119).
     CEILING = f"ALTER TABLE prowl_research_clients ADD COLUMN daily_usd DOUBLE PRECISION NOT NULL DEFAULT {DAILY_FLOOR_USD}"
-    HAS_CEILING = ("SELECT 1 FROM information_schema.columns WHERE table_name = 'prowl_research_clients'"
-                   " AND column_name = 'daily_usd'")
+    HAS_COLUMN = ("SELECT 1 FROM information_schema.columns WHERE table_name = 'prowl_research_clients'"
+                  " AND column_name = %s")
+    #: Added in 0.6.0 (B-121, the issuing desk); each only when missing (B-119).
+    DESK_COLUMNS = (("issued_by", "TEXT"), ("grants", "TEXT"), ("max_daily_usd", "DOUBLE PRECISION"))
 
     def __init__(self, connect: Callable):
         self.connect = connect
@@ -155,11 +233,35 @@ class PostgresClients:
         if not self._ready:
             with connection.cursor() as cur:
                 cur.execute(self.TABLE)
-                if not cur.execute(self.HAS_CEILING).fetchone():
+                if not cur.execute(self.HAS_COLUMN, ("daily_usd",)).fetchone():
                     cur.execute(self.CEILING)
+                for column, kind in self.DESK_COLUMNS:
+                    if not cur.execute(self.HAS_COLUMN, (column,)).fetchone():
+                        cur.execute(f"ALTER TABLE prowl_research_clients ADD COLUMN {column} {kind}")
             connection.commit()
             self._ready = True
         return connection
+
+    def _get(self, name: str) -> dict | None:
+        db = self._db()
+        with db.cursor() as cur:
+            row = cur.execute("SELECT name, scopes, daily_usd, revoked_at, issued_by, grants, max_daily_usd FROM prowl_research_clients"
+                              " WHERE name=%s", (name,)).fetchone()
+        db.commit()
+        if row is None:
+            return None
+        return {"name": row[0], "scopes": json.loads(row[1]), "dailyUsd": row[2], "revokedAt": row[3], "issuedBy": row[4],
+                "grants": json.loads(row[5]) if row[5] else None, "maxDailyUsd": row[6]}
+
+    def _insert(self, name: str, record: dict) -> None:
+        db = self._db()
+        key = record["key"]
+        with db.cursor() as cur:
+            cur.execute("INSERT INTO prowl_research_clients(name, sha256, scopes, prefix, created_at, revoked_at, daily_usd, issued_by,"
+                        " grants, max_daily_usd) VALUES (%s,%s,%s,%s,%s,NULL,%s,%s,%s,%s)",
+                        (name, _hash(key), json.dumps(record["scopes"]), key[:12], _now(), record["dailyUsd"], record["issuedBy"],
+                         json.dumps(record["grants"]) if record["grants"] else None, record["maxDailyUsd"]))
+        db.commit()
 
     def add(self, name: str, scopes, daily_usd: float = DAILY_FLOOR_USD) -> str:
         scopes, daily_usd = _check(name, scopes), _ceiling(daily_usd)
@@ -203,10 +305,11 @@ class PostgresClients:
     def list(self) -> list[dict]:
         db = self._db()
         with db.cursor() as cur:
-            rows = cur.execute("SELECT name, scopes, prefix, created_at, revoked_at, daily_usd FROM prowl_research_clients ORDER BY name").fetchall()
+            rows = cur.execute("SELECT name, scopes, prefix, created_at, revoked_at, daily_usd, issued_by FROM prowl_research_clients"
+                               " ORDER BY name").fetchall()
         db.commit()  # end the read transaction: an open one holds a lock that a later ALTER waits on (B-119)
-        return [{"name": r[0], "scopes": json.loads(r[1]), "prefix": r[2], "createdAt": r[3], "revokedAt": r[4], "dailyUsd": r[5]}
-                for r in rows]
+        return [{"name": r[0], "scopes": json.loads(r[1]), "prefix": r[2], "createdAt": r[3], "revokedAt": r[4], "dailyUsd": r[5],
+                 "issuedBy": r[6]} for r in rows]
 
     def verify(self, key) -> dict | None:
         if not _usable(key):

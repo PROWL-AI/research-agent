@@ -55,6 +55,22 @@ least 10 USD per UTC day, 10 by default (the operator's word recorded in the age
 in-20261112-996c34): `client add <name> --daily-usd 25`, `client limit <name> --daily-usd 25`. `--raw` prints only
 the key, for a pipe straight into the holder's vault slot.
 
+## Issuing desk
+
+A team's key steward (for the Appvillis copy, the organization agent Аня) holds a desk key and issues the team's keys
+itself (B-121, research template 1.6.0). The operator's tool creates it and says what it may give:
+
+```sh
+heroku run -a appvillis-prowl-research --no-tty -- prowl-research-service client add-desk ania \
+  --grants read,research.run,tools.call --max-daily-usd 10 --raw | <vault.py put ... the steward's slot>
+```
+
+The desk key (scope `keys.issue`) sees only the desk tools on `/mcp`: `client.issue` (`name`, `scopes` within the
+grants, `dailyUsd` from 10 up to the desk's maximum; the key is in the answer once, for a pipe into the holder's
+slot), `client.rotate`, `client.revoke` and `client.list`, each on the keys this desk issued only. A desk key reads no
+data and calls no data tool; an ordinary key has no desk tools. Without `--grants` a desk gives read keys only, at the
+floor.
+
 ## Deploy
 
 Heroku key and provider keys never enter argv or chat: run under Observatory.
