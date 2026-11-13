@@ -4,6 +4,14 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.2 (2026-11-13)
+
+- The service installs on a space of a shared Mac with no GUI login, the Mac Studio (B-106): `install-fabric-service.py
+  --background --port <port>` writes a system daemon definition that runs as the account, labelled per account, into
+  the space's background folder and loads it through studio-agent's door; the first load is the administrator's (exit
+  77 with the line to run). A port another listener holds is refused. `scripts/mcp_headers.py` gives Claude Code the
+  bearer header from the agent token file, so no token sits in a client configuration ([FABRIC.md](docs/FABRIC.md)).
+
 ## 0.6.1 (2026-11-13)
 
 - Text from pages and tools is fenced with the agents database pattern `untrusted-fence` 1.2.1 (B-102): every prompt

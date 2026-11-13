@@ -12,6 +12,14 @@ environment are passed to the service; they are public configuration, not keys.
 A folder holding only some slots launches with those (the service is degraded
 for the missing provider and says so); a folder holding none is refused.
 --dry-run prints the launch argv and the slots it needs, installs nothing.
+
+--background (B-106) is for a space of a shared Mac with no GUI login (the Mac Studio): launchd has no `gui/<uid>`
+there, so the definition goes into the space's background folder, where Observatory's `observatory-space-daemons`
+turns it into a system daemon that runs as the account (`UserName`), never as root. The label carries the account
+(`chat.prowl.research.<account>`), since every space shares one /Library/LaunchDaemons; the port is the space's own,
+since every space shares one loopback. The installer loads it through studio-agent's door
+`sudo -n studio-space-service deploy <label>` (DEC-0033); before the administrator's first `apply` there is no daemon to
+replace, and the installer exits 77 with the line that loads it.
 """
 
 import argparse
@@ -20,6 +28,7 @@ import json
 import os
 import plistlib
 import shutil
+import socket
 import subprocess
 import sys
 import tarfile
@@ -33,6 +42,12 @@ ID = "prowl-research"
 LABEL = "chat.prowl.research"
 #: The provider keys the service needs, by vault slot name (never a value).
 SLOTS = ("PROWL_API_KEY", "RESEARCH_LLM_API_KEY")
+#: B-106: a space without a GUI login. Observatory reads this folder under the home folder only.
+BACKGROUND_DIR = (".local", "share", "project-observatory", "background", "LaunchAgents")
+SPACE_DOOR = "/usr/local/libexec/studio-space-service"
+SPACE_DAEMONS = "/usr/local/libexec/observatory-space-daemons"
+#: The definition is written and the release built; the administrator's first `apply` loads it.
+FIRST_APPLY = 77
 
 
 def command(*args, **kw):
@@ -126,6 +141,61 @@ def held_slots(project, p):
     return held, missing
 
 
+def space_user():
+    """The account's name, as Observatory's command takes it; one the user database does not name is its uid."""
+    import pwd
+
+    try:
+        return pwd.getpwuid(os.getuid()).pw_name
+    except KeyError:
+        return str(os.getuid())
+
+
+def background_label(user):
+    """One system daemon per space: every space of the machine shares /Library/LaunchDaemons."""
+    return f"{LABEL}.{user}"
+
+
+def first_apply_line(user, label):
+    return f"sudo /usr/bin/python3 -I {SPACE_DAEMONS} apply --user {user} --label {label}"
+
+
+def background_definition(payload, label, home):
+    """The plist a space daemon runs: its own label, HOME and a PATH that reaches Homebrew and the account's tools (a
+    system daemon starts with neither), the vault in vault-only mode; output goes to the service's own log folder."""
+    doc = dict(payload, Label=label)
+    doc.pop("StandardOutPath", None)
+    doc.pop("StandardErrorPath", None)
+    env = dict(doc.get("EnvironmentVariables") or {})
+    env.update({"HOME": str(home), "OBSERVATORY_VAULT_ONLY": "1",
+                "PATH": f"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{home}/.local/bin"})
+    doc["EnvironmentVariables"] = env
+    return doc
+
+
+def port_answers(port, timeout=1.0):
+    """Whether something listens on the loopback port (on a shared Mac, maybe another space's service)."""
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def door_deploy(label, run=subprocess.run):
+    """Load the space's changed definition through studio-agent's door. ("loaded" | "first-apply", door output)."""
+    try:
+        r = run(["sudo", "-n", SPACE_DOOR, "deploy", label], capture_output=True, text=True, timeout=180)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError(f"the space door {SPACE_DOOR} did not run: {exc}") from exc
+    out = ((r.stdout or "") + (r.stderr or "")).strip()
+    if r.returncode == 0:
+        return "loaded", out
+    if r.returncode == 3:  # not-installed: no system daemon yet
+        return "first-apply", out
+    raise RuntimeError(f"the space door refused deploy {label} (exit {r.returncode}): {out[-400:]}")
+
+
 def strip_build_output(source: Path) -> list[str]:
     """Remove build output the archive may carry: setuptools installs a stale ``build/lib`` in place of the
     sources it sits beside (0.3.0 and 0.3.1 shipped one). Returns what was removed."""
@@ -162,6 +232,9 @@ def main():
     p.add_argument("--port", type=int, default=18764)
     p.add_argument("--vault-project", help="Observatory vault folder holding the service's keys (prod slots %s)" % ", ".join(SLOTS))
     p.add_argument("--dry-run", action="store_true", help="print the launch argv and the slots it needs; install nothing")
+    p.add_argument("--background", action="store_true",
+                   help="a space with no GUI login (Mac Studio): a system daemon run as this account, loaded through "
+                        "studio-agent's door (B-106); give the space its own --port")
     p.add_argument("--ready-timeout", type=float, default=READY_TIMEOUT_S,
                    help="seconds to wait for the service to answer on the new commit (default %(default)s)")
     a = p.parse_args()
@@ -214,8 +287,12 @@ def main():
             if d.get("origin") == f"http://127.0.0.1:{a.port}" and (d.get("id"), d.get("instance")) != (ID, "default"):
                 p.error("Port already claimed by " + path.name)
         target = registry / (ID + ".default.json")
-        if target.exists() and json.loads(target.read_text()).get("installedBy") != "prowl-research-service":
+        own = json.loads(target.read_text()) if target.exists() else None
+        if own is not None and own.get("installedBy") != "prowl-research-service":
             p.error("Existing descriptor belongs to another installer")
+        if port_answers(a.port) and (own or {}).get("origin") != f"http://127.0.0.1:{a.port}":
+            # On a shared Mac loopback is shared too: another space's service may hold the port (B-106).
+            p.error(f"Port {a.port} already answers and this account's descriptor does not claim it; choose a free --port")
         if not release.exists():
             release.mkdir(parents=True)
             try:
@@ -237,7 +314,9 @@ def main():
         data = Path.home() / "Library/Application Support" / ID
         logs = Path.home() / "Library/Logs" / ID
         logs.mkdir(parents=True, exist_ok=True, mode=0o700)
-        plist = Path.home() / "Library/LaunchAgents" / f"{LABEL}.plist"
+        user = space_user()
+        label = background_label(user) if a.background else LABEL
+        plist = (Path.home().joinpath(*BACKGROUND_DIR) if a.background else Path.home() / "Library/LaunchAgents") / f"{label}.plist"
         python = str(release / "venv/bin/python")
         argv = launch_argv(python, data, a.port, release / "build.json", logs, a.vault_project, held)
         payload = {
@@ -256,18 +335,22 @@ def main():
             "StandardOutPath": str(logs / "service.log"),
             "StandardErrorPath": str(logs / "service.log"),
         }
-        domain = f"gui/{os.getuid()}"
-        overrides = command("launchctl", "print-disabled", domain)
-        disabled = f'"{LABEL}" => disabled' in overrides
-        # Stop only this owned label and wait; never disturb unrelated research agents.
-        subprocess.run(["launchctl", "bootout", domain + "/" + LABEL], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        for _ in range(50):
-            if subprocess.run(["launchctl", "print", domain + "/" + LABEL], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
-                break
-            time.sleep(0.1)
+        if a.background:
+            payload = background_definition(payload, label, Path.home())
+            disabled = False
         else:
-            raise RuntimeError("Previous service did not stop; installation left unchanged")
-        plist.parent.mkdir(parents=True, exist_ok=True)
+            domain = f"gui/{os.getuid()}"
+            overrides = command("launchctl", "print-disabled", domain)
+            disabled = f'"{LABEL}" => disabled' in overrides
+            # Stop only this owned label and wait; never disturb unrelated research agents.
+            subprocess.run(["launchctl", "bootout", domain + "/" + LABEL], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            for _ in range(50):
+                if subprocess.run(["launchctl", "print", domain + "/" + LABEL], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+                    break
+                time.sleep(0.1)
+            else:
+                raise RuntimeError("Previous service did not stop; installation left unchanged")
+        plist.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         atomic(plist, plistlib.dumps(payload))
         subprocess.run(["plutil", "-lint", str(plist)], check=True)
         descriptor = {
@@ -278,8 +361,12 @@ def main():
             "summary": "Research requests, evidence, costs and human decisions",
             "origin": f"http://127.0.0.1:{a.port}",
             "auth": {"tokenFile": str(data / "host.token")},
-            "lifecycle": {"manager": "launchd", "label": LABEL, "plist": str(plist)},
-            "paths": {"data": str(data), "config": str(data), "logs": [str(logs / "events.log"), str(logs / "service.log")]},
+            "lifecycle": ({"manager": "launchd", "domain": "system", "label": label, "plist": str(plist),
+                           "control": f"sudo -n {SPACE_DOOR} <start|stop|restart|status|deploy> {label}"}
+                          if a.background else {"manager": "launchd", "label": LABEL, "plist": str(plist)}),
+            # A space daemon has no stdout file (Observatory's definition carries none): the service's own log only.
+            "paths": {"data": str(data), "config": str(data),
+                      "logs": [str(logs / "events.log")] + ([] if a.background else [str(logs / "service.log")])},
             "commands": {"doctor": [python, "-m", "research_agent.service.cli", "doctor", "--port", str(a.port), "--json"]},
             "source": {"repository": "https://github.com/PROWL-AI/research-agent"},
             "fabricManifest": str(release / "source/fabric-agent.json"),
@@ -287,14 +374,22 @@ def main():
             "installedBy": "prowl-research-service",
         }
         atomic(target, (json.dumps(descriptor, indent=2) + "\n").encode())
-        if not disabled:
+        loaded = "first-apply"
+        if a.background:
+            loaded, door = door_deploy(label)
+        elif not disabled:
             subprocess.run(["launchctl", "bootstrap", domain, str(plist)], check=True)
-            if not wait_ready(descriptor["origin"], sha, a.ready_timeout):
-                raise RuntimeError(
-                    f"Service did not answer on commit {sha[:12]} within {a.ready_timeout:g} s; the release and its "
-                    f"descriptor are installed and launchd keeps starting it. Check: curl -s "
-                    f"{descriptor['origin']}/.well-known/fabric-service (a loaded machine can take longer; "
-                    f"--ready-timeout raises the wait)")
+            loaded = "loaded"
+        if loaded == "loaded" and not wait_ready(descriptor["origin"], sha, a.ready_timeout):
+            raise RuntimeError(
+                f"Service did not answer on commit {sha[:12]} within {a.ready_timeout:g} s; the release and its "
+                f"descriptor are installed and launchd keeps starting it. Check: curl -s "
+                f"{descriptor['origin']}/.well-known/fabric-service (a loaded machine can take longer; "
+                f"--ready-timeout raises the wait)")
+        if a.background and loaded == "first-apply":
+            print(json.dumps({"descriptor": str(target), "commit": sha, "release": str(release), "plist": str(plist),
+                              "label": label, "firstApply": first_apply_line(user, label), "door": door}))
+            raise SystemExit(FIRST_APPLY)
         print(json.dumps({"descriptor": str(target), "commit": sha, "disabled": disabled, "release": str(release)}))
         # Retain current + previous release. Only directories made by this installer.
         others = sorted(
