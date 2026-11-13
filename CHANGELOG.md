@@ -6,6 +6,8 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- The dashboard's settings carry the agents' daily allowance, and its «Ключи и разрешения» callout, SECURITY.md and
+  FABRIC.md describe the 0.5.0 approval rule instead of «every paid job waits» (B-109).
 - A one-off cloud command (`client add`) no longer hangs behind the web dyno (B-119): reads of client keys end their
   transaction, and the 0.5.0 column is added only when it is missing.
 - The remote descriptor `scripts/cloud.py register` writes passes Fabric Dashboards (B-118): residency, data class and
