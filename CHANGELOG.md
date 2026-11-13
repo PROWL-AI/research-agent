@@ -4,6 +4,16 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.11 (2026-11-13)
+
+- The writer writes with prompt version 2 (B-108, rule R30): no em dash in the prompt or its assumption marker, now
+  `(target, assumption, not data)` (the lint accepts both forms, so reports written before keep passing), and the copy
+  rules of the agents database pattern `copy-check` 1.1.0 (vendored as `research_agent/agent/copy_check.py`): the lint
+  flags AT-06 and AT-16 on the report's lines outside code blocks, and the repair pass rewrites them. Version 1 stays as
+  shipped and runs with `RESEARCH_WRITER_PROMPT=1` (R28). Measured on three saved acceptance runs: em dashes 1, 7, 145
+  to 0, 0, 0; the judge inside the model's own variance
+  ([report](docs/reports/2026-11-13-writer-prompt-v2/README.md)).
+
 ## 0.6.10 (2026-11-13)
 
 - `competitor-seo`, `domain-baseline` and `seo-site-audit` 1.1 use Prowl's Moz tools (B-113): Moz Domain Authority,
