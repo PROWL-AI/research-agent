@@ -522,10 +522,38 @@ async def test_a_plan_truncated_at_the_ceiling_fails_the_run_with_a_named_reason
     with pytest.raises(OrchestratorError, match="planner output truncated"):
         await Orchestrator(FakeProwl(), _client(provider), runs_root=tmp_path / "runs").run(
             "mini-teardown", BRIEF, run_id="plan-ceiling", max_llm_usd=5.0)
-    assert len(_planner_budgets(provider)) == 2  # one retry, never a loop
+    assert len(_planner_budgets(provider)) == 3  # two retries, the last with reasoning off, never a loop
     checkpoint = ArtifactStore(tmp_path / "runs" / "plan-ceiling").load_checkpoint()
     assert checkpoint.status == "failed" and checkpoint.terminal_code == "error"
     assert "planner" in checkpoint.stop_reason and "max_tokens=24000" in checkpoint.stop_reason
+
+
+async def test_a_plan_cut_twice_is_asked_once_more_with_reasoning_off(patched_runbooks, tmp_path):
+    """B-128: kimi-k3.1-pro cut the domain-baseline 1.1 plan at 8000 and at 24000 tokens (2026-11-13); the third
+    request goes with reasoning off, and a plan that arrives then runs."""
+    from research_agent.agent.orchestrator import _PLAN_ESCALATED_MAX_TOKENS
+
+    class CutTwice(TruncatingPlanner):
+        def __call__(self, request):
+            self.cut_below = 10**9 if len(_planner_budgets(self)) < 2 else 0
+            return super().__call__(request)
+
+    provider = CutTwice(cut_below=10**9, cost=0.01, plan_steps=1)
+    llm = _client(provider)
+    seen = []
+    complete = llm.complete
+
+    async def recording(messages, *args, **kwargs):
+        if kwargs.get("stage") == "planner":
+            seen.append(kwargs.get("reasoning"))
+        return await complete(messages, *args, **kwargs)
+
+    llm.complete = recording
+    result = await Orchestrator(FakeProwl(), llm, runs_root=tmp_path / "runs").run(
+        "mini-teardown", BRIEF, run_id="plan-reasoning-off", max_llm_usd=5.0)
+    assert seen == [None, None, False]
+    assert _planner_budgets(provider)[-1] == _PLAN_ESCALATED_MAX_TOKENS
+    assert result.terminal_code != "error"
 
 
 def _length_null(cost: float = 0.01) -> dict:

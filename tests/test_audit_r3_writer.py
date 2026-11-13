@@ -132,6 +132,7 @@ class TestWriterDraftTruncation:
         llm = _QueueLLM([
             LLMError("cut", retryable=False, finish_reason="length", content="first half"),
             LLMError("cut", retryable=False, finish_reason="length", content="second half"),
+            LLMError("cut", retryable=False, finish_reason="length", content="half"),
         ])
         draft = await writer.write_report(
             llm, get_runbook("mini-teardown"), _one_claim_ledger(tmp_path),
@@ -140,8 +141,45 @@ class TestWriterDraftTruncation:
         assert "second half" in draft
         assert "truncated" in draft
         assert llm.max_tokens_seen == [
-            writer._DRAFT_MAX_TOKENS, writer._DRAFT_ESCALATED_MAX_TOKENS,
+            writer._DRAFT_MAX_TOKENS, writer._DRAFT_ESCALATED_MAX_TOKENS, writer._DRAFT_ESCALATED_MAX_TOKENS,
         ]
+
+    async def test_a_cut_draft_is_asked_once_more_with_reasoning_off(self, patched_runbooks, tmp_path):
+        """B-128: a draft cut at the ceiling (not empty) gets one request with reasoning off; its answer ships."""
+        from research_agent.agent import writer
+        from research_agent.runbook import get_runbook
+
+        seen = []
+
+        class Recording(_QueueLLM):
+            async def complete(self, messages, tier="cheap", json_mode=False, **kwargs):
+                seen.append(kwargs.get("reasoning"))
+                return await super().complete(messages, tier, json_mode, **kwargs)
+
+        llm = Recording([
+            LLMError("cut", retryable=False, finish_reason="length", content="first half"),
+            LLMError("cut", retryable=False, finish_reason="length", content="second half"),
+            "# Clean report\n\nNo numbers here.",
+        ])
+        draft = await writer.write_report(
+            llm, get_runbook("mini-teardown"), _one_claim_ledger(tmp_path), {"competitors": ["a.com"]},
+        )
+        assert draft == "# Clean report\n\nNo numbers here."
+        assert seen == [None, None, False]
+
+    async def test_the_longer_cut_draft_ships_when_reasoning_off_is_cut_too(self, patched_runbooks, tmp_path):
+        from research_agent.agent import writer
+        from research_agent.runbook import get_runbook
+
+        llm = _QueueLLM([
+            LLMError("cut", retryable=False, finish_reason="length", content="first half"),
+            LLMError("cut", retryable=False, finish_reason="length", content="a longer second half"),
+            LLMError("cut", retryable=False, finish_reason="length", content="short"),
+        ])
+        draft = await writer.write_report(
+            llm, get_runbook("mini-teardown"), _one_claim_ledger(tmp_path), {"competitors": ["a.com"]},
+        )
+        assert draft.startswith("a longer second half") and "truncated" in draft
 
     async def test_both_drafts_empty_retries_once_with_reasoning_off(self, patched_runbooks, tmp_path):
         """B-122: reasoning took the whole budget of both drafts and no word came back (kimi-k3.1-pro on a

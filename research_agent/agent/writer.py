@@ -611,8 +611,25 @@ async def write_report(
                 messages, tier="strong", max_tokens=_DRAFT_ESCALATED_MAX_TOKENS, temperature=0.3,
                 stage="writer", reasoning=False,
             )
-        # Still truncated at the ceiling: ship the partial draft (lint and
-        # repair can only improve it) rather than lose the run's evidence.
+        # B-128: a draft cut at the ceiling has spent part of its budget on reasoning too (measured 2026-11-13:
+        # moonshotai/kimi-k3.1-pro, accept-subscription-20261021b, shipped partial with 4 lint issues). One more
+        # request with reasoning off; whatever comes back, the longer draft ships, never a shorter one.
+        log.warning("writer draft still truncated at max_tokens=%d; retrying with reasoning off",
+                    _DRAFT_ESCALATED_MAX_TOKENS)
+        try:
+            return await llm.complete(
+                messages, tier="strong", max_tokens=_DRAFT_ESCALATED_MAX_TOKENS, temperature=0.3,
+                stage="writer", reasoning=False,
+            )
+        except LLMBudgetExceeded:
+            pass
+        except LLMError as last:
+            if last.retryable or last.finish_reason != "length":
+                raise
+            if len((last.content or "").strip()) > len(truncated):
+                truncated = (last.content or "").strip()
+        # Still truncated: ship the partial draft (lint and repair can only
+        # improve it) rather than lose the run's evidence.
         log.warning(
             "writer draft still truncated at max_tokens=%d; shipping the partial draft",
             _DRAFT_ESCALATED_MAX_TOKENS,
