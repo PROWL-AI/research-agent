@@ -171,6 +171,8 @@ class Store:
             self._save(job)
             if not approve:
                 text = "Запрос отклонён до выполнения."
+            elif decision["by"] == "allowance" and decision.get("keyClass") == "interactive":
+                text = "Запуск по ключу без лимита: трата записана на вызывающего."
             elif decision["by"] == "allowance":
                 text = "Запуск разрешён дневным лимитом вызывающего агента."
             else:

@@ -91,14 +91,17 @@ def client_command(argv, environ=os.environ, out=print):
     """`client add|rotate|limit|revoke|list`: the cloud instance's client keys (B-099 M3, B-100).
     On Heroku: `heroku run prowl-research-service client add <name> --scopes read,tools.call --daily-usd 10`.
     `--raw` prints the key alone, for a pipe straight into the holder's vault slot (never into a transcript)."""
-    from .clients import DAILY_FLOOR_USD, DESK_DEFAULT_GRANTS, SCOPES, from_env
+    from .clients import DAILY_FLOOR_USD, DEFAULT_CLASS, DESK_DEFAULT_GRANTS, KEY_CLASSES, SCOPES, from_env
 
     parser = argparse.ArgumentParser(prog="prowl-research-service client")
     parser.add_argument("action", choices=["add", "add-desk", "rotate", "limit", "revoke", "list"])
     parser.add_argument("name", nargs="?")
     parser.add_argument("--scopes", default="read", help="comma-separated: " + ", ".join(SCOPES))
-    parser.add_argument("--daily-usd", type=float, default=DAILY_FLOOR_USD,
-                        help=f"the key's ceiling per UTC day, at least {DAILY_FLOOR_USD:g} (B-100)")
+    parser.add_argument("--daily-usd", type=float, default=None,
+                        help=f"an automated key's ceiling per UTC day, at least {DAILY_FLOOR_USD:g}, {DAILY_FLOOR_USD:g} by default (B-100)")
+    parser.add_argument("--class", dest="key_class", choices=KEY_CLASSES, default=DEFAULT_CLASS,
+                        help="add: interactive (a person, or an agent a person calls) has no ceiling; automated (a pipeline) "
+                             "keeps one (K1)")
     parser.add_argument("--raw", action="store_true", help="print only the key, for a pipe into a vault")
     parser.add_argument("--grants", default=",".join(DESK_DEFAULT_GRANTS),
                         help="add-desk: the scopes the desk may give, comma-separated (B-121)")
@@ -116,13 +119,15 @@ def client_command(argv, environ=os.environ, out=print):
         out(f"revoked {args.name}")
         return 0
     if args.action == "limit":
+        if args.daily_usd is None:
+            parser.error("limit needs --daily-usd")
         clients.limit(args.name, args.daily_usd)
         out(f"{args.name}: daily ceiling {args.daily_usd:g} USD")
         return 0
     if args.action == "add-desk":
         key = clients.add_desk(args.name, args.grants.split(","), args.max_daily_usd)
     elif args.action == "add":
-        key = clients.add(args.name, args.scopes.split(","), args.daily_usd)
+        key = clients.add(args.name, args.scopes.split(","), args.daily_usd, args.key_class)
     else:
         key = clients.rotate(args.name)
     # The one time the key is shown: it is not stored, only its SHA-256.

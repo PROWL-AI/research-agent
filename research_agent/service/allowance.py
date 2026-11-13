@@ -11,6 +11,10 @@ job waits for the operator as before.
 - A job counts against the day it was approved: its worst case until it ends with every call priced, then what it
   really cost. A job rejected or cancelled before approval costs nothing.
 - The dashboard's own requests are the operator's: they wait for the operator's click as before.
+- K1 (the operator's word of 2026-11-13, DEC-0074 of the Appvillis keys plan): a cloud client's `interactive` key, a
+  person or an agent a person calls in that moment, has no ceiling. Its job starts at once, whatever it costs, and its
+  decision keeps who spent (the principal) and the class. An `automated` key, and a key without a class, keeps its
+  ceiling.
 """
 from __future__ import annotations
 
@@ -81,10 +85,13 @@ def spent_today(store, principal: str, day: str | None = None) -> float:
     return total
 
 
-def ceiling_for(job: dict[str, Any], settings: dict[str, Any]) -> float:
-    """A cloud client's own ceiling (never below the floor), else the service's setting for local agents."""
+def ceiling_for(job: dict[str, Any], settings: dict[str, Any]) -> float | None:
+    """A cloud client's own ceiling (never below the floor), none for its interactive key (K1), else the service's
+    setting for local agents."""
     delegation = job.get("delegation") or {}
     if delegation.get("tier") == "client":
+        if delegation.get("keyClass") == "interactive":
+            return None
         return max(float(delegation.get("dailyUsd") or DAILY_FLOOR_USD), DAILY_FLOOR_USD)
     return float(settings.get("agent_daily_usd", DAILY_FLOOR_USD))
 
@@ -98,9 +105,12 @@ def verdict(store, job: dict[str, Any]) -> dict[str, Any] | None:
     if worst == 0.0:
         return {"by": "allowance", "principal": principal, "worstCaseUsd": 0.0, "reason": "free"}
     ceiling = ceiling_for(job, job.get("config") or {})
+    spent = spent_today(store, principal)
+    if ceiling is None:  # an interactive key: measured and shown, never held (K1)
+        return {"by": "allowance", "principal": principal, "worstCaseUsd": round(worst, 4),
+                "spentTodayUsd": round(spent, 4), "ceilingUsd": None, "keyClass": "interactive"}
     if ceiling <= OFF:
         return None
-    spent = spent_today(store, principal)
     if spent + worst > ceiling:
         return None
     return {"by": "allowance", "principal": principal, "worstCaseUsd": round(worst, 4),

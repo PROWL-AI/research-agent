@@ -44,16 +44,17 @@ CLIENT_NAME = {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"}
 DESK_SCHEMAS = {
  "client.issue": obj({"name": CLIENT_NAME, "scopes": {"type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": True,
                                                       "items": {"enum": ["read", "research.run", "tools.call"]}},
-                      "dailyUsd": {"type": "number", "minimum": 10, "maximum": 1000}}, ["name"]),
+                      "dailyUsd": {"type": "number", "minimum": 10, "maximum": 1000},
+                      "class": {"enum": ["interactive", "automated"]}}, ["name"]),
  "client.rotate": obj({"name": CLIENT_NAME}, ["name"]),
  "client.revoke": obj({"name": CLIENT_NAME}, ["name"]),
  "client.list": obj(),
 }
 DESK_DESCRIPTIONS = {
- "client.issue": "Issue a client key within this desk's grants and ceiling; the key is in this answer once, put it straight into the holder's vault slot.",
+ "client.issue": "Issue a client key within this desk's grants and ceiling; the key is in this answer once, put it straight into the holder's vault slot. class interactive (a person, or an agent a person calls in that moment) has no daily ceiling and takes no dailyUsd; class automated (a pipeline or a schedule, the default) keeps one.",
  "client.rotate": "Rotate a key this desk issued; the new key is in this answer once.",
  "client.revoke": "Revoke a key this desk issued, for good.",
- "client.list": "The keys this desk issued: names, scopes, ceilings, prefixes and dates, never a key.",
+ "client.list": "The keys this desk issued: names, classes, scopes, ceilings (null for an interactive key, never 0), prefixes and dates, never a key.",
 }
 CAPABILITIES = list(SCHEMAS)[:5]
 for name in CAPABILITIES:
@@ -83,7 +84,7 @@ def tools_list(desk=False):
         effect = tool_effect(name)
         out = {"type": "object", "oneOf": [{**RESULT_SCHEMA, "properties": {"output": OUTPUTS[name]}}, HANDLE_SCHEMA]} if name in JOBS else OUTPUTS[name] if name in CAPABILITIES else {"type": "object", "required": ["job"]}
         tools.append({"name": name, "description": {
-            "research.run": "Run a research runbook; durable job that starts within the caller's daily allowance, above it waits for the operator.",
+            "research.run": "Run a research runbook; durable job that starts within the caller's daily allowance (an interactive client key has no ceiling and starts at once), above it waits for the operator.",
             "research.tools.call": "Call one Prowl data tool with its parameters; durable job, same allowance rule as research.run.",
             "research.tutorial": "Create a clearly labeled synthetic learning job; never contacts providers.",
             "research.list_runbooks": "List local runbooks, typed inputs and tool budgets.",
@@ -275,8 +276,9 @@ class Protocol:
         if name == "client.revoke":
             self.desk.desk_revoke(desk, args["name"])
             return {"name": args["name"], "revoked": True}
-        key = (self.desk.desk_issue(desk, args["name"], args.get("scopes"), args.get("dailyUsd")) if name == "client.issue"
+        key = (self.desk.desk_issue(desk, args["name"], args.get("scopes"), args.get("dailyUsd"), args.get("class"))
+               if name == "client.issue"
                else self.desk.desk_rotate(desk, args["name"]))
         record = next(c for c in self.desk.desk_list(desk) if c["name"] == args["name"])
-        return {"name": args["name"], "key": key, "scopes": record["scopes"], "dailyUsd": record["dailyUsd"],
+        return {"name": args["name"], "key": key, "scopes": record["scopes"], "dailyUsd": record["dailyUsd"], "class": record["keyClass"],
                 "prefix": record["prefix"], "shownOnce": True}

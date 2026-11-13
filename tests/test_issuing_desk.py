@@ -32,7 +32,7 @@ def test_the_store_keeps_a_desk_inside_its_grants_ceiling_and_own_keys(clients):
     desk = clients.add_desk("ania", ["read", "research.run"], 20)
     assert clients.verify(desk)["scopes"] == ["keys.issue"]
     key = clients.desk_issue("ania", "team-bot", ["read", "research.run"], 15)
-    assert clients.verify(key) == {"name": "team-bot", "scopes": ["read", "research.run"], "dailyUsd": 15.0}
+    assert clients.verify(key) == {"name": "team-bot", "scopes": ["read", "research.run"], "dailyUsd": 15.0, "keyClass": "automated"}
     with pytest.raises(ValueError, match="may give read, research.run"):
         clients.desk_issue("ania", "x", ["tools.call"])
     with pytest.raises(ValueError, match="at most 20"):

@@ -19,11 +19,17 @@ from typing import Callable
 
 #: What a key may do. `read`: list runbooks, read artifacts, run the free tutorial.
 #: `research.run`: create research jobs. `tools.call`: create single Prowl tool jobs.
-#: A paid job starts on its own when it fits the key's daily ceiling, else it waits for the operator (B-100).
+#: A paid job starts on its own when it fits the key's daily ceiling, else it waits for the operator (B-100); a job of an
+#: interactive key starts on its own whatever it costs (K1).
 SCOPES = ("read", "research.run", "tools.call")
 #: Every key carries a daily USD ceiling of at least this, 10 by default: the operator's word recorded in the agents
 #: database (intake in-20261112-996c34, research template 1.6.0). A smaller one is refused.
 DAILY_FLOOR_USD = 10.0
+#: K1 (the operator's word of 2026-11-13, DEC-0074 of the Appvillis keys plan): a key is `interactive` (a person, or an
+#: agent a person calls in that moment) and has no daily ceiling, or `automated` (a pipeline, a schedule) and keeps its
+#: ceiling. A key without a class reads as `automated`: it behaves as before until it is reissued.
+KEY_CLASSES = ("interactive", "automated")
+DEFAULT_CLASS = "automated"
 PREFIX = "prc_"
 NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
@@ -66,6 +72,25 @@ def _ceiling(daily_usd) -> float:
     return value
 
 
+def _classed(key_class, daily_usd) -> tuple[str, float | None]:
+    """(class, ceiling): an interactive key carries no ceiling (None, never 0); an automated one carries its ceiling."""
+    key_class = key_class or DEFAULT_CLASS
+    if key_class not in KEY_CLASSES:
+        raise ValueError("key class: " + " or ".join(KEY_CLASSES))
+    if key_class == "interactive":
+        if daily_usd is not None:
+            raise ValueError("an interactive key has no daily ceiling; issue it as automated to give it one")
+        return key_class, None
+    return key_class, _ceiling(DAILY_FLOOR_USD if daily_usd is None else daily_usd)
+
+
+def _ceiling_of(key_class, stored) -> float | None:
+    """What a record's ceiling reads as: None for an interactive key, else never below the floor."""
+    if (key_class or DEFAULT_CLASS) == "interactive":
+        return None
+    return max(float(DAILY_FLOOR_USD if stored is None else stored), DAILY_FLOOR_USD)
+
+
 def _usable(key) -> bool:
     return isinstance(key, str) and key.startswith(PREFIX) and 20 < len(key) < 200
 
@@ -83,7 +108,7 @@ class DeskMixin:
             raise ValueError(f"client {name} exists; rotate it or choose another name")
         key = _new_key()
         self._insert(name, {"key": key, "scopes": [DESK_SCOPE], "dailyUsd": DAILY_FLOOR_USD, "issuedBy": None,
-                            "grants": grants, "maxDailyUsd": max_daily_usd})
+                            "grants": grants, "maxDailyUsd": max_daily_usd, "keyClass": DEFAULT_CLASS})
         return key
 
     def _desk(self, desk: str) -> dict:
@@ -98,19 +123,20 @@ class DeskMixin:
             raise KeyError("unknown-client")  # another desk's or the operator's key reads as unknown
         return record
 
-    def desk_issue(self, desk: str, name: str, scopes=None, daily_usd: float | None = None) -> str:
+    def desk_issue(self, desk: str, name: str, scopes=None, daily_usd: float | None = None,
+                   key_class: str | None = None) -> str:
         d = self._desk(desk)
         scopes = _check(name, scopes or ["read"])
         if not set(scopes) <= set(d["grants"]):
             raise ValueError("scopes: this desk may give " + ", ".join(d["grants"]))
-        daily_usd = _ceiling(DAILY_FLOOR_USD if daily_usd is None else daily_usd)
-        if daily_usd > d["maxDailyUsd"]:
+        key_class, daily_usd = _classed(key_class, daily_usd)
+        if daily_usd is not None and daily_usd > d["maxDailyUsd"]:
             raise ValueError(f"daily ceiling: this desk may give at most {d['maxDailyUsd']:g} USD per UTC day")
         if self._get(name) is not None:
             raise ValueError(f"client {name} exists; choose another name")
         key = _new_key()
         self._insert(name, {"key": key, "scopes": scopes, "dailyUsd": daily_usd, "issuedBy": desk, "grants": None,
-                            "maxDailyUsd": None})
+                            "maxDailyUsd": None, "keyClass": key_class})
         return key
 
     def desk_rotate(self, desk: str, name: str) -> str:
@@ -160,14 +186,15 @@ class FileClients(DeskMixin):
         data[name] = {"sha256": _hash(key), "prefix": key[:12], "createdAt": _now(), "revokedAt": None, **record}
         self._write(data)
 
-    def add(self, name: str, scopes, daily_usd: float = DAILY_FLOOR_USD) -> str:
-        scopes, daily_usd = _check(name, scopes), _ceiling(daily_usd)
+    def add(self, name: str, scopes, daily_usd: float | None = None, key_class: str | None = None) -> str:
+        scopes = _check(name, scopes)
+        key_class, daily_usd = _classed(key_class, daily_usd)
         data = self._load()
         if name in data:
             raise ValueError(f"client {name} exists; rotate it or choose another name")
         key = _new_key()
         data[name] = {"sha256": _hash(key), "scopes": scopes, "prefix": key[:12], "createdAt": _now(), "revokedAt": None,
-                      "dailyUsd": daily_usd}
+                      "dailyUsd": daily_usd, "keyClass": key_class}
         self._write(data)
         return key
 
@@ -185,6 +212,8 @@ class FileClients(DeskMixin):
         data = self._load()
         if name not in data or data[name]["revokedAt"]:
             raise KeyError(f"no active client {name}")
+        if data[name].get("keyClass") == "interactive":
+            raise ValueError(f"{name} is an interactive key and has no daily ceiling; issue an automated key to limit it")
         data[name]["dailyUsd"] = daily_usd
         self._write(data)
 
@@ -197,7 +226,8 @@ class FileClients(DeskMixin):
 
     def list(self) -> list[dict]:
         return [{"name": n, "scopes": c["scopes"], "prefix": c["prefix"], "createdAt": c["createdAt"], "revokedAt": c["revokedAt"],
-                 "dailyUsd": c.get("dailyUsd", DAILY_FLOOR_USD), "issuedBy": c.get("issuedBy")} for n, c in sorted(self._load().items())]
+                 "dailyUsd": _ceiling_of(c.get("keyClass"), c.get("dailyUsd")), "keyClass": c.get("keyClass") or DEFAULT_CLASS,
+                 "issuedBy": c.get("issuedBy")} for n, c in sorted(self._load().items())]
 
     def verify(self, key) -> dict | None:
         if not _usable(key):
@@ -205,7 +235,8 @@ class FileClients(DeskMixin):
         wanted = _hash(key)
         for name, c in self._load().items():
             if not c["revokedAt"] and secrets.compare_digest(c["sha256"], wanted):
-                return {"name": name, "scopes": c["scopes"], "dailyUsd": max(c.get("dailyUsd", DAILY_FLOOR_USD), DAILY_FLOOR_USD)}
+                return {"name": name, "scopes": c["scopes"], "dailyUsd": _ceiling_of(c.get("keyClass"), c.get("dailyUsd")),
+                        "keyClass": c.get("keyClass") or DEFAULT_CLASS}
         return None
 
 
@@ -222,7 +253,10 @@ class PostgresClients(DeskMixin):
     HAS_COLUMN = ("SELECT 1 FROM information_schema.columns WHERE table_name = 'prowl_research_clients'"
                   " AND column_name = %s")
     #: Added in 0.6.0 (B-121, the issuing desk); each only when missing (B-119).
-    DESK_COLUMNS = (("issued_by", "TEXT"), ("grants", "TEXT"), ("max_daily_usd", "DOUBLE PRECISION"))
+    DESK_COLUMNS = (("issued_by", "TEXT"), ("grants", "TEXT"), ("max_daily_usd", "DOUBLE PRECISION"),
+                    # Added in 0.6.3 (K1): NULL reads as automated. `daily_usd` stays NOT NULL; an interactive key keeps
+                    # the floor there and reads it as no ceiling.
+                    ("key_class", "TEXT"))
 
     def __init__(self, connect: Callable):
         self.connect = connect
@@ -245,33 +279,38 @@ class PostgresClients(DeskMixin):
     def _get(self, name: str) -> dict | None:
         db = self._db()
         with db.cursor() as cur:
-            row = cur.execute("SELECT name, scopes, daily_usd, revoked_at, issued_by, grants, max_daily_usd FROM prowl_research_clients"
-                              " WHERE name=%s", (name,)).fetchone()
+            row = cur.execute("SELECT name, scopes, daily_usd, revoked_at, issued_by, grants, max_daily_usd, key_class"
+                              " FROM prowl_research_clients WHERE name=%s", (name,)).fetchone()
         db.commit()
         if row is None:
             return None
-        return {"name": row[0], "scopes": json.loads(row[1]), "dailyUsd": row[2], "revokedAt": row[3], "issuedBy": row[4],
-                "grants": json.loads(row[5]) if row[5] else None, "maxDailyUsd": row[6]}
+        return {"name": row[0], "scopes": json.loads(row[1]), "dailyUsd": _ceiling_of(row[7], row[2]), "revokedAt": row[3],
+                "issuedBy": row[4], "grants": json.loads(row[5]) if row[5] else None, "maxDailyUsd": row[6],
+                "keyClass": row[7] or DEFAULT_CLASS}
 
     def _insert(self, name: str, record: dict) -> None:
         db = self._db()
         key = record["key"]
         with db.cursor() as cur:
             cur.execute("INSERT INTO prowl_research_clients(name, sha256, scopes, prefix, created_at, revoked_at, daily_usd, issued_by,"
-                        " grants, max_daily_usd) VALUES (%s,%s,%s,%s,%s,NULL,%s,%s,%s,%s)",
-                        (name, _hash(key), json.dumps(record["scopes"]), key[:12], _now(), record["dailyUsd"], record["issuedBy"],
-                         json.dumps(record["grants"]) if record["grants"] else None, record["maxDailyUsd"]))
+                        " grants, max_daily_usd, key_class) VALUES (%s,%s,%s,%s,%s,NULL,%s,%s,%s,%s,%s)",
+                        (name, _hash(key), json.dumps(record["scopes"]), key[:12], _now(),
+                         DAILY_FLOOR_USD if record["dailyUsd"] is None else record["dailyUsd"], record["issuedBy"],
+                         json.dumps(record["grants"]) if record["grants"] else None, record["maxDailyUsd"],
+                         record.get("keyClass") or DEFAULT_CLASS))
         db.commit()
 
-    def add(self, name: str, scopes, daily_usd: float = DAILY_FLOOR_USD) -> str:
-        scopes, daily_usd = _check(name, scopes), _ceiling(daily_usd)
+    def add(self, name: str, scopes, daily_usd: float | None = None, key_class: str | None = None) -> str:
+        scopes = _check(name, scopes)
+        key_class, daily_usd = _classed(key_class, daily_usd)
         db = self._db()
         with db.cursor() as cur:
             if cur.execute("SELECT 1 FROM prowl_research_clients WHERE name=%s", (name,)).fetchone():
                 raise ValueError(f"client {name} exists; rotate it or choose another name")
             key = _new_key()
-            cur.execute("INSERT INTO prowl_research_clients(name, sha256, scopes, prefix, created_at, revoked_at, daily_usd)"
-                        " VALUES (%s,%s,%s,%s,%s,NULL,%s)", (name, _hash(key), json.dumps(scopes), key[:12], _now(), daily_usd))
+            cur.execute("INSERT INTO prowl_research_clients(name, sha256, scopes, prefix, created_at, revoked_at, daily_usd, key_class)"
+                        " VALUES (%s,%s,%s,%s,%s,NULL,%s,%s)", (name, _hash(key), json.dumps(scopes), key[:12], _now(),
+                                                               DAILY_FLOOR_USD if daily_usd is None else daily_usd, key_class))
         db.commit()
         return key
 
@@ -289,8 +328,11 @@ class PostgresClients(DeskMixin):
         daily_usd = _ceiling(daily_usd)
         db = self._db()
         with db.cursor() as cur:
-            if not cur.execute("SELECT 1 FROM prowl_research_clients WHERE name=%s AND revoked_at IS NULL", (name,)).fetchone():
+            row = cur.execute("SELECT key_class FROM prowl_research_clients WHERE name=%s AND revoked_at IS NULL", (name,)).fetchone()
+            if not row:
                 raise KeyError(f"no active client {name}")
+            if row[0] == "interactive":
+                raise ValueError(f"{name} is an interactive key and has no daily ceiling; issue an automated key to limit it")
             cur.execute("UPDATE prowl_research_clients SET daily_usd=%s WHERE name=%s", (daily_usd, name))
         db.commit()
 
@@ -305,21 +347,24 @@ class PostgresClients(DeskMixin):
     def list(self) -> list[dict]:
         db = self._db()
         with db.cursor() as cur:
-            rows = cur.execute("SELECT name, scopes, prefix, created_at, revoked_at, daily_usd, issued_by FROM prowl_research_clients"
-                               " ORDER BY name").fetchall()
+            rows = cur.execute("SELECT name, scopes, prefix, created_at, revoked_at, daily_usd, issued_by, key_class"
+                               " FROM prowl_research_clients ORDER BY name").fetchall()
         db.commit()  # end the read transaction: an open one holds a lock that a later ALTER waits on (B-119)
-        return [{"name": r[0], "scopes": json.loads(r[1]), "prefix": r[2], "createdAt": r[3], "revokedAt": r[4], "dailyUsd": r[5],
-                 "issuedBy": r[6]} for r in rows]
+        return [{"name": r[0], "scopes": json.loads(r[1]), "prefix": r[2], "createdAt": r[3], "revokedAt": r[4],
+                 "dailyUsd": _ceiling_of(r[7], r[5]), "keyClass": r[7] or DEFAULT_CLASS, "issuedBy": r[6]} for r in rows]
 
     def verify(self, key) -> dict | None:
         if not _usable(key):
             return None
         db = self._db()
         with db.cursor() as cur:
-            row = cur.execute("SELECT name, scopes, daily_usd FROM prowl_research_clients WHERE sha256=%s AND revoked_at IS NULL",
-                              (_hash(key),)).fetchone()
+            row = cur.execute("SELECT name, scopes, daily_usd, key_class FROM prowl_research_clients WHERE sha256=%s"
+                              " AND revoked_at IS NULL", (_hash(key),)).fetchone()
         db.commit()  # the web dyno verifies every request: never leave it idle in a transaction (B-119)
-        return {"name": row[0], "scopes": json.loads(row[1]), "dailyUsd": max(row[2], DAILY_FLOOR_USD)} if row else None
+        if row is None:
+            return None
+        return {"name": row[0], "scopes": json.loads(row[1]), "dailyUsd": _ceiling_of(row[3], row[2]),
+                "keyClass": row[3] or DEFAULT_CLASS}
 
 
 def from_env(root: Path, environ=os.environ):
