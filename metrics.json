@@ -1,0 +1,118 @@
+{
+ "schema": "agent-metrics/1",
+ "template": "research",
+ "variant": "runbook",
+ "checked": "2026-11-13",
+ "standard": "agent-metrics/1 as proposed in source 3070b531aa99 at docs/proposals/2026-11-10-agent-metrics-standard.md@464993dd, checked 2026-11-11 (format v2.1)",
+ "about": "This agent's metrics, the research template's set (rule R31; B-114). Ids and versions are the template's; a changed meaning is the next version, an ended metric is marked retired, never removed (R28). Values are agent-measurement/1 records printed by scripts/measure_metrics.py.",
+ "metrics": [
+  {
+   "id": "answered_share",
+   "version": 1,
+   "family": "outcome",
+   "means": "Share of research jobs (ask, investigate, a runbook run, an analyze) that ended succeeded or partial with at least one verified claim, out of all that reached a terminal state.",
+   "unit": "share",
+   "direction": "up",
+   "population": {
+    "unit": "job",
+    "filter": "Jobs created in the window that reached a terminal state, one per idempotency key, check orders and the tutorial job excluded."
+   },
+   "window": {
+    "kind": "rolling",
+    "days": 7
+   },
+   "source": {
+    "kind": "custom",
+    "ref": "the service job store (research_agent/service/store.py, terminal states of research jobs); scripts/measure_metrics.py"
+   },
+   "baseline": null,
+   "baselineNotMeasured": "n=3 research jobs on the local service in 30 days (2026-11-13), too small to be a baseline; measured over the first 14 closed UTC days of the cloud instances, which serve the Studio spaces since 2026-11-13",
+   "target": null,
+   "targetNotSet": "set by the assembled agent's owner once its own baseline is measured; a target without a baseline is a guess",
+   "owner": "prowl-research"
+  },
+  {
+   "id": "verified_claim_share",
+   "version": 1,
+   "family": "quality",
+   "means": "Share of the claims in delivered answers and reports whose status is verified (a verbatim quote found in the cited source, or two independent sources agreeing), the rest listed as not verified.",
+   "unit": "share",
+   "direction": "up",
+   "population": {
+    "unit": "accepted_unit",
+    "filter": "Every claim of every answer or report delivered in the window (verified and notVerified lists together)."
+   },
+   "window": {
+    "kind": "rolling",
+    "days": 7
+   },
+   "source": {
+    "kind": "custom",
+    "ref": "the run ledgers (research_agent/evidence/ledger.py statuses verified, assumed, conflict); scripts/measure_metrics.py"
+   },
+   "baseline": {
+    "value": 0.411,
+    "n": 3355,
+    "window": {
+     "kind": "all-ledgers",
+     "end": "2026-11-13"
+    },
+    "runs": 14,
+    "measuredBy": "scripts/measure_metrics.py"
+   },
+   "target": null,
+   "targetNotSet": "the operator sets it; the writer's repair pass (statuses must match the ledger) is the lever being measured next (B-107)",
+   "owner": "prowl-research"
+  },
+  {
+   "id": "failed_by_service_share",
+   "version": 1,
+   "family": "reliability",
+   "means": "Share of research jobs that ended failed for a reason of the service (attempts exhausted, a crash not resumed, a lost lease), not for a budget the caller set, a cancel or a refusal; a pause (disk, lane, wallet) that resumed is not a failure.",
+   "unit": "share",
+   "direction": "down",
+   "population": {
+    "unit": "job",
+    "filter": "Jobs created in the window that reached a terminal state, check orders and the tutorial job excluded."
+   },
+   "window": {
+    "kind": "rolling",
+    "days": 7
+   },
+   "source": {
+    "kind": "custom",
+    "ref": "the service job store, failed with execution-failed or interrupted; scripts/measure_metrics.py"
+   },
+   "baseline": null,
+   "baselineNotMeasured": "n=3 research jobs on the local service in 30 days (2026-11-13), too small to be a baseline; measured over the first 14 closed UTC days of the cloud instances, which serve the Studio spaces since 2026-11-13",
+   "target": null,
+   "targetNotSet": "set by the assembled agent's owner once its own baseline is measured; a target without a baseline is a guess",
+   "owner": "prowl-research"
+  },
+  {
+   "id": "cost_per_answer_usd",
+   "version": 1,
+   "family": "cost",
+   "means": "Money spent per answered job: models and paid data tools together, from the spend ledger, unknown costs reported as unknown and never as zero.",
+   "unit": "usd",
+   "direction": "down",
+   "population": {
+    "unit": "job",
+    "filter": "Jobs answered in the window (answered_share's numerator), each with its settled and uncertain ledger rows."
+   },
+   "window": {
+    "kind": "rolling",
+    "days": 7
+   },
+   "source": {
+    "kind": "custom",
+    "ref": "the service call journal (research_agent/service/store.py calls, costUsd; unpriced calls stay unknown)"
+   },
+   "baseline": null,
+   "baselineNotMeasured": "not measured yet: the call journal holds unpriced calls; measured with answered_share",
+   "target": null,
+   "targetNotSet": "set by the assembled agent's owner once its own baseline is measured; a target without a baseline is a guess",
+   "owner": "prowl-research"
+  }
+ ]
+}
