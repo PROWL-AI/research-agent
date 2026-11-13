@@ -6,6 +6,8 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- The dashboard reads without internal ids or raw JSON on its first views (B-120): inputs and settings are labelled
+  facts, phases are in Russian, the JSON view is the «Технические данные» tab.
 - `metrics.json` and `scripts/measure_metrics.py` (B-114, rule R31): the research template's metrics, measured from local
   files; the first baseline is a verified claim share of 0.411 over 3355 claims of 14 runs.
 - A runbook runs at an exact version: `research.run` with `runbook: "market-pulse@1.0"` takes the current text or the
