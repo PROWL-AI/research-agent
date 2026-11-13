@@ -38,7 +38,7 @@ SERVICES = Path.home() / "Library/Application Support/ai.passioncode.fabric/serv
 #: Config vars the cloud instance may carry. Anything else is refused, so a stray
 #: variable of the caller's environment never reaches the server.
 CONFIG_NAMES = {"PROWL_API_KEY", "OPENROUTER_API_KEY", "RESEARCH_LLM_API_KEY", "FABRIC_SERVICE_TOKEN", "PUBLIC_ORIGIN",
-                "RESEARCH_LLM_MODEL", "RESEARCH_LLM_BASE_URL"}
+                "RESEARCH_LLM_MODEL", "RESEARCH_LLM_BASE_URL", "CLIENT_KEY_PEPPER"}
 
 
 def headers(environ=os.environ):
