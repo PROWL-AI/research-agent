@@ -96,3 +96,25 @@ body
 def test_get_runbook_unknown_name():
     with pytest.raises(RunbookError, match="unknown runbook"):
         get_runbook("does-not-exist")
+
+
+def test_a_runbook_is_run_at_an_exact_version(tmp_path):
+    """B-110 (rule R28, acceptance 31 of research 1.7.1): `name@version` runs the current text or an archived one
+    kept byte for byte in `versions/`; an unknown version is refused and names what exists."""
+    import shutil
+
+    from research_agent.runbook import RUNBOOKS_DIR, RunbookError, get_runbook
+
+    shutil.copytree(RUNBOOKS_DIR / "market-pulse", tmp_path / "market-pulse")
+    current = (tmp_path / "market-pulse" / "SKILL.md").read_text(encoding="utf-8")
+    (tmp_path / "market-pulse" / "versions").mkdir()
+    (tmp_path / "market-pulse" / "versions" / "1.0.md").write_text(current, encoding="utf-8")
+    (tmp_path / "market-pulse" / "SKILL.md").write_text(current.replace('version: "1.0"', 'version: "1.1"', 1), encoding="utf-8")
+    assert get_runbook("market-pulse", tmp_path).meta.version == "1.1"
+    assert get_runbook("market-pulse@1.1", tmp_path).meta.version == "1.1"
+    archived = get_runbook("market-pulse@1.0", tmp_path)
+    assert archived.meta.version == "1.0" and archived.path.name == "1.0.md"
+    with pytest.raises(RunbookError, match="no version '0.9'.*archived: 1.0"):
+        get_runbook("market-pulse@0.9", tmp_path)
+    with pytest.raises(RunbookError, match="invalid runbook name"):
+        get_runbook("market-pulse@../x", tmp_path)

@@ -16,6 +16,7 @@ INPUT_TYPES = ("domain", "list[domain]", "string")
 EFFORT_CLASSES = ("lookup", "comparison", "deep")
 
 _RUNBOOK_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9\-]*$")
+_RUNBOOK_VERSION_RE = re.compile(r"^[0-9][0-9A-Za-z.+-]{0,31}$")
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 
 
@@ -135,14 +136,25 @@ def list_runbooks(runbooks_dir: Path | None = None) -> list[Runbook]:
 
 
 def get_runbook(name: str, runbooks_dir: Path | None = None) -> Runbook:
-    if not _RUNBOOK_NAME_RE.match(name):
+    """`name` is the current version; `name@version` names a version exactly: the current one, or a shipped text kept
+    byte for byte in `<name>/versions/<version>.md` (rule R28, B-110), so a report made with it can be made again."""
+    base, _, version = name.partition("@")
+    if not _RUNBOOK_NAME_RE.match(base) or (version and not _RUNBOOK_VERSION_RE.match(version)):
         raise RunbookError(f"invalid runbook name '{name}'")
     directory = runbooks_dir or RUNBOOKS_DIR
-    path = directory / name / "SKILL.md"
+    path = directory / base / "SKILL.md"
     if not path.is_file():
         available = ", ".join(rb.name for rb in list_runbooks(directory)) or "(none)"
-        raise RunbookError(f"unknown runbook '{name}'; available: {available}")
-    return load_runbook(path)
+        raise RunbookError(f"unknown runbook '{base}'; available: {available}")
+    current = load_runbook(path)
+    if not version or version == current.meta.version:
+        return current
+    archived = directory / base / "versions" / f"{version}.md"
+    if not archived.is_file():
+        kept = sorted(p.stem for p in (directory / base / "versions").glob("*.md"))
+        raise RunbookError(f"runbook '{base}' has no version '{version}'; current {current.meta.version}"
+                           + (f", archived: {', '.join(kept)}" if kept else ""))
+    return load_runbook(archived)
 
 
 InputType = Literal["domain", "list[domain]", "string"]
