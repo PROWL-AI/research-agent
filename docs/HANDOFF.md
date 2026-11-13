@@ -1,6 +1,29 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-13 (evening): 0.6.2, Studio spaces get their own instance (supersedes every "Exact next task" below)
+## Current entry, 2026-11-13 (night): 0.6.3, key classes K1, B-111 closed (supersedes every "Exact next task" below)
+
+0.6.3 (`a3cc834`, tag `v0.6.3`, PR #94) builds Аня's spec K1 section 1 (DEC-0074 of `ania-agent-appvillis`, the
+operator's word of 2026-11-13): a cloud client key is `interactive` (no daily ceiling, its paid job starts at once,
+the decision keeps `client:<name>` and the class) or `automated` (the default, keeps its ceiling); a key issued before
+reads as automated until it is reissued; a missing ceiling reads as `null`, never 0. PR #95 (`ac7619e`) took the
+personal space names out of the files the organization copy carries (its org-transfer audit had refused the sync).
+Deployed: cloud `prowl-research` (build `191bc1ec`, `a3cc834`), Appvillis copy `7482daf` (from `ac7619e`, its suite 906
+passed, build `2cd0f124`); both well-known 0.6.3, `ready`, `degraded: []`. The suite and the deploy gates ran on the
+Studio (`studio-sshlg`, `~/DATA/_worktrees/ra-test/.venv`): the MacBook had 2 GB free.
+
+B-111 closed by Аня's session on the operator's word (the shared Prowl key in both clouds' slots, config set). Studio
+B-106: three spaces installed, waiting for studio-agent's first `apply` (thread `7da412ee`), see the entry below.
+
+**Exact next tasks:**
+1. Live acceptance of B-100 and B-107: one paid research run per cloud through a client key (a run of
+   `market-pulse` or a smaller runbook, worst case about 6.5 USD), check the decision (`by: allowance`, or the
+   interactive class with `ceilingUsd: null`), the report and its cost.
+2. When a Studio daemon answers (`curl -s http://127.0.0.1:<port>/.well-known/fabric-service` in that space), switch
+   the space's Claude Code entry to it as the entry below says, then close B-106.
+3. Аня reissues people's keys as `interactive` through her desk (`client.issue` with `class: interactive`, no
+   `dailyUsd`); pipelines keep automated keys.
+
+## Entry, 2026-11-13 (evening): 0.6.2, Studio spaces get their own instance (supersedes every "Exact next task" below)
 
 0.6.2 (`a68c18c`, tag `v0.6.2`, PR #92) builds B-106: `install-fabric-service.py --background --port <port>` installs
 the service as a system daemon of a Studio space (a label per account, the space door `studio-space-service deploy`,
