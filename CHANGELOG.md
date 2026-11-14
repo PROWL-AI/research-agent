@@ -4,6 +4,14 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.18 (2026-11-14)
+
+- A refused handshake with Prowl closes its transport in the task that opened it (B-140): when prowl.chat answered
+  401 the open transport was closed later from another task and logged "Attempted to exit cancel scope in a different
+  task" with "Task exception was never retrieved" (3 such lines per refusal against prowl.chat with a bad key, 0
+  now). A failed job now names its cause before the standing advice ("MCPError: Invalid or revoked API key. Inspect
+  call receipts..."), secret-free; it used to say only "MCPError".
+
 ## 0.6.17 (2026-11-14)
 
 - Citation fidelity checks up to 200 cited sentences a report instead of 40 (B-138): on the domain-baseline report

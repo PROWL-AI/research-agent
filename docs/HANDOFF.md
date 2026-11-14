@@ -6,10 +6,13 @@ B-139, deadline 2026-11-16: both clouds still use the operator's leaked Prowl ke
 (board thread `7951869c`, message `fdd33aca`); Prowl puts a new key into each vault slot. Prowl confirmed B-067 as two
 defects (T435) and is fixing them; PR #29 is being closed there.
 
-**Exact next tasks:** (1) when each slot's sha256 prefix is no longer `3f1869c3`, run `scripts/cloud.py config
-PROWL_API_KEY` for `prowl-research` (from this repository) and `appvillis-prowl-research` (from the copy) with the
-value from the slot through `use_secret.py run`, check one live `research.tools.call` on each, and reply on the thread
-with the date; (2) close B-067 when Prowl's T435 is live and a lookup returns the right app or `null` with candidates;
+Update 19:40 UTC: Prowl's minted keys (`a0186037`, `a72a9e5e`) answer 401 at prowl.chat; both clouds now run on the
+agent's own key `a22d008e` (vault `prowl-research-agent/prod/PROWL_API_KEY`), off the leaked one, each checked with a
+live call. 0.6.18 fixes B-140 found on the way.
+
+**Exact next tasks:** (1) when Prowl answers on thread `7951869c` that its minted keys work (check: `initialize` on
+`https://prowl.chat/mcp` answers 200 with the slot's value), run `scripts/cloud.py config PROWL_API_KEY` for each cloud
+from its own slot through `use_secret.py run` and check one live tool call; (2) close B-067 when Prowl's T435 is live and a lookup returns the right app or `null` with candidates;
 (3) B-123 by 2026-11-17 and the Appvillis Prowl top-up (both human payments).
 
 ## Entry, 2026-11-14 (evening): the board in waves, 0.6.16 (supersedes every "Exact next task" below)
