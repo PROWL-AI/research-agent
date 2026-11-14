@@ -617,9 +617,10 @@ async def write_report(
         sent = _without_reasoning(messages) if reasoning is False else messages
         text = await llm.complete(sent, tier="strong", max_tokens=max_tokens, temperature=0.3, stage="writer",
                                   reasoning=reasoning)
-        if is_report(text):
+        if reasoning is not False or is_report(text):
             return text
-        # B-135: an answer without a heading is not a report; the longest real draft so far ships instead.
+        # B-135: an answer written without reasoning that has no heading is not a report (seen only there); the
+        # longest real draft so far ships instead.
         log.warning("writer answered without a report (%d words, reasoning %s); not shipped as one",
                     len(text.split()), "off" if reasoning is False else "on")
         if first_truncated:
