@@ -100,6 +100,11 @@ def _client_with_post(monkeypatch, responses):
 class TestWriterDraftTruncation:
     # R2.1: finish_reason='length' on the initial draft used to kill the whole
     # run after all the tool spend. Now: one retry with escalated max_tokens.
+    # These pin the 0.6.14 escalation (RESEARCH_WRITER_REASONING=on); the default is in TestWriterReasoningFirst.
+
+    @pytest.fixture(autouse=True)
+    def _escalation_on(self, monkeypatch):
+        monkeypatch.setenv("RESEARCH_WRITER_REASONING", "on")
 
     async def test_length_truncated_draft_retries_with_escalated_max_tokens(
         self, patched_runbooks, tmp_path
@@ -632,3 +637,64 @@ class TestCliHonesty:
         out = capsys.readouterr().out
         assert "1/3 completed, 2 disclosed" in out
         assert "'failed': 2" in out
+
+
+class TestWriterReasoningFirst:
+    """B-133: by default only the first draft reasons; the larger retry is written without reasoning."""
+
+    @pytest.fixture(autouse=True)
+    def _default(self, monkeypatch):
+        monkeypatch.delenv("RESEARCH_WRITER_REASONING", raising=False)
+
+    def _recording(self, responses, seen):
+        class Recording(_QueueLLM):
+            async def complete(self, messages, tier="cheap", json_mode=False, **kwargs):
+                seen.append((kwargs.get("max_tokens"), kwargs.get("reasoning")))
+                return await super().complete(messages, tier, json_mode, **kwargs)
+        return Recording(responses)
+
+    async def test_the_larger_retry_goes_without_reasoning(self, patched_runbooks, tmp_path):
+        from research_agent.agent import writer
+        from research_agent.runbook import get_runbook
+
+        seen = []
+        llm = self._recording([LLMError("cut", retryable=False, finish_reason="length", content="half"),
+                               "# Clean report\n\nNo numbers here."], seen)
+        draft = await writer.write_report(llm, get_runbook("mini-teardown"), _one_claim_ledger(tmp_path),
+                                          {"competitors": ["a.com"]})
+        assert draft == "# Clean report\n\nNo numbers here."
+        assert seen == [(writer._DRAFT_MAX_TOKENS, None), (writer._DRAFT_ESCALATED_MAX_TOKENS, False)]
+
+    async def test_a_cut_retry_ships_the_longer_draft_with_no_third_request(self, patched_runbooks, tmp_path):
+        from research_agent.agent import writer
+        from research_agent.runbook import get_runbook
+
+        seen = []
+        llm = self._recording([LLMError("cut", retryable=False, finish_reason="length", content="first half"),
+                               LLMError("cut", retryable=False, finish_reason="length", content="a second half")],
+                              seen)
+        draft = await writer.write_report(llm, get_runbook("mini-teardown"), _one_claim_ledger(tmp_path),
+                                          {"competitors": ["a.com"]})
+        assert draft.startswith("a second half") and "truncated" in draft
+        assert len(seen) == 2
+
+    async def test_an_empty_retry_without_reasoning_raises(self, patched_runbooks, tmp_path):
+        from research_agent.agent import writer
+        from research_agent.runbook import get_runbook
+
+        llm = _QueueLLM([LLMError("cut", retryable=False, finish_reason="length", content=None)] * 2)
+        with pytest.raises(LLMError):
+            await writer.write_report(llm, get_runbook("mini-teardown"), _one_claim_ledger(tmp_path),
+                                      {"competitors": ["a.com"]})
+
+    def test_the_setting(self, monkeypatch):
+        from research_agent.agent import writer
+
+        assert writer.writer_reasoning() == (None, False)
+        monkeypatch.setenv("RESEARCH_WRITER_REASONING", "on")
+        assert writer.writer_reasoning() == (None, None)
+        monkeypatch.setenv("RESEARCH_WRITER_REASONING", "off")
+        assert writer.writer_reasoning() == (False, False)
+        monkeypatch.setenv("RESEARCH_WRITER_REASONING", "sometimes")
+        with pytest.raises(ValueError):
+            writer.writer_reasoning()

@@ -296,6 +296,26 @@ def copy_rule_issues(report_md: str) -> list["LintIssue"]:
     return issues
 
 
+#: B-133: which writer drafts reason. "first" (default): the first draft reasons and the larger retry does not;
+#: measured 2026-11-14 on moonshotai/kimi-k3.1-pro, a 75-step domain-baseline (`pr-ccc142f3e62bfb674bbb`): the first
+#: draft was cut at 8000 tokens after 4.5 min, the 24000-token retry with reasoning was cut again after 12 min, and the
+#: run died at its 40-minute deadline before the reasoning-off third request answered. "on" is 0.6.14 (both reason,
+#: a third request without reasoning); "off": no draft reasons.
+WRITER_REASONING_VALUES = ("first", "on", "off")
+DEFAULT_WRITER_REASONING = "first"
+
+
+def writer_reasoning() -> tuple[bool | None, bool | None]:
+    """The `reasoning` of the first draft and of the larger retry: None is the model's own, False is off."""
+    import os
+
+    value = (os.environ.get("RESEARCH_WRITER_REASONING", DEFAULT_WRITER_REASONING).strip().lower()
+             or DEFAULT_WRITER_REASONING)
+    if value not in WRITER_REASONING_VALUES:
+        raise ValueError(f"RESEARCH_WRITER_REASONING: one of {', '.join(WRITER_REASONING_VALUES)}")
+    return {"first": (None, False), "on": (None, None), "off": (False, False)}[value]
+
+
 class WriterOutcome(BaseModel):
     report_md: str
     lint_before: int
@@ -569,9 +589,11 @@ async def write_report(
         user += "\n\n## Source coverage (state it wherever these results are used)\n" + "\n".join(
             f"- {note}" for note in coverage_notes)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    first_reasoning, escalated_reasoning = writer_reasoning()
     try:
         return await llm.complete(
             messages, tier="strong", max_tokens=_DRAFT_MAX_TOKENS, temperature=0.3, stage="writer",
+            reasoning=first_reasoning,
         )
     except LLMError as exc:
         if exc.retryable or exc.finish_reason != "length":
@@ -587,7 +609,7 @@ async def write_report(
     try:
         return await llm.complete(
             messages, tier="strong", max_tokens=_DRAFT_ESCALATED_MAX_TOKENS, temperature=0.3,
-            stage="writer",
+            stage="writer", reasoning=escalated_reasoning,
         )
     except LLMBudgetExceeded:
         if not first_truncated:
@@ -600,6 +622,13 @@ async def write_report(
         truncated = (exc.content or "").strip()
         if exc.retryable or exc.finish_reason != "length":
             raise
+        if escalated_reasoning is False:
+            # The larger draft was already written without reasoning: asking the same again buys nothing.
+            if not truncated:
+                raise
+            log.warning("writer draft still truncated at max_tokens=%d; shipping the partial draft",
+                        _DRAFT_ESCALATED_MAX_TOKENS)
+            return truncated + "\n\n*(Report truncated at the model's output limit.)*"
         # B-122 and B-128: the larger budget went to reasoning, and the draft came back empty (moonshotai/kimi-k3.1-pro
         # on the 90-step teardown) or cut (the same model, accept-subscription-20261021b, shipped partial with 4 lint
         # issues). The same request once more with reasoning off, as the repair pass does (B-062); if that is cut too,

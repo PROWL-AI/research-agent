@@ -82,11 +82,46 @@ LIMITS: dict[str, dict[str, ArgumentLimit]] = {
 }
 
 
+@dataclass(frozen=True)
+class FlagDependency:
+    """A boolean argument the provider takes only when other booleans are true as well (B-134)."""
+    requires: tuple[str, ...]
+    note: str
+    source: str
+
+
+#: A true flag whose requirements are not all true is taken out before the step is sent: the provider refuses the
+#: whole task otherwise, and switching the requirements on would buy paid options nobody asked for.
+FLAG_DEPENDENCIES: dict[str, dict[str, FlagDependency]] = {
+    "dataforseo_onpage_task_post": {
+        "enable_browser_rendering": FlagDependency(
+            requires=("enable_javascript", "load_resources"),
+            note=("`enable_browser_rendering` is accepted only with `enable_javascript` and `load_resources` both "
+                  "true; leave it out unless both are set."),
+            source=("B-134: acceptance pr-ccc142f3e62bfb674bbb (2026-11-14) sent it with enable_javascript only: "
+                    "DataForSEO 40501 \"Invalid Field: 'enable_browser_rendering', 'enable_javascript' and "
+                    "'load_resources' must be enabled\", and the three on-page reads after it were not sent"),
+        ),
+    },
+}
+
+
 def planner_notes(tools: Iterable[str]) -> str:
     """One line per limit of the given tools, for the planner's prompt ('' when none)."""
+    tools = list(tools)
     lines = [f"- `{tool}` `{argument}`: {limit.note}"
              for tool in tools for argument, limit in LIMITS.get(tool, {}).items()]
+    lines += [f"- `{tool}` `{flag}`: {dep.note}"
+              for tool in tools for flag, dep in FLAG_DEPENDENCIES.get(tool, {}).items()]
     return "\n".join(lines)
+
+
+def unmet_flags(tool: str, arguments: Any) -> list[str]:
+    """The true flags of `arguments` whose required flags are not all true (B-134)."""
+    if not isinstance(arguments, dict):
+        return []
+    return [flag for flag, dep in FLAG_DEPENDENCIES.get(tool, {}).items()
+            if arguments.get(flag) is True and not all(arguments.get(r) is True for r in dep.requires)]
 
 
 def coverage_notes(tools: Iterable[str]) -> list[str]:
@@ -100,10 +135,10 @@ def coverage_notes(tools: Iterable[str]) -> list[str]:
 def canonical(tool: str, arguments: Any) -> Any:
     """`arguments` with each limited value in the spelling the provider lists ("fr" ->
     "FR"): only the value was measured, so it is sent as the provider's list writes it."""
-    if not isinstance(arguments, dict) or tool not in LIMITS:
+    if not isinstance(arguments, dict) or (tool not in LIMITS and tool not in FLAG_DEPENDENCIES):
         return arguments
-    out = dict(arguments)
-    for argument, limit in LIMITS[tool].items():
+    out = {k: v for k, v in arguments.items() if k not in unmet_flags(tool, arguments)}
+    for argument, limit in LIMITS.get(tool, {}).items():
         value = out.get(argument)
         if isinstance(value, str):
             match = next((a for a in limit.allowed if a.upper() == value.upper()), None)
