@@ -144,3 +144,67 @@ def test_a_key_stored_before_the_ceiling_reads_as_the_floor(tmp_path):
     del data["old"]["dailyUsd"]
     path.write_text(json.dumps(data))
     assert clients.verify(key)["dailyUsd"] == 10.0
+
+
+# B-103: the month ledger (agents database pattern spend-ledger 1.3.0) across every automated caller.
+
+def _month(runtime, usd):
+    config = runtime.store.config()
+    runtime.store.configure(config["revision"], {k: v for k, v in config.items() if k != "revision"}
+                            | {"agent_monthly_usd": usd, "agent_daily_usd": 1000.0})
+
+
+async def test_an_allowance_job_reserves_its_worst_case_in_the_month_ledger(runtime):
+    job = runtime.create(RESEARCH, "m1", via="mcp")
+    assert job["decision"]["monthLedger"] is True
+    ledger = allowance.month_ledger(runtime.store)
+    assert float(ledger.committed("month")) == pytest.approx(6.5)
+    assert float(ledger.limit("month")) == pytest.approx(95.0)  # 95 % of the default 100
+    assert (runtime.store.root / allowance.LEDGER_FILE).exists() and ledger.verify_journal()
+
+
+async def test_a_job_that_would_cross_the_month_stop_waits_for_the_operator(runtime):
+    _month(runtime, 10.0)  # stop 9.5
+    first = runtime.create(RESEARCH, "m1", via="mcp")
+    second = runtime.create(RESEARCH, "m2", via="mcp")
+    assert first["status"] == "working" and second["status"] == "input_required"
+    assert allowance.month_degraded(runtime.store) == []  # 6.5 of 9.5: not reached
+
+
+async def test_an_ended_job_settles_to_its_cost_and_a_job_without_calls_is_released(runtime):
+    job = runtime.create(RESEARCH, "m1", via="mcp")
+    ledger = allowance.month_ledger(runtime.store)
+    runtime.store.transition(job["id"], "cancelled", "cancelled")
+    assert float(ledger.committed("month")) == 0.0  # released: it ended before any call
+    other = runtime.create(TOOL, "m2", via="mcp")
+    call = runtime.store.start_call(other["id"], "tool", "google_news", {})
+    runtime.store.finish_call(call, status="completed", costUsd=0.02, costBasis="provider")
+    runtime.store.transition(other["id"], "completed", "completed")
+    assert float(ledger.committed("month")) == pytest.approx(0.02)
+
+
+async def test_the_operators_and_interactive_jobs_are_not_held(runtime):
+    runtime.create(RESEARCH, "m1", via="dashboard")
+    assert float(allowance.month_ledger(runtime.store).committed("month")) == 0.0
+
+
+async def test_a_zero_month_limit_turns_the_allowance_off(runtime):
+    _month(runtime, 0.0)
+    job = runtime.create(RESEARCH, "m1", via="mcp")
+    assert job["status"] == "input_required" and allowance.month_ledger(runtime.store) is None
+
+
+async def test_an_edited_journal_line_shows_in_degraded(runtime):
+    runtime.create(RESEARCH, "m1", via="mcp")
+    path = runtime.store.root / allowance.LEDGER_FILE
+    text = path.read_text()
+    assert "6500000" in text  # micro-dollars
+    path.write_text(text.replace("6500000", "500000", 1))
+    reasons = [d["reason"] for d in allowance.month_degraded(runtime.store)]
+    assert any("edited" in r or "unreadable" in r for r in reasons), reasons
+
+
+async def test_a_cloud_client_key_keeps_its_issued_ceiling_and_is_not_held(runtime):
+    job = runtime.create(TOOL, "c1", delegation=client("anna", 12))
+    assert job["status"] == "working" and "monthLedger" not in job["decision"]
+    assert float(allowance.month_ledger(runtime.store).committed("month")) == 0.0

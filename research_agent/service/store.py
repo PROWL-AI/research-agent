@@ -44,6 +44,10 @@ class Settings(BaseModel):
     #: B-100: what a local agent's paid jobs may reserve per UTC day before one waits for the operator; 0 turns the
     #: allowance off. The floor 10 binds cloud client keys (`clients.py`), not this local setting.
     agent_daily_usd: float = Field(default=10.0, ge=0, le=1000)
+    #: B-103: what automated callers' paid jobs may spend per UTC month across all of them (the provider-key limit of
+    #: the spend-ledger pattern; its stop sits at 95 %). Default 100: the operator's rule of 2026-11-07, every agent's
+    #: own monthly budget is USD 100 by default. 0 turns the allowance off for the month (every paid job waits).
+    agent_monthly_usd: float = Field(default=100.0, ge=0, le=1000)
 
 
 #: Seconds a request may wait for its decision before the operator is told about it.
@@ -53,6 +57,8 @@ AWAITING_NOTICE_GRACE_SECONDS = 60
 class Store:
     def __init__(self, root: Path):
         self.root = root
+        #: Called with a job once it reaches a terminal state (B-103: the month ledger settles it).
+        self.on_end: list = []
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.db = sqlite3.connect(root / "service.sqlite3")
         self.db.row_factory = sqlite3.Row
@@ -195,7 +201,13 @@ class Store:
             self.event("job." + phase, {"completed": "Результат сохранён.", "failed": "Запрос завершился с ошибкой. Проверьте шаги.",
                        "cancelled": "Запрос отменён. Уже выполненные списания сохраняются.", "interrupted": "Выполнение прервано перезапуском; автоматического повтора не будет."}.get(phase, "Состояние запроса изменено: " + phase), job,
                        "error" if status == "failed" else "info", status == "failed")
-            return job
+        if status in TERMINAL:
+            for hook in self.on_end:
+                try:
+                    hook(job)
+                except Exception:  # noqa: BLE001 — a ledger fault never changes a job's end; it shows in `degraded`
+                    log.exception("on_end hook failed for %s", job["id"])
+        return job
 
     def recover(self):
         # Run dirs first: a research job's checkpoint left 'running' by a
@@ -295,7 +307,7 @@ class Store:
                 self.db.execute("DELETE FROM auth WHERE hash=?", (hashed,))
             return bool(row and row[0] > now())
 
-    def usage(self):
+    def usage(self, instance: str = "default"):
         jobs = {j["id"]: j for j in self.jobs()}
         days = {}
         # 30 UTC days with today, the window the overview calls «30 дней» (B-083).
@@ -320,5 +332,5 @@ class Store:
             totals = {key: sum(r[key] for r in by_model) for key in ("calls", "unpricedCalls", "inputTokens", "outputTokens")}
             costs = [r["costUsd"] for r in by_model if r["costUsd"] is not None]
             result.append(dict(date=date, byModel=by_model, costUsd=sum(costs) if costs else None, **totals))
-        return {"protocol": "fabric-service/0.1", "service": {"id": SERVICE_ID, "instance": "default"},
+        return {"protocol": "fabric-service/0.1", "service": {"id": SERVICE_ID, "instance": instance},  # B-137
                 "generatedAt": now(), "currency": "USD", "days": result}

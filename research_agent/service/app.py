@@ -17,6 +17,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
 from starlette.middleware.base import BaseHTTPMiddleware
+from . import allowance
 from .delegation import DelegationPolicy, is_loopback, refusal_http
 from .identity import HEADER, SERVICE_ID, SERVICE_NAME
 from .protocol import CLOUD_DASHBOARD_SERVICE, DASHBOARD_SERVICE, EFFECTS, Protocol, CAPABILITIES, artifact
@@ -130,6 +131,7 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
             result.append({"source": "llm", "reason": "Ключ модели не подключён. Исследования недоступны."})
         if rt.free_bytes() < JOB_FLOOR_BYTES:
             result.append({"source": "disk", "reason": "Мало места на диске: новые запросы ждут в очереди, пока место не освободится."})
+        result.extend(allowance.month_degraded(store))
         return result
 
     def health():
@@ -205,7 +207,7 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
             if not token_matches(request, host_token):
                 return JSONResponse({"error": "host token required"}, 401)
             if path.endswith("usage"):
-                return JSONResponse(store.usage())
+                return JSONResponse(store.usage(instance))
             limit = int(request.query_params.get("limit", "50"))
             if not 1 <= limit <= 200:
                 raise ValueError("limit must be between 1 and 200")
@@ -264,7 +266,7 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
                     "delegation": job.get("delegation"), "via": job.get("via"), "runDir": job.get("runDir"),
                     "chainOwner": job.get("chainOwner"), "errorCode": (job.get("error") or {}).get("code"),
                     "costUsd": sum(costs) if costs else None, "unpricedCalls": sum(c["costUsd"] is None for c in calls), "calls": len(calls)})
-            return JSONResponse({"at": now(), "health": health(), "jobs": summaries, "config": store.config(), "usage": store.usage(), "runbooks": runbooks()})
+            return JSONResponse({"at": now(), "health": health(), "jobs": summaries, "config": store.config(), "usage": store.usage(instance), "runbooks": runbooks()})
         if path == "/api/jobs" and request.method == "POST":
             data = await body(request)
             return JSONResponse(rt.create(data["request"], data["idempotencyKey"], via="dashboard"), 201)
