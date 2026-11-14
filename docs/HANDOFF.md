@@ -1,6 +1,18 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-14 (evening): the board in waves, 0.6.16 (supersedes every "Exact next task" below)
+## Current entry, 2026-11-14 (late evening): the leaked Prowl key on both clouds (supersedes every "Exact next task" below)
+
+B-139, deadline 2026-11-16: both clouds still use the operator's leaked Prowl key `3f1869c3`. Answered Prowl "mint"
+(board thread `7951869c`, message `fdd33aca`); Prowl puts a new key into each vault slot. Prowl confirmed B-067 as two
+defects (T435) and is fixing them; PR #29 is being closed there.
+
+**Exact next tasks:** (1) when each slot's sha256 prefix is no longer `3f1869c3`, run `scripts/cloud.py config
+PROWL_API_KEY` for `prowl-research` (from this repository) and `appvillis-prowl-research` (from the copy) with the
+value from the slot through `use_secret.py run`, check one live `research.tools.call` on each, and reply on the thread
+with the date; (2) close B-067 when Prowl's T435 is live and a lookup returns the right app or `null` with candidates;
+(3) B-123 by 2026-11-17 and the Appvillis Prowl top-up (both human payments).
+
+## Entry, 2026-11-14 (evening): the board in waves, 0.6.16 (supersedes every "Exact next task" below)
 
 Wave 1 (external rows): B-073 closed (Prowl fixed it in T415); B-067 sent to the Prowl project on the board (its PR
 #29 was never merged); B-001 stays waived with a new condition (no Fabric binding carries model profiles yet); B-095
