@@ -1,6 +1,19 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-14 (later): 0.6.15, the writer and the crawl flag (supersedes every "Exact next task" below)
+## Current entry, 2026-11-14 (night): 0.6.15 accepted everywhere (supersedes every "Exact next task" below)
+
+0.6.15 (`bf1fa60`, tag `v0.6.15`) runs on cloud `prowl-research` (build `e0bbba02`), the Appvillis copy (`ffbf8aa`,
+build `d180378d`), the Studio spaces 18765, 18766, 18767 and the MacBook service, each `ready`, `degraded: []`. The
+domain-baseline 1.2 acceptance `pr-beed8e47d1addec0ed03` wrote its report in 30.9 minutes (planner 1.0, writer 5.3);
+details and the causes of its remaining skips in [the report](reports/2026-11-14-planner-and-transforms/README.md).
+Prowl fixed the two tool errors this audit sent it (thread `7951869c`, production `1f2c76f6`).
+
+**Exact next tasks:** (1) B-123, the operator's Heroku payment by 2026-11-17 (human gate: the account's billing page;
+the Studio spaces no longer depend on that cloud); (2) the next R31 measurement of `verified_claim_share` after 14 days
+of the clouds (from 2026-11-27); (3) the open board rows by priority (B-095 waits CT-125, B-103 waits the operator's
+money decision, B-017 waits a human label set).
+
+## Entry, 2026-11-14 (later): 0.6.15, the writer and the crawl flag (supersedes every "Exact next task" below)
 
 The 0.6.14 control run (`pr-ccc142f3e62bfb674bbb`) confirmed B-129 and B-131 and found B-133 (the writer's retry with
 reasoning outlived the job), B-134 (a dependent DataForSEO flag) and, measuring B-133, B-135 (Kimi without reasoning
