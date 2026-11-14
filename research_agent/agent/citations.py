@@ -26,7 +26,10 @@ _CITATION_ID_RE = re.compile(r"C(\d+)")
 _ANY_BRACKET_RE = re.compile(r"\[[^\]]*\]")
 _PARAGRAPH_SPLIT_RE = re.compile(r"\n\s*\n")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
-_MAX_SENTENCES = 40
+#: B-138: was 40; measured 2026-11-14 on the domain-baseline report `pr-beed8e47d1addec0ed03` (deepseek-v4.1-flash): 40
+#: checked 121 of 268 references and found nothing, every sentence checked all 268 in 10 calls instead of 4 and found
+#: 3 references the report did not support. 200 covers a 90-step report; the cap stays against a runaway report.
+_MAX_SENTENCES = 200
 _BATCH_SIZE = 10
 _UNVERIFIED_LABEL_CHARS = 160
 

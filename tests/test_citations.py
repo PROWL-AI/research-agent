@@ -120,3 +120,16 @@ async def test_fidelity_stats_in_run_result(
     report = Path(result.report_path).read_text()
     assert "[UNVERIFIED:" in report
     assert "[C1]" in report
+
+
+def test_a_hundred_cited_sentences_are_all_checked_and_the_cap_still_bounds():
+    """B-138: a 75-step report cites about 100 sentences; 40 left 147 of 268 references unchecked and 3 bad ones
+    shipped (pr-beed8e47d1addec0ed03). Every sentence of such a report is checked; a runaway one is still capped."""
+    from research_agent.agent import citations
+
+    report = "\n\n".join(f"Fact number {i} is {i * 3} [C{i}]." for i in range(1, 101))
+    kept, dropped = citations._cited_sentences(report)
+    assert len(kept) == 100 and dropped == []
+    runaway = "\n\n".join(f"Fact {i} is {i} [C{i}]." for i in range(1, citations._MAX_SENTENCES + 11))
+    kept, dropped = citations._cited_sentences(runaway)
+    assert len(kept) == citations._MAX_SENTENCES and len(dropped) == 10
