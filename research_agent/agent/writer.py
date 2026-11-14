@@ -296,6 +296,47 @@ def copy_rule_issues(report_md: str) -> list["LintIssue"]:
     return issues
 
 
+#: B-133: which writer drafts reason. "first" (default): the first draft reasons and the larger retry does not;
+#: measured 2026-11-14 on moonshotai/kimi-k3.1-pro, a 75-step domain-baseline (`pr-ccc142f3e62bfb674bbb`): the first
+#: draft was cut at 8000 tokens after 4.5 min, the 24000-token retry with reasoning was cut again after 12 min, and the
+#: run died at its 40-minute deadline before the reasoning-off third request answered. "on" is 0.6.14 (both reason,
+#: a third request without reasoning); "off": no draft reasons.
+WRITER_REASONING_VALUES = ("first", "on", "off")
+DEFAULT_WRITER_REASONING = "first"
+
+
+def writer_reasoning() -> tuple[bool | None, bool | None]:
+    """The `reasoning` of the first draft and of the larger retry: None is the model's own, False is off."""
+    import os
+
+    value = (os.environ.get("RESEARCH_WRITER_REASONING", DEFAULT_WRITER_REASONING).strip().lower()
+             or DEFAULT_WRITER_REASONING)
+    if value not in WRITER_REASONING_VALUES:
+        raise ValueError(f"RESEARCH_WRITER_REASONING: one of {', '.join(WRITER_REASONING_VALUES)}")
+    return {"first": (None, False), "on": (None, None), "off": (False, False)}[value]
+
+
+#: B-135: what a writer request without reasoning adds. Measured 2026-11-14 on moonshotai/kimi-k3.1-pro rewriting
+#: `pr-ccc142f3e62bfb674bbb`: without reasoning the model answered "I'll write the final markdown report now." and
+#: stopped (10 and 30 words, finish=stop), and the lint passed it as a clean report.
+_NO_PREFACE = ("\n\nAnswer with the report itself, complete: its first line is the report's `# ` title. No preface, "
+               "no plan, no sentence about what you are going to write.")
+_HEADING_RE = re.compile(r"^#{1,6} \S", re.MULTILINE)
+
+
+def is_report(text: str) -> bool:
+    """Whether a writer's answer is a report at all: it has a markdown heading (B-135). A sentence announcing a
+    report is not one."""
+    return bool(_HEADING_RE.search(text or ""))
+
+
+def _without_reasoning(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    """The same request with the no-preface line on the last user message (B-135)."""
+    out = [dict(m) for m in messages]
+    out[-1]["content"] = out[-1]["content"] + _NO_PREFACE
+    return out
+
+
 class WriterOutcome(BaseModel):
     report_md: str
     lint_before: int
@@ -569,10 +610,25 @@ async def write_report(
         user += "\n\n## Source coverage (state it wherever these results are used)\n" + "\n".join(
             f"- {note}" for note in coverage_notes)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    first_reasoning, escalated_reasoning = writer_reasoning()
+    first_truncated = ""
+
+    async def draft(max_tokens: int, reasoning: bool | None) -> str:
+        sent = _without_reasoning(messages) if reasoning is False else messages
+        text = await llm.complete(sent, tier="strong", max_tokens=max_tokens, temperature=0.3, stage="writer",
+                                  reasoning=reasoning)
+        if reasoning is not False or is_report(text):
+            return text
+        # B-135: an answer written without reasoning that has no heading is not a report (seen only there); the
+        # longest real draft so far ships instead.
+        log.warning("writer answered without a report (%d words, reasoning %s); not shipped as one",
+                    len(text.split()), "off" if reasoning is False else "on")
+        if first_truncated:
+            return first_truncated + "\n\n*(Report truncated at the model's output limit.)*"
+        raise LLMError("writer answered without a report (no markdown heading)", retryable=False)
+
     try:
-        return await llm.complete(
-            messages, tier="strong", max_tokens=_DRAFT_MAX_TOKENS, temperature=0.3, stage="writer",
-        )
+        return await draft(_DRAFT_MAX_TOKENS, first_reasoning)
     except LLMError as exc:
         if exc.retryable or exc.finish_reason != "length":
             raise
@@ -585,10 +641,7 @@ async def write_report(
             _DRAFT_MAX_TOKENS, _DRAFT_ESCALATED_MAX_TOKENS,
         )
     try:
-        return await llm.complete(
-            messages, tier="strong", max_tokens=_DRAFT_ESCALATED_MAX_TOKENS, temperature=0.3,
-            stage="writer",
-        )
+        return await draft(_DRAFT_ESCALATED_MAX_TOKENS, escalated_reasoning)
     except LLMBudgetExceeded:
         if not first_truncated:
             raise
@@ -600,17 +653,23 @@ async def write_report(
         truncated = (exc.content or "").strip()
         if exc.retryable or exc.finish_reason != "length":
             raise
+        if escalated_reasoning is False:
+            # The larger draft was already written without reasoning: asking the same again buys nothing.
+            if not truncated:
+                raise
+            log.warning("writer draft still truncated at max_tokens=%d; shipping the partial draft",
+                        _DRAFT_ESCALATED_MAX_TOKENS)
+            return truncated + "\n\n*(Report truncated at the model's output limit.)*"
         # B-122 and B-128: the larger budget went to reasoning, and the draft came back empty (moonshotai/kimi-k3.1-pro
         # on the 90-step teardown) or cut (the same model, accept-subscription-20261021b, shipped partial with 4 lint
         # issues). The same request once more with reasoning off, as the repair pass does (B-062); if that is cut too,
         # the longest draft ships, never a shorter one, and only no text at all loses the report.
         log.warning("writer draft %s at max_tokens=%d; retrying with reasoning off",
                     "cut" if truncated else "empty", _DRAFT_ESCALATED_MAX_TOKENS)
+        if len(truncated) > len(first_truncated):
+            first_truncated = truncated
         try:
-            return await llm.complete(
-                messages, tier="strong", max_tokens=_DRAFT_ESCALATED_MAX_TOKENS, temperature=0.3,
-                stage="writer", reasoning=False,
-            )
+            return await draft(_DRAFT_ESCALATED_MAX_TOKENS, False)
         except LLMBudgetExceeded:
             if not truncated:
                 raise

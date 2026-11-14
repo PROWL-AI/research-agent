@@ -4,6 +4,22 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.15 (2026-11-14)
+
+- The writer's larger retry goes without reasoning (B-133): on a 75-step domain-baseline run
+  (`pr-ccc142f3e62bfb674bbb`) the first draft was cut at 8000 tokens, the 24000-token retry with reasoning was cut
+  after 12 minutes, and the job died at its 40-minute deadline with no report. Rewritten from the same ledger: the
+  0.6.15 default (`first`) wrote in 302 s, judge 0.82. `RESEARCH_WRITER_REASONING=on` restores 0.6.14, `off` writes
+  every draft without reasoning (144 s, judge 0.82 on the same run).
+- A writer answer without reasoning that has no markdown heading is not a report (B-135): without reasoning
+  `moonshotai/kimi-k3.1-pro` answered "I'll write the final markdown report now." and stopped, and the lint passed it.
+  Such requests now ask for the report itself, starting with its title; an answer still without a heading is replaced
+  by the longest real draft, or fails the write instead of shipping a sentence as a report.
+- A true `enable_browser_rendering` without `enable_javascript` and `load_resources` is taken out of
+  `dataforseo_onpage_task_post` before it is sent, and the planner is told the rule (B-134): DataForSEO refused the
+  whole crawl (40501) and three on-page reads after it were not sent.
+  ([measurement](docs/reports/2026-11-14-planner-and-transforms/README.md))
+
 ## 0.6.14 (2026-11-14)
 
 - The planner writes with reasoning off (B-129): measured on `moonshotai/kimi-k3.1-pro` over three runbooks, a plan
