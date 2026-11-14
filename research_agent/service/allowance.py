@@ -15,6 +15,12 @@ job waits for the operator as before.
   person or an agent a person calls in that moment, has no ceiling. Its job starts at once, whatever it costs, and its
   decision keeps who spent (the principal) and the class. An `automated` key, and a key without a class, keeps its
   ceiling.
+- B-103: every job the allowance approves also reserves its worst case in the month ledger (the agents database
+  pattern `spend-ledger` 1.3.0, vendored unchanged): one UTC-month stop across all automated callers at 95 % of
+  `agent_monthly_usd` (USD 100 by default, the operator's rule of 2026-11-07). A job that would cross it waits for the
+  operator, as above the day ceiling. When the job ends the hold settles to what it cost (the worst case while a call
+  is unpriced), or is released when it ended before any call. Every change is a line of a hash-chained journal,
+  `spend-ledger.jsonl` in the data root. Interactive keys (K1) and the operator's own jobs are not held.
 """
 from __future__ import annotations
 
@@ -22,6 +28,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from research_agent.config import ConfigError, resolve_llm_cap
+from research_agent.service.vendor import spend_ledger
 from research_agent.runbook import RunbookError, get_runbook
 
 #: The floor and default of a caller's ceiling, USD per UTC day (in-20261112-996c34).
@@ -34,6 +41,62 @@ UNREADABLE_WORST_USD = 1_000_000.0
 OFF = 0.0
 
 TERMINAL = {"completed", "failed", "cancelled"}
+#: The month ledger's journal in the data root (the cloud's snapshot keeps it with the job store).
+LEDGER_FILE = "spend-ledger.jsonl"
+
+
+def month_ledger(store) -> spend_ledger.SpendLedger | None:
+    """The store's month ledger at the current `agent_monthly_usd`, or None when it is 0 (allowance off). Rebuilt when
+    the setting changes; the journal file is the same."""
+    limit = float((store.config() or {}).get("agent_monthly_usd", 100.0))
+    if limit <= OFF:
+        return None
+    cached = getattr(store, "_month_ledger", None)
+    if cached is not None and cached[0] == limit:
+        return cached[1]
+    if cached is not None:
+        cached[1].close()
+    ledger = spend_ledger.SpendLedger(spend_ledger.Policy(key_limit_usd=str(limit), on_month_exhaust="defer"),
+                                      str(store.root / LEDGER_FILE), storage="jsonl")
+    store._month_ledger = (limit, ledger)
+    if not getattr(store, "_month_hooked", False):
+        store.on_end.append(lambda job: settle(store, job))
+        store._month_hooked = True
+    return ledger
+
+
+def settle(store, job: dict[str, Any]) -> None:
+    """A held job ended: its hold settles to what it cost, or is released when it ended before any call."""
+    if not (job.get("decision") or {}).get("monthLedger"):
+        return
+    ledger = month_ledger(store)
+    if ledger is None:
+        return
+    calls = store.calls(job["id"])
+    if not calls:
+        try:
+            ledger.release(job["id"], f"job ended {job['status']} before any call")
+            return
+        except ValueError:
+            return  # already settled or released
+    priced = all(c.get("costUsd") is not None for c in calls)
+    cost = sum(c["costUsd"] for c in calls if c.get("costUsd") is not None)
+    try:
+        ledger.settle(job["id"], cost, confirmed=priced)
+    except ValueError:
+        pass  # a repeat: the first figure stays
+
+
+def month_degraded(store) -> list[dict[str, Any]]:
+    """The month ledger's own `degraded` entries: a reached stop, a halt, a torn or edited journal line. Unpriced
+    calls are counted at their worst case and are not a fault of the service, so they are left out."""
+    try:
+        ledger = month_ledger(store)
+    except (ValueError, OSError) as exc:
+        return [{"source": "budget", "reason": f"the month ledger cannot open: {exc}"}]
+    if ledger is None:
+        return []
+    return [d for d in ledger.degraded() if d.get("source") != "usage"]
 
 
 def today() -> str:
@@ -113,5 +176,12 @@ def verdict(store, job: dict[str, Any]) -> dict[str, Any] | None:
         return None
     if spent + worst > ceiling:
         return None
+    ledger = month_ledger(store)
+    if ledger is None:
+        return None
+    held = ledger.reserve(job["id"], worst, scopes={"principal": principal}, label=job["request"].get("kind", ""))
+    if not held.allowed:
+        return None
     return {"by": "allowance", "principal": principal, "worstCaseUsd": round(worst, 4),
-            "spentTodayUsd": round(spent, 4), "ceilingUsd": ceiling}
+            "spentTodayUsd": round(spent, 4), "ceilingUsd": ceiling, "monthLedger": True,
+            "monthCommittedUsd": float(ledger.committed("month")), "monthStopUsd": float(ledger.limit("month"))}

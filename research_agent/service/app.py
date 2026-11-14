@@ -17,6 +17,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
 from starlette.middleware.base import BaseHTTPMiddleware
+from . import allowance
 from .delegation import DelegationPolicy, is_loopback, refusal_http
 from .identity import HEADER, SERVICE_ID, SERVICE_NAME
 from .protocol import CLOUD_DASHBOARD_SERVICE, DASHBOARD_SERVICE, EFFECTS, Protocol, CAPABILITIES, artifact
@@ -130,6 +131,7 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
             result.append({"source": "llm", "reason": "Ключ модели не подключён. Исследования недоступны."})
         if rt.free_bytes() < JOB_FLOOR_BYTES:
             result.append({"source": "disk", "reason": "Мало места на диске: новые запросы ждут в очереди, пока место не освободится."})
+        result.extend(allowance.month_degraded(store))
         return result
 
     def health():
