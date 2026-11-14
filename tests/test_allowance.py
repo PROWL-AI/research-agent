@@ -198,6 +198,7 @@ async def test_an_edited_journal_line_shows_in_degraded(runtime):
     runtime.create(RESEARCH, "m1", via="mcp")
     path = runtime.store.root / allowance.LEDGER_FILE
     text = path.read_text()
-    path.write_text(text.replace("6.5", "0.5", 1) if "6.5" in text else text.replace('"', "'", 1))
+    assert "6500000" in text  # micro-dollars
+    path.write_text(text.replace("6500000", "500000", 1))
     reasons = [d["reason"] for d in allowance.month_degraded(runtime.store)]
-    assert any("edited" in r or "unreadable" in r for r in reasons)
+    assert any("edited" in r or "unreadable" in r for r in reasons), reasons
