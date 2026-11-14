@@ -698,3 +698,50 @@ class TestWriterReasoningFirst:
         monkeypatch.setenv("RESEARCH_WRITER_REASONING", "sometimes")
         with pytest.raises(ValueError):
             writer.writer_reasoning()
+
+
+class TestWriterAnswersWithoutAReport:
+    """B-135: moonshotai/kimi-k3.1-pro without reasoning answered "I'll write the final markdown report now." and
+    stopped (pr-ccc142f3e62bfb674bbb rewrite, 2026-11-14); the lint passed it as a clean report."""
+
+    @pytest.fixture(autouse=True)
+    def _default(self, monkeypatch):
+        monkeypatch.delenv("RESEARCH_WRITER_REASONING", raising=False)
+
+    def test_is_report(self):
+        from research_agent.agent import writer
+
+        assert writer.is_report("# Title\n\nbody")
+        assert writer.is_report("intro\n\n## Section\nbody")
+        assert not writer.is_report("I'll write the final markdown report now.")
+        assert not writer.is_report("**PARTIAL RUN:** cancelled.\nI'll write the final markdown report now.")
+        assert not writer.is_report("#hashtag without a space")
+
+    async def test_an_announcement_after_a_cut_draft_ships_the_cut_draft(self, patched_runbooks, tmp_path):
+        from research_agent.agent import writer
+        from research_agent.runbook import get_runbook
+
+        seen = []
+
+        class Recording(_QueueLLM):
+            async def complete(self, messages, tier="cheap", json_mode=False, **kwargs):
+                seen.append((kwargs.get("reasoning"), messages[-1]["content"]))
+                return await super().complete(messages, tier, json_mode, **kwargs)
+
+        llm = Recording([LLMError("cut", retryable=False, finish_reason="length", content="# Report\n\nfirst half"),
+                         "I'll write the final markdown report now."])
+        draft = await writer.write_report(llm, get_runbook("mini-teardown"), _one_claim_ledger(tmp_path),
+                                          {"competitors": ["a.com"]})
+        assert draft.startswith("# Report\n\nfirst half") and "truncated" in draft
+        assert seen[0][0] is None and "No preface" not in seen[0][1]
+        assert seen[1][0] is False and "No preface" in seen[1][1]
+
+    async def test_an_announcement_with_nothing_before_it_raises(self, patched_runbooks, tmp_path, monkeypatch):
+        from research_agent.agent import writer
+        from research_agent.runbook import get_runbook
+
+        monkeypatch.setenv("RESEARCH_WRITER_REASONING", "off")
+        llm = _QueueLLM(["I'll write the final markdown report now."])
+        with pytest.raises(LLMError, match="without a report"):
+            await writer.write_report(llm, get_runbook("mini-teardown"), _one_claim_ledger(tmp_path),
+                                      {"competitors": ["a.com"]})
