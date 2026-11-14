@@ -202,3 +202,9 @@ async def test_an_edited_journal_line_shows_in_degraded(runtime):
     path.write_text(text.replace("6500000", "500000", 1))
     reasons = [d["reason"] for d in allowance.month_degraded(runtime.store)]
     assert any("edited" in r or "unreadable" in r for r in reasons), reasons
+
+
+async def test_a_cloud_client_key_keeps_its_issued_ceiling_and_is_not_held(runtime):
+    job = runtime.create(TOOL, "c1", delegation=client("anna", 12))
+    assert job["status"] == "working" and "monthLedger" not in job["decision"]
+    assert float(allowance.month_ledger(runtime.store).committed("month")) == 0.0

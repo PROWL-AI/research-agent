@@ -15,8 +15,9 @@ job waits for the operator as before.
   person or an agent a person calls in that moment, has no ceiling. Its job starts at once, whatever it costs, and its
   decision keeps who spent (the principal) and the class. An `automated` key, and a key without a class, keeps its
   ceiling.
-- B-103: every job the allowance approves also reserves its worst case in the month ledger (the agents database
-  pattern `spend-ledger` 1.3.0, vendored unchanged): one UTC-month stop across all automated callers at 95 % of
+- B-103: every job the allowance approves for the service's own agents (not a cloud client key, which keeps the
+  ceiling issued with it) also reserves its worst case in the month ledger (the agents database pattern
+  `spend-ledger` 1.3.0, vendored unchanged): one UTC-month stop across those agents at 95 % of
   `agent_monthly_usd` (USD 100 by default, the operator's rule of 2026-11-07). A job that would cross it waits for the
   operator, as above the day ceiling. When the job ends the hold settles to what it cost (the worst case while a call
   is unpriced), or is released when it ended before any call. Every change is a line of a hash-chained journal,
@@ -176,6 +177,11 @@ def verdict(store, job: dict[str, Any]) -> dict[str, Any] | None:
         return None
     if spent + worst > ceiling:
         return None
+    if (job.get("delegation") or {}).get("tier") == "client":
+        # A cloud client key's spend is governed by the ceiling issued with it (B-100, K1); the month ledger is the
+        # service's own agents' budget, the operator's rule of 2026-11-07.
+        return {"by": "allowance", "principal": principal, "worstCaseUsd": round(worst, 4),
+                "spentTodayUsd": round(spent, 4), "ceilingUsd": ceiling}
     ledger = month_ledger(store)
     if ledger is None:
         return None
