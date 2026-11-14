@@ -47,6 +47,15 @@ def failure(exc):
     return {"message": text[:300]}
 
 
+def _cause(exc) -> str:
+    """B-140: the failure's own words, secret-free and short, before the standing advice ("MCPError: Invalid or revoked
+    API key. "); a job failed by a 401 from Prowl used to say only "MCPError"."""
+    text = failure(exc)["message"].strip()
+    name = type(exc).__name__
+    text = text if text.startswith(name) else (f"{name}: {text}" if text and text != name else name)
+    return text[:180].rstrip(". ") + ". "
+
+
 def child_trace(parent):
     if parent is None:
         return None
@@ -408,7 +417,7 @@ class Runtime:
                 # The run's checkpoint keeps what was recorded and paid; the disk watch continues it (B-114).
                 self.store.transition(job_id, "failed", "failed", error=self._with_terminal(job_id, {"code": "disk_low", "message": "The disk was full; the run is kept and continues by itself once space is free."}))
                 return
-            self.store.transition(job_id, "failed", "failed", error=self._with_terminal(job_id, {"code": "execution-failed", "message": type(exc).__name__ + ": inspect call receipts and provider health; no automatic retry."}))
+            self.store.transition(job_id, "failed", "failed", error=self._with_terminal(job_id, {"code": "execution-failed", "message": _cause(exc) + "Inspect call receipts and provider health; no automatic retry."}))
 
     def resume_disk_low(self) -> list[str]:
         """Continue every research job a full disk stopped, once the disk is a margin above the floor: a resume of the

@@ -121,11 +121,18 @@ class ProwlClient:
 
     async def _connect(self) -> None:
         assert self._stack is not None
-        read, write = await self._stack.enter_async_context(
-            open_streams(self.mcp_url, {"Authorization": f"Bearer {self.api_key}"})
-        )
-        session = await self._stack.enter_async_context(ClientSession(read, write))
-        await session.initialize()
+        try:
+            read, write = await self._stack.enter_async_context(
+                open_streams(self.mcp_url, {"Authorization": f"Bearer {self.api_key}"})
+            )
+            session = await self._stack.enter_async_context(ClientSession(read, write))
+            await session.initialize()
+        except BaseException:
+            # B-140: a refused handshake (prowl.chat answered 401 on 2026-11-14) left the transport's task group
+            # open; closed later from another task it raised "Attempted to exit cancel scope in a different task".
+            # Close it here, in the task that opened it, then let the cause through.
+            await self.aclose()
+            raise
         self._session = session
 
     async def _reconnect(self) -> None:
