@@ -72,13 +72,16 @@ class TestLinkSchemeSanitization:
 
 
 class TestFidelityBudgetHonesty:
-    # B2: sentences dropped by the 40-sentence budget must count as unchecked.
+    # B2: sentences dropped by the sentence budget must count as unchecked (the budget is 200 since B-138).
 
     async def test_budget_dropped_refs_count_as_unchecked(self, tmp_path, fake_llm: FakeLLM):
+        from research_agent.agent import citations
+
         ledger = _ledger(tmp_path)
+        budget = citations._MAX_SENTENCES
         report = "\n\n".join(
             f"Finding {i}: a.com gets 150,00{i % 10} monthly visitors [C1]."
-            for i in range(41)
+            for i in range(budget + 1)
         )
         fake_llm.fidelity_payload = {
             "verdicts": [
@@ -86,8 +89,8 @@ class TestFidelityBudgetHonesty:
             ]
         }
         result = await verify_citations(fake_llm, report, ledger)
-        assert result.checked == 40
-        assert result.supported == 40
+        assert result.checked == budget
+        assert result.supported == budget
         assert result.unchecked == 1
         assert result.unverified == 0
 
