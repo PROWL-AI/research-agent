@@ -307,7 +307,7 @@ class Store:
                 self.db.execute("DELETE FROM auth WHERE hash=?", (hashed,))
             return bool(row and row[0] > now())
 
-    def usage(self):
+    def usage(self, instance: str = "default"):
         jobs = {j["id"]: j for j in self.jobs()}
         days = {}
         # 30 UTC days with today, the window the overview calls «30 дней» (B-083).
@@ -332,5 +332,5 @@ class Store:
             totals = {key: sum(r[key] for r in by_model) for key in ("calls", "unpricedCalls", "inputTokens", "outputTokens")}
             costs = [r["costUsd"] for r in by_model if r["costUsd"] is not None]
             result.append(dict(date=date, byModel=by_model, costUsd=sum(costs) if costs else None, **totals))
-        return {"protocol": "fabric-service/0.1", "service": {"id": SERVICE_ID, "instance": "default"},
+        return {"protocol": "fabric-service/0.1", "service": {"id": SERVICE_ID, "instance": instance},  # B-137
                 "generatedAt": now(), "currency": "USD", "days": result}

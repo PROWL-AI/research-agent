@@ -207,7 +207,7 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
             if not token_matches(request, host_token):
                 return JSONResponse({"error": "host token required"}, 401)
             if path.endswith("usage"):
-                return JSONResponse(store.usage())
+                return JSONResponse(store.usage(instance))
             limit = int(request.query_params.get("limit", "50"))
             if not 1 <= limit <= 200:
                 raise ValueError("limit must be between 1 and 200")
@@ -266,7 +266,7 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
                     "delegation": job.get("delegation"), "via": job.get("via"), "runDir": job.get("runDir"),
                     "chainOwner": job.get("chainOwner"), "errorCode": (job.get("error") or {}).get("code"),
                     "costUsd": sum(costs) if costs else None, "unpricedCalls": sum(c["costUsd"] is None for c in calls), "calls": len(calls)})
-            return JSONResponse({"at": now(), "health": health(), "jobs": summaries, "config": store.config(), "usage": store.usage(), "runbooks": runbooks()})
+            return JSONResponse({"at": now(), "health": health(), "jobs": summaries, "config": store.config(), "usage": store.usage(instance), "runbooks": runbooks()})
         if path == "/api/jobs" and request.method == "POST":
             data = await body(request)
             return JSONResponse(rt.create(data["request"], data["idempotencyKey"], via="dashboard"), 201)

@@ -146,3 +146,10 @@ async def test_the_page_and_identity_name_the_service(client):
         assert page == (STATIC / "index.html").read_text()
     health = (await client.get("/.well-known/fabric-service", headers=bearer("service-value"))).json()
     assert health["service"]["id"] == SERVICE_ID and health["service"]["name"] == SERVICE_NAME
+
+
+async def test_the_usage_report_names_the_same_instance_as_the_well_known_document(client):
+    """B-137: the cloud's usage report said instance "default" while its well-known document says "cloud"."""
+    health = (await client.get("/.well-known/fabric-service", headers=bearer("service-value"))).json()
+    usage = (await client.get("/fabric/v1/usage", headers=bearer("service-value"))).json()
+    assert usage["service"] == {"id": health["service"]["id"], "instance": "cloud"}
