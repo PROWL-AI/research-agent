@@ -1,6 +1,18 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-14 (night): 0.6.15 accepted everywhere (supersedes every "Exact next task" below)
+## Current entry, 2026-11-14 (evening): the board in waves, 0.6.16 (supersedes every "Exact next task" below)
+
+Wave 1 (external rows): B-073 closed (Prowl fixed it in T415); B-067 sent to the Prowl project on the board (its PR
+#29 was never merged); B-001 stays waived with a new condition (no Fabric binding carries model profiles yet); B-095
+stays pinned (CT-125 still `open: proposed`); B-123 is still a human gate (Heroku: "delinquent ... suspend it on Tue Nov
+17 2026", `heroku auth:whoami` 2026-11-14). Wave 2: B-103 closed in 0.6.16 (month ledger). Wave 3: B-137 fixed; ruff
+clean; nightly CI green on 0.6.15; B-138 filed. B-017 waits a person's labels.
+
+**Exact next tasks:** (1) deploy 0.6.16 everywhere (clouds, Appvillis copy, Studio spaces, MacBook) and read each
+`/.well-known/fabric-service` and `/fabric/v1/usage`; (2) watch the board thread `7951869c` for Prowl's answer on
+B-067; (3) B-123 by 2026-11-17 (human gate).
+
+## Entry, 2026-11-14 (night): 0.6.15 accepted everywhere (supersedes every "Exact next task" below)
 
 0.6.15 (`bf1fa60`, tag `v0.6.15`) runs on cloud `prowl-research` (build `e0bbba02`), the Appvillis copy (`ffbf8aa`,
 build `d180378d`), the Studio spaces 18765, 18766, 18767 and the MacBook service, each `ready`, `degraded: []`. The

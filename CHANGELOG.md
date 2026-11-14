@@ -4,6 +4,18 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.16 (2026-11-14)
+
+- A month ceiling across the service's own agents, with a hash-chained journal (B-103): every job the daily allowance
+  approves for them also reserves its worst case in the agents database pattern `spend-ledger` 1.3.0 (vendored
+  unchanged as `research_agent/service/vendor/spend_ledger.py`), one UTC-month stop at 95 % of `agent_monthly_usd`
+  (USD 100 by default, the operator's rule of 2026-11-07; 0 turns the allowance off). A job that would cross it waits
+  for the operator. An ended job settles to what it cost, one that made no call is released, and every change is a
+  line of `spend-ledger.jsonl` in the data root, chained by hash; a reached stop or an edited line shows in the
+  service's `degraded`. Cloud client keys keep the ceiling issued with them; interactive keys and the operator's own
+  jobs are not held. The setting is in the dashboard's settings.
+- The usage report names the instance its well-known document names (B-137): the cloud said `default`.
+
 ## 0.6.15 (2026-11-14)
 
 - The writer's larger retry goes without reasoning (B-133): on a 75-step domain-baseline run
