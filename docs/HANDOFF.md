@@ -1,6 +1,16 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-14 (late evening): the leaked Prowl key on both clouds (supersedes every "Exact next task" below)
+## Current entry, 2026-11-14 (night, last): every board row we can move is moved (supersedes every "Exact next task" below)
+
+0.6.18 (`c785b06`) runs on all six instances, `ready`, `degraded: []`. B-139 closed: each cloud runs on its own Prowl
+key with a 10 USD daily cap; B-067 closed: fixed at Prowl (T435) and checked live.
+
+**Exact next tasks:** (1) B-123: the operator pays Heroku by 2026-11-17, else the personal cloud stops (human gate);
+(2) the Appvillis Prowl account holds 1.18 USD: a top-up is the operator's payment; (3) B-017 when the operator labels a
+report; (4) B-095 when CT-125 lands; (5) B-001 when a Fabric binding carries model profiles; (6) the next R31 measurement
+from 2026-11-27.
+
+## Entry, 2026-11-14 (late evening): the leaked Prowl key on both clouds (supersedes every "Exact next task" below)
 
 B-139, deadline 2026-11-16: both clouds still use the operator's leaked Prowl key `3f1869c3`. Answered Prowl "mint"
 (board thread `7951869c`, message `fdd33aca`); Prowl puts a new key into each vault slot. Prowl confirmed B-067 as two
