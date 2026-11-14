@@ -4,6 +4,13 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.17 (2026-11-14)
+
+- Citation fidelity checks up to 200 cited sentences a report instead of 40 (B-138): on the domain-baseline report
+  `pr-beed8e47d1addec0ed03` the 40-sentence budget checked 121 of 268 references and found nothing, while every
+  sentence checked all 268 and found 3 references the report did not support. The cost was 6 more calls of the cheap
+  model (`deepseek/deepseek-v4.1-flash`, about 16000 input tokens).
+
 ## 0.6.16 (2026-11-14)
 
 - A month ceiling across the service's own agents, with a hash-chained journal (B-103): every job the daily allowance

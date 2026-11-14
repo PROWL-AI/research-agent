@@ -8,9 +8,14 @@ stays pinned (CT-125 still `open: proposed`); B-123 is still a human gate (Herok
 17 2026", `heroku auth:whoami` 2026-11-14). Wave 2: B-103 closed in 0.6.16 (month ledger). Wave 3: B-137 fixed; ruff
 clean; nightly CI green on 0.6.15; B-138 filed. B-017 waits a person's labels.
 
-**Exact next tasks:** (1) deploy 0.6.16 everywhere (clouds, Appvillis copy, Studio spaces, MacBook) and read each
-`/.well-known/fabric-service` and `/fabric/v1/usage`; (2) watch the board thread `7951869c` for Prowl's answer on
-B-067; (3) B-123 by 2026-11-17 (human gate).
+0.6.16 (`b2b2f5a`) ran on every instance, `ready`, `degraded: []`; the usage report names `cloud` on both clouds, and a
+live agent tool job on the Studio space `sshlg` (`pr-36e65964a7c6c871398b`) reserved USD 1 and settled to 0.009 in
+the hash-chained month journal. 0.6.17 closes B-138 (citation fidelity checks up to 200 sentences; measured: 3
+unsupported references the 40-sentence budget let through).
+
+**Exact next tasks:** (1) deploy 0.6.17 everywhere as 0.6.16 was; (2) watch the board thread `7951869c` for Prowl's
+answer on B-067; (3) B-123 by 2026-11-17 (human gate); (4) B-017 when the operator labels a report; (5) the next
+R31 measurement from 2026-11-27.
 
 ## Entry, 2026-11-14 (night): 0.6.15 accepted everywhere (supersedes every "Exact next task" below)
 
