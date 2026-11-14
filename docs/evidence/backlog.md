@@ -21,6 +21,12 @@
 
 ## Closed
 
+- **B-135 · A sentence announcing a report shipped as the report** · closed 2026-11-14 · found by the B-133 measurement: `moonshotai/kimi-k3.1-pro` writing without reasoning answered "I'll write the final markdown report now." (10 and 30 words, finish=stop) and the lint passed it as clean; the B-128 path (0.6.12 to 0.6.14) sent such requests too. 0.6.15: requests without reasoning ask for the report itself, and an answer without a heading is replaced by the longest real draft or fails (`writer.is_report`; `tests/test_audit_r3_writer.py::TestWriterAnswersWithoutAReport`; [report](../reports/2026-11-14-planner-and-transforms/README.md)).
+
+- **B-134 · A dependent flag made DataForSEO refuse the whole crawl** · closed 2026-11-14 · `pr-ccc142f3e62bfb674bbb` sent `enable_browser_rendering` without `load_resources` (40501) and three reads after it were not sent. 0.6.15: `tool_limits.FLAG_DEPENDENCIES`, the flag is taken out and the planner is told (`tests/test_tool_limits_flags.py`). The schema gap went to the Prowl project on the board (thread `7951869c`).
+
+- **B-133 · The writer's retry with reasoning outlived the job** · closed 2026-11-14 · `pr-ccc142f3e62bfb674bbb` (domain-baseline 1.2, 0.6.14): drafts cut at 8000 after 4.5 min and at 24000 after 12 min, the job died at 40 min with no report. 0.6.15: `writer_reasoning`, the larger retry goes without reasoning (`first`); rewritten from the same ledger in 302 s, judge 0.82 ([report](../reports/2026-11-14-planner-and-transforms/README.md)).
+
 - **B-132 · A transform could miss the sources its instruction names** · closed 2026-11-14 · found by auditing `pr-8ca06955600a3e5fd3be`: `select_competitors` named four steps and read the last three artifacts at 4000 characters of indented JSON (`orchestrator.py` `_TRANSFORM_CONTEXT_*`), without the homepage and with `dfs_competitors` cut to its own domain. 0.6.14: `_transform_sources` reads the named steps (up to 8, 32000 characters), `_compact_json`; replayed three times each way: sources read 3 of 4 to 4 of 4, bindings 0 both ways because Prowl's competitor tools returned no in-niche domain for prowl.chat (`tests/test_transform_sources.py`, [report](../reports/2026-11-14-planner-and-transforms/README.md)).
 
 - **B-131 · domain-baseline could never run its site audit** · closed 2026-11-14 · `seo_growth_audit` reads raw HTML only and 1.1 had no tool that returns it; 1.2 scrapes with `firecrawl_scrape_page_seo` and hands it over with `{{output:...}}`; 1.1 kept (R28, `catalog/shipped.lock.json`).

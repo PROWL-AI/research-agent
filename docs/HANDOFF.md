@@ -1,6 +1,18 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-14: audit after 0.6.13, release 0.6.14 (supersedes every "Exact next task" below)
+## Current entry, 2026-11-14 (later): 0.6.15, the writer and the crawl flag (supersedes every "Exact next task" below)
+
+The 0.6.14 control run (`pr-ccc142f3e62bfb674bbb`) confirmed B-129 and B-131 and found B-133 (the writer's retry with
+reasoning outlived the job), B-134 (a dependent DataForSEO flag) and, measuring B-133, B-135 (Kimi without reasoning
+announces a report instead of writing it). All three ship in 0.6.15 with their measurement in
+[the report](reports/2026-11-14-planner-and-transforms/README.md). The Prowl-side errors (`perplexity_responses`
+NoneType, the on-page schema gap) went to project `0xDEV` on the board, thread `7951869c`.
+
+**Exact next tasks:** (1) after 0.6.15 is deployed everywhere, run the domain-baseline 1.2 acceptance on the Studio
+space `sshlg` again and read: a report written, planner and writer minutes, skipped steps; (2) B-123, the operator's
+Heroku payment by 2026-11-17 (human gate); (3) the next R31 measurement after 14 days of the clouds.
+
+## Entry, 2026-11-14: audit after 0.6.13, release 0.6.14 (supersedes every "Exact next task" below)
 
 Audit of the domain-baseline 1.1 acceptance (`pr-8ca06955600a3e5fd3be`) and the board (empty): four defects behind its
 skipped steps. B-130 shipped in 0.6.13; B-129 (planner reasoning off), B-131 (domain-baseline 1.2 hands raw HTML to
