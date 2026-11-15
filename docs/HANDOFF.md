@@ -1,5 +1,17 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-15 (night): compiled wiki vendored, board request d2495699 (supersedes every "Exact next task" below)
+
+The agents database recommended its compiled wiki (`patterns/compiled-wiki` 1.0.0, D-51; board request `d2495699`, thread
+`b08b0655`). Taken as an adaptation: the module is vendored unedited (`research_agent/agent/compiled_wiki.py`, sha256 of
+the body checked in `tests/test_compiled_wiki_adoption.py`) and bound to our `untrusted_fence` in
+`research_agent/agent/research_wiki.py`; it refuses to open without an outbound guard. Checks run: 5 adoption tests, the
+pattern's own 63 tests against the vendored copy, ruff clean (one older ruff error in a report's probe script fixed),
+the full suite. Not on the answer path: our variants answer from live paid tool calls, the base lists research's use of
+the wiki in `corpus-desk` only, and the floor and outbound guard are missing. That is B-147, with its four steps.
+
+**Exact next tasks:** unchanged from the entry below, plus B-147 by priority (design step first).
+
 ## Current entry, 2026-11-15 (evening): xAI search and what people research in 2026 (supersedes every "Exact next task" below)
 
 The operator asked to add the xAI API for searching X trends and to find, across all sources, the 30 research types
