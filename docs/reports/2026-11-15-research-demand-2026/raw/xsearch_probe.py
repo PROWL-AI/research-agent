@@ -1,5 +1,8 @@
 """Probe: xAI X Search through OpenRouter (native web plugin + x_search). Key from env, never printed."""
-import json, os, sys, urllib.request
+import json
+import os
+import sys
+import urllib.request
 
 prompt = sys.argv[1]
 out = sys.argv[2]

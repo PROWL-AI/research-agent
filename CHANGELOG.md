@@ -6,6 +6,10 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## Unreleased
 
+- The compiled wiki of the agents database (`patterns/compiled-wiki` 1.0.0, decision D-51) is vendored unedited as
+  `research_agent/agent/compiled_wiki.py` and bound in `research_agent/agent/research_wiki.py` to this agent's untrusted
+  fence and scan, with an outbound guard required to open it. Not on the answer path yet (B-147): no run reads or writes
+  it. The pattern's own 63 tests pass on the vendored copy with our fence 1.2.1.
 - A study of what people research in 2026 (`docs/reports/2026-11-15-research-demand-2026/`): 30 research types from X
   (searched through xAI Grok), Google Trends, Reddit and the web, each mapped to a runbook here and a Prowl playbook,
   with `research-types-2026.json` for agents. Gaps filed as B-142 to B-146; the X pulse runbook is B-141.
