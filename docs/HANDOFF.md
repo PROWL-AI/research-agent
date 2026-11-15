@@ -7,10 +7,11 @@ Prowl credited 898.83 USD on the operator's order (board thread `7951869c`, repl
 `appvillis-topup-1000-2026-11-14`); the first 100 USD were Prowl's own on 2026-11-14. The key `a72a9e5e` keeps its 10 USD
 daily cap. All six instances answer (clouds and MacBook at 0.6.18, `degraded: []`; Studio ports 18765 to 18767 answer 200).
 
-Deploy route: the Heroku CLI on `studio-sshlg` answers "Invalid credentials provided" (2026-11-15), so `heroku auth:token`
-there no longer feeds `scripts/cloud.py deploy`. The MacBook's CLI is signed in and reaches both apps
-(`heroku apps:info -a prowl-research`, `-a appvillis-prowl-research`): take the token from the MacBook (pipe it to the
-Studio run over ssh stdin, or deploy from a MacBook worktree). No Heroku key is in Observatory for these projects.
+Deploy route: the Heroku CLI on `studio-sshlg` answers "Invalid credentials provided" (2026-11-15), so the old route
+(`heroku auth:token` there) is gone. Each cloud now has its own deploy authorization in Observatory, issued by the
+Heroku door: `prowl-research-agent/prod/HEROKU_API_KEY` and `appvillis-com-appvillis-prowl-research/prod/HEROKU_API_KEY`
+(expire 2027-02-13), each proved against its app. The key travels from the MacBook's vault to the Studio gate
+interpreter on ssh stdin; the route was proved with a read of `prowl-research` from Studio (`docs/CLOUD.md`, Deploy).
 
 B-123 is narrower than its row said: since B-106 the Studio spaces run their own instances, so a suspension stops only
 the personal cloud and its clients (jobs and Fabric Dashboards sessions still reach it, router log 2026-11-15). The
