@@ -19,6 +19,7 @@
   "runbook/seo-site-audit@1.0": "sha256:575e4c774401a79ef69d919583d989bc383785d94962614d0a688116375df53a",
   "runbook/seo-site-audit@1.1": "sha256:1dc0f2ecd83213f8d845a6c511987ba194aa0c45ee602f9be01d509098a83485",
   "runbook/subscription-app-audit@1.0": "sha256:586b6c2069b0178f7c0c10bebacf63091a5071c45d56bcc0a0ad9547be88a09d",
+  "runbook/x-trend-pulse@1.0": "sha256:aa13e1f3b5df712799a6b2ab9eba14c8ed59d7d6a229c0c2279578ff5e63e6ce",
   "template/base.html.j2": "sha256:669579d1c4ef3179f45783ec57d67e2d06024fe720bf3712c735296dfe62eb55",
   "template/base.v2.html.j2": "sha256:e12c5c4817b29330ea09217d4b81a2b03689cc095abb780b97327e8fb03a6378"
  }

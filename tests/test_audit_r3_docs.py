@@ -62,7 +62,7 @@ class TestBudgetModelValidation:
 
     def test_all_shipped_runbooks_have_positive_call_budget(self):
         runbooks = list_runbooks()
-        assert len(runbooks) == 14
+        assert len(runbooks) == 15  # x-trend-pulse added 2026-11-15 (B-141)
         for rb in runbooks:
             assert rb.meta.budget.max_tool_calls > 0, rb.name
 
