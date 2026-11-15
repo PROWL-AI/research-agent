@@ -1,0 +1,534 @@
+{
+ "schema": "research-demand/1",
+ "as_of": "2026-11-15",
+ "window": "posts and trends from 2026-01-01 (X), 12 months and 5 years (Google Trends)",
+ "ranking": "ordinal by evidence tier (A: measured search trend plus a second source; B: two source types; C: one source), then by strength inside the tier. Not a measured volume ranking.",
+ "items": [
+  {
+   "rank": 1,
+   "id": "competitor-teardown",
+   "type": "Competitor teardown / competitive intelligence",
+   "example_phrasings": [
+    "reverse-engineer my competitor's strategy",
+    "deep competitive intelligence on <competitor>"
+   ],
+   "evidence": [
+    "X: very high, prompts with 500+ likes (x1 #3,#4)",
+    "GT related: business competitor analysis 46, competitor analysis report 34",
+    "Reddit: r/ProductMarketing threads (50+ and 20+ comments)"
+   ],
+   "evidence_tier": "A",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "saas-competitor-teardown",
+   "prowl_playbook": "competitor-teardown",
+   "coverage": "covered"
+  },
+  {
+   "rank": 2,
+   "id": "market-sizing",
+   "type": "Market sizing: TAM, SAM, SOM, CAGR",
+   "example_phrasings": [
+    "TAM analysis for <industry>",
+    "TAM, SAM, SOM breakdown with growth projections"
+   ],
+   "evidence": [
+    "GT 5y: 'market size' 3.9 -> 31.1 (highest of its set)",
+    "GT rising: 'cagr' +80%",
+    "X: high (x1 #2)"
+   ],
+   "evidence_tier": "A",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "market-sizing",
+   "prowl_playbook": null,
+   "coverage": "covered (no Prowl playbook)"
+  },
+  {
+   "rank": 3,
+   "id": "niche-market-research",
+   "type": "Market research on a niche, increasingly with AI",
+   "example_phrasings": [
+    "ai market research",
+    "how to do market research"
+   ],
+   "evidence": [
+    "GT 5y: 'market research' 5.1 -> 26.9",
+    "GT related top: 'ai market research' 100, 'ai for market research' 38",
+    "Web: deep-research tools used for market research (Reddit r/Agents_Everywhere 2026-10-22)"
+   ],
+   "evidence_tier": "A",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "market-pulse; domain-baseline",
+   "prowl_playbook": "idea-validation",
+   "coverage": "covered"
+  },
+  {
+   "rank": 4,
+   "id": "seo-competitor-gap",
+   "type": "SEO competitor and keyword gap analysis",
+   "example_phrasings": [
+    "seo competitor analysis",
+    "competitor keyword analysis"
+   ],
+   "evidence": [
+    "GT related top: 'seo competitor analysis' 100",
+    "GT rising: 'keyword competitor analysis' +90%, 'competitor analysis for seo' +60%"
+   ],
+   "evidence_tier": "A",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "competitor-seo",
+   "prowl_playbook": "competitor-teardown",
+   "coverage": "covered"
+  },
+  {
+   "rank": 5,
+   "id": "ai-visibility-geo",
+   "type": "AI search visibility: GEO / AEO, being cited by ChatGPT, Perplexity, Gemini",
+   "example_phrasings": [
+    "how do I get cited in ChatGPT",
+    "GEO vs SEO"
+   ],
+   "evidence": [
+    "GT 12m: 'ai visibility' avg 43, 26.2 -> 34.8; 'answer engine optimization' 3.4 -> 5.2; 'generative engine optimization' 6.0 -> 8.8",
+    "X: top new 2026 topic (x1 new #1, 4 posts)",
+    "Web: 'What 34 Studies Reveal About AI Search in 2026'"
+   ],
+   "evidence_tier": "A",
+   "new_or_much_bigger_in_2026": true,
+   "agent_runbook": "ai-visibility-audit",
+   "prowl_playbook": "geo-visibility-audit",
+   "coverage": "covered"
+  },
+  {
+   "rank": 6,
+   "id": "competitor-complaint-mining",
+   "type": "Mining competitor complaints and reviews for the roadmap",
+   "example_phrasings": [
+    "mine your competitors' complaints before you build your roadmap",
+    "complaint | frequency | severity | still unsolved?"
+   ],
+   "evidence": [
+    "X: 400+ likes (x1 #3, #10)",
+    "Reddit: 'what customers think about competing products' (r/ProductMarketing, 1 week old)"
+   ],
+   "evidence_tier": "A",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "reviews-voice",
+   "prowl_playbook": "local-and-reputation",
+   "coverage": "covered"
+  },
+  {
+   "rank": 7,
+   "id": "ai-agents-market",
+   "type": "AI agents market map: who builds, how agents make money, marketplaces",
+   "example_phrasings": [
+    "how AI agents actually make money",
+    "the marketplace behind the agent"
+   ],
+   "evidence": [
+    "GT 12m: 'ai agents' avg 52 (highest of its set)",
+    "X: the dominant new 2026 theme (x2 #1, #2, #10-#17)"
+   ],
+   "evidence_tier": "A",
+   "new_or_much_bigger_in_2026": true,
+   "agent_runbook": null,
+   "prowl_playbook": null,
+   "coverage": "gap: no AI-market-map runbook or playbook"
+  },
+  {
+   "rank": 8,
+   "id": "competitor-website-analysis",
+   "type": "Competitor website analysis (pages, tech, speed, funnel)",
+   "example_phrasings": [
+    "competitor website analysis",
+    "online competitor analysis"
+   ],
+   "evidence": [
+    "GT related: 45; rising +60%"
+   ],
+   "evidence_tier": "B",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "domain-baseline",
+   "prowl_playbook": "competitor-teardown",
+   "coverage": "covered"
+  },
+  {
+   "rank": 9,
+   "id": "competitor-pricing",
+   "type": "Competitor pricing and tier analysis",
+   "example_phrasings": [
+    "competitor price analysis",
+    "pricing history & tier analysis"
+   ],
+   "evidence": [
+    "GT related: 'competitor price analysis' 54",
+    "X: listed (x1 additional types)",
+    "GT 12m: generic 'pricing strategy' 7.8 -> 2.4 (falling)"
+   ],
+   "evidence_tier": "B",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": null,
+   "prowl_playbook": null,
+   "coverage": "partial: a section of saas-competitor-teardown; no dedicated runbook or playbook"
+  },
+  {
+   "rank": 10,
+   "id": "company-dossier",
+   "type": "Research dossier on a target company (sales, partnership, investment target)",
+   "example_phrasings": [
+    "research dossier for target company",
+    "I created the ultimate prompt for company research"
+   ],
+   "evidence": [
+    "GT rising: 'research dossier for target company' Breakout",
+    "Reddit: r/ThinkingDeeplyAI company research prompt"
+   ],
+   "evidence_tier": "B",
+   "new_or_much_bigger_in_2026": true,
+   "agent_runbook": null,
+   "prowl_playbook": null,
+   "coverage": "gap: closest are domain-baseline and finance-equity-research"
+  },
+  {
+   "rank": 11,
+   "id": "trend-pulse",
+   "type": "What is moving in a market now (trend and news pulse)",
+   "example_phrasings": [
+    "what changed in <market> this year",
+    "is now a good moment to enter"
+   ],
+   "evidence": [
+    "X: AI-augmented multi-source research shift (x1 summary)",
+    "GT: trend reads are the substrate of every set above"
+   ],
+   "evidence_tier": "B",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "market-pulse",
+   "prowl_playbook": null,
+   "coverage": "covered (no Prowl playbook)"
+  },
+  {
+   "rank": 12,
+   "id": "x-conversation-pulse",
+   "type": "What people say and ask on X about a topic before it reaches search",
+   "example_phrasings": [
+    "what are people asking about <topic>",
+    "what is new in <topic> in 2026"
+   ],
+   "evidence": [
+    "X: this study itself; 26 cited posts in two passes",
+    "Search lags X: GT 'ai agents' peaked then fell 31.8 -> 23.6 while X discussion kept growing (x2)"
+   ],
+   "evidence_tier": "B",
+   "new_or_much_bigger_in_2026": true,
+   "agent_runbook": "x-trend-pulse (pending xai_* in Prowl)",
+   "prowl_playbook": null,
+   "coverage": "pending: runbook on branch feat/x-trend-pulse"
+  },
+  {
+   "rank": 13,
+   "id": "subscription-app-benchmarks",
+   "type": "Subscription app benchmarks, paywalls and AI costs in monetization",
+   "example_phrasings": [
+    "only 17.3% of new apps reach $1,000 MRR in two years",
+    "freemium converts at 2.1% by day 35"
+   ],
+   "evidence": [
+    "X: RevenueCat State of Subscription Apps 2026 quoted (x2 #4, #5); figures are the report's, quoted by posts"
+   ],
+   "evidence_tier": "B",
+   "new_or_much_bigger_in_2026": true,
+   "agent_runbook": "subscription-app-audit",
+   "prowl_playbook": "mobile-aso",
+   "coverage": "covered"
+  },
+  {
+   "rank": 14,
+   "id": "ad-creative-research",
+   "type": "Ad creative and ad library research (Meta, TikTok), UGC and AI video",
+   "example_phrasings": [
+    "what ads is <competitor> running",
+    "AI UGC video that converts"
+   ],
+   "evidence": [
+    "GT 12m: 'meta ad library' flat 1.6 -> 1.5",
+    "X: AI video / UGC posts (x2 #19)"
+   ],
+   "evidence_tier": "B",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "ads-creative-research",
+   "prowl_playbook": null,
+   "coverage": "covered (no Prowl playbook)"
+  },
+  {
+   "rank": 15,
+   "id": "equity-ai-infra",
+   "type": "Equity research on AI infrastructure winners",
+   "example_phrasings": [
+    "Anthropic IPO and the stakes of Amazon and Google",
+    "AI infra financing models 2026-2030"
+   ],
+   "evidence": [
+    "X: x2 #18",
+    "GT: 'stock market news' 18, 'stock market today' 16 in related queries of 'market research'"
+   ],
+   "evidence_tier": "B",
+   "new_or_much_bigger_in_2026": true,
+   "agent_runbook": "finance-equity-research",
+   "prowl_playbook": null,
+   "coverage": "covered (no Prowl playbook)"
+  },
+  {
+   "rank": 16,
+   "id": "social-commerce",
+   "type": "Social commerce research: TikTok Shop products, sellers, demand",
+   "example_phrasings": [
+    "best selling TikTok Shop products",
+    "is TikTok Shop worth it"
+   ],
+   "evidence": [
+    "GT 12m: 'tiktok shop' avg 48, falling 52.4 -> 35.8 (still the second largest of its set)"
+   ],
+   "evidence_tier": "B",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": null,
+   "prowl_playbook": "amazon-marketplace (Amazon only)",
+   "coverage": "gap: no TikTok Shop runbook or playbook"
+  },
+  {
+   "rank": 17,
+   "id": "agentic-commerce",
+   "type": "Agentic commerce: what changes when agents buy, APIs for consumer agents",
+   "example_phrasings": [
+    "agentic commerce could account for $3 to 5T by 2030",
+    "every app will need to open APIs for consumer agents"
+   ],
+   "evidence": [
+    "X: 2k+ likes (x2 #3, #10)",
+    "claim attributed to McKinsey, not checked here"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": true,
+   "agent_runbook": null,
+   "prowl_playbook": null,
+   "coverage": "gap"
+  },
+  {
+   "rank": 18,
+   "id": "app-growth-aso",
+   "type": "App growth and ASO strategy",
+   "example_phrasings": [
+    "2026? 'Redirect'",
+    "ASO keyword landscape"
+   ],
+   "evidence": [
+    "X: x2 #6",
+    "GT 12m: 'app store optimization' avg 1, falling (people search the brand names of tools instead)"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "subscription-app-audit (partial)",
+   "prowl_playbook": "mobile-aso",
+   "coverage": "covered in Prowl; partial in the agent"
+  },
+  {
+   "rank": 19,
+   "id": "channel-economics",
+   "type": "Channel economics: where attention is under-priced",
+   "example_phrasings": [
+    "CAC by channel",
+    "which channel to start with"
+   ],
+   "evidence": [
+    "X: investor-style unit economics (x1 #4)",
+    "Prowl playbook exists"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "channel-economics",
+   "prowl_playbook": "channel-economics-audit",
+   "coverage": "covered"
+  },
+  {
+   "rank": 20,
+   "id": "investor-unit-economics",
+   "type": "Investor-style economics: capital intensity, returns, what growth is worth",
+   "example_phrasings": [
+    "how much capital is required to generate that growth",
+    "what returns will that capital earn"
+   ],
+   "evidence": [
+    "X: hundreds of likes (x1 #4)"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "finance-equity-research (partial); channel-economics (partial)",
+   "prowl_playbook": null,
+   "coverage": "partial"
+  },
+  {
+   "rank": 21,
+   "id": "idea-validation",
+   "type": "Idea validation and niche discovery for a product idea",
+   "example_phrasings": [
+    "is there demand for <idea>",
+    "validate my SaaS idea"
+   ],
+   "evidence": [
+    "Reddit r/aiToolForBusiness: underserved segments",
+    "Prowl playbook exists"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "idea-validation",
+   "prowl_playbook": "idea-validation",
+   "coverage": "covered"
+  },
+  {
+   "rank": 22,
+   "id": "positioning-audit",
+   "type": "Positioning and differentiation audit against alternatives",
+   "example_phrasings": [
+    "who are they targeting, what problem do they promise",
+    "look for gaps, not ideas to copy"
+   ],
+   "evidence": [
+    "X: x1 #5"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "saas-competitor-teardown (partial)",
+   "prowl_playbook": "competitor-teardown (partial)",
+   "coverage": "partial"
+  },
+  {
+   "rank": 23,
+   "id": "growth-signals",
+   "type": "Growth signals of a company: hiring, launches, momentum",
+   "example_phrasings": [
+    "is <company> growing",
+    "who is hiring into this niche"
+   ],
+   "evidence": [
+    "X: roadmap clues from job postings and patents (x1 additional)"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "growth-signals",
+   "prowl_playbook": null,
+   "coverage": "covered (no Prowl playbook)"
+  },
+  {
+   "rank": 24,
+   "id": "amazon-marketplace",
+   "type": "Amazon marketplace demand and shelf research",
+   "example_phrasings": [
+    "Amazon keyword and rating gaps"
+   ],
+   "evidence": [
+    "Prowl playbook exists; no new 2026 signal collected here"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": null,
+   "prowl_playbook": "amazon-marketplace",
+   "coverage": "partial: Prowl only"
+  },
+  {
+   "rank": 25,
+   "id": "local-reputation",
+   "type": "Local business visibility and reputation",
+   "example_phrasings": [
+    "own the local pack",
+    "what reviews say about us"
+   ],
+   "evidence": [
+    "Prowl playbook exists; X: local/DTC adaptation to agents (x2 #20)"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "reviews-voice (partial)",
+   "prowl_playbook": "local-and-reputation",
+   "coverage": "covered in Prowl"
+  },
+  {
+   "rank": 26,
+   "id": "content-planning-seo-geo",
+   "type": "Content planning that ranks on Google and gets cited by AI",
+   "example_phrasings": [
+    "hybrid SEO + GEO workflow"
+   ],
+   "evidence": [
+    "X: x1 new #2"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": true,
+   "agent_runbook": "seo-site-audit (partial)",
+   "prowl_playbook": "content-engine",
+   "coverage": "covered in Prowl"
+  },
+  {
+   "rank": 27,
+   "id": "cross-industry-substitutes",
+   "type": "Non-traditional competitors and substitutes",
+   "example_phrasings": [
+    "your competitors may not come from the same industry"
+   ],
+   "evidence": [
+    "X: x1 #6"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "saas-competitor-teardown (partial)",
+   "prowl_playbook": null,
+   "coverage": "partial"
+  },
+  {
+   "rank": 28,
+   "id": "industry-structure",
+   "type": "Industry structure: Porter's five forces, attractiveness",
+   "example_phrasings": [
+    "how easy is it for a new business to enter"
+   ],
+   "evidence": [
+    "X: x1 #7; GT: 'swot analysis' 7.1 -> 5.1 (5y, falling)"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": false,
+   "agent_runbook": "market-sizing (partial)",
+   "prowl_playbook": null,
+   "coverage": "partial"
+  },
+  {
+   "rank": 29,
+   "id": "agent-governance-b2b",
+   "type": "B2B shift to AI agent governance and control planes",
+   "example_phrasings": [
+    "who is the agent, what is it allowed to touch, can you prove it to an auditor"
+   ],
+   "evidence": [
+    "X: x2 #11, #17"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": true,
+   "agent_runbook": null,
+   "prowl_playbook": null,
+   "coverage": "gap (niche B2B)"
+  },
+  {
+   "rank": 30,
+   "id": "prediction-markets-sentiment",
+   "type": "Prediction market and options-flow data as sentiment signals",
+   "example_phrasings": [
+    "prediction market data feeds for attention mapping"
+   ],
+   "evidence": [
+    "X: x1 new #5, #7 (low volume)"
+   ],
+   "evidence_tier": "C",
+   "new_or_much_bigger_in_2026": true,
+   "agent_runbook": null,
+   "prowl_playbook": null,
+   "coverage": "gap (niche)"
+  }
+ ]
+}

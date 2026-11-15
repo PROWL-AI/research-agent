@@ -1,0 +1,92 @@
+{
+ "tool": "OpenRouter x-ai/grok-4.3, plugin web engine native + x_search {from_date: 2026-01-01}",
+ "retrieved_at": "2026-11-15",
+ "question": "New or much bigger 2026 research questions in apps, e-commerce, ads, AI agents, SaaS pricing, investing, local, creators",
+ "model": "x-ai/grok-4.3",
+ "usage": {
+  "prompt_tokens": 37192,
+  "completion_tokens": 3231,
+  "cost": 0.2500795
+ },
+ "citations": [
+  {
+   "url": "https://x.com/Lumen0x/status/2122045420331512092",
+   "title": "1",
+   "start_index": 397,
+   "end_index": 452
+  },
+  {
+   "url": "https://x.com/0xerfa/status/2108840620080902654",
+   "title": "2",
+   "start_index": 452,
+   "end_index": 506
+  },
+  {
+   "url": "https://x.com/Thomasbcn/status/2120530705247813816",
+   "title": "3",
+   "start_index": 506,
+   "end_index": 563
+  },
+  {
+   "url": "https://x.com/Jun__Yoo/status/2119825126967705981",
+   "title": "4",
+   "start_index": 3443,
+   "end_index": 3499
+  },
+  {
+   "url": "https://x.com/nikesharora/status/2102061935516881135",
+   "title": "5",
+   "start_index": 4440,
+   "end_index": 4499
+  },
+  {
+   "url": "https://x.com/karansingh010/status/2122042896362983452",
+   "title": "6",
+   "start_index": 4826,
+   "end_index": 4887
+  },
+  {
+   "url": "https://x.com/Levi54978160987/status/2122044799096369614",
+   "title": "7",
+   "start_index": 5188,
+   "end_index": 5251
+  },
+  {
+   "url": "https://x.com/pjcolbeck/status/2122044699196154189",
+   "title": "8",
+   "start_index": 5565,
+   "end_index": 5622
+  },
+  {
+   "url": "https://x.com/bykushnir/status/2122043232779456928",
+   "title": "9",
+   "start_index": 5889,
+   "end_index": 5946
+  },
+  {
+   "url": "https://x.com/trysynths/status/2122042409764696508",
+   "title": "10",
+   "start_index": 6226,
+   "end_index": 6284
+  },
+  {
+   "url": "https://x.com/bretance/status/2122042882928574624",
+   "title": "11",
+   "start_index": 6528,
+   "end_index": 6585
+  },
+  {
+   "url": "https://x.com/ThesisAndMetric/status/2122044426403164289",
+   "title": "12",
+   "start_index": 7231,
+   "end_index": 7295
+  },
+  {
+   "url": "https://x.com/shanielcreation/status/2122031146166841801",
+   "title": "13",
+   "start_index": 7556,
+   "end_index": 7620
+  }
+ ],
+ "answer": "**Here are 20 emerging or significantly scaled research questions/themes in 2026 (based on X posts from 2026), focused on the requested categories. These emphasize topics that appear new or much larger than in 2025, such as AI agent monetization/marketplaces, agentic commerce impacts, app growth shifts (e.g., \"redirect\"), subscription economics with AI costs, and related B2B/investing angles.**[[1]](https://x.com/Lumen0x/status/2122045420331512092)[[2]](https://x.com/0xerfa/status/2108840620080902654)[[3]](https://x.com/Thomasbcn/status/2120530705247813816)\n\nI prioritized posts discussing forward-looking research, trends, questions, or data (e.g., RevenueCat 2026 reports, agent experiments, 2026 app topics). Many center on **AI agents** as a breakout area. Each entry includes:\n\n- Research type (3-6 words)\n- Real example phrasing from a post\n- Audience (e.g., founders, investors, marketers)\n- Engagement/frequency signal (e.g., views, likes, replies, or implied virality from context)\n\n**1. AI agents monetization models**  \nExample: “A $20 AI service making sales every day could be a better business than an AI startup that raised $10M... how AI agents actually make money.”  \nAudience: AI founders/builders, indie hackers.  \nSignal: Detailed thread with examples; multiple related posts on specialized agents vs. funded startups.[[1]](https://x.com/Lumen0x/status/2122045420331512092)\n\n**2. Specialized AI agent marketplaces**  \nExample: “TermiX: The Marketplace Behind The Agent... list what their agents do and sell that service directly.”  \nAudience: AI product builders, marketplace operators.  \nSignal: In-depth post analyzing revenue economics and infrastructure.[[1]](https://x.com/Lumen0x/status/2122045420331512092)\n\n**3. Agentic commerce economics**  \nExample: “McKinsey estimates agentic commerce... could account for $3 to 5T globally by 2030.”  \nAudience: E-commerce/DTC founders, investors.  \nSignal: Cited in subscription apps discussion with high engagement (300+ likes on related post).[[2]](https://x.com/0xerfa/status/2108840620080902654)\n\n**4. Subscription app revenue benchmarks 2026**  \nExample: “Only 17.3% of newly launched apps reach $1,000 in monthly revenue within their first two years... freemium apps convert at just 2.1% by day 35.” (RevenueCat State of Subscription Apps 2026).  \nAudience: Mobile app founders, ASO/subscription experts.  \nSignal: Report referenced in multiple threads on AI making monetization harder.[[2]](https://x.com/0xerfa/status/2108840620080902654)\n\n**5. AI costs in app monetization**  \nExample: “AI makes this harder, since every interaction has a cost. Its answer is commerce...”  \nAudience: Mobile/subscription app builders.  \nSignal: Tied to low conversion stats; sparks discussion on shifting models.[[2]](https://x.com/0xerfa/status/2108840620080902654)\n\n**6. 2026 app growth strategies (“Redirect”)**  \nExample: “2026? ‘Redirect’” (in list of evolving app growth topics from ASO/ROAS to new signals).  \nAudience: Mobile growth marketers, ASO specialists.  \nSignal: Post outlining yearly evolution with 30+ likes/replies.[[3]](https://x.com/Thomasbcn/status/2120530705247813816)\n\n**7. App-tech reward systems vs. AI agents**  \nExample: “If agents crush the cost of participating... does that model even hold?” (Q1 on human-first internet/commerce).  \nAudience: App/tech platform builders, growth leads.  \nSignal: Thread with multiple research questions; 200+ views.[[4]](https://x.com/Jun__Yoo/status/2119825126967705981)\n\n**8. Charging AI agents for resources**  \nExample: “Beyond just blocking agents, does ‘let them in, but charge for the resources they use’ become the move?”  \nAudience: Platform/API owners, e-commerce/tech infra teams.  \nSignal: Part of multi-question thread on agent impacts.[[4]](https://x.com/Jun__Yoo/status/2119825126967705981)\n\n**9. AI agent sybil farming & detection**  \nExample: “Crypto had multi-account sybil farming... Do we see agents farming rewards across multiple accounts here too?”  \nAudience: Growth hackers, anti-fraud/platform teams.  \nSignal: Forward-looking questions in engaged thread.[[4]](https://x.com/Jun__Yoo/status/2119825126967705981)\n\n**10. APIs for consumer AI agents**  \nExample: “Every app... will need to existentially decide to open APIs for consumer agents to interact.”  \nAudience: App founders, marketplace/commerce operators.  \nSignal: High-engagement post (2k+ likes) on agent distribution battles.[[5]](https://x.com/nikesharora/status/2102061935516881135)\n\n**11. IT Ops control planes for AI agents**  \nExample: “Governing those agents (identity, policy, guardrails, audit) will matter more than building them... the control layer is where the moat will be.”  \nAudience: B2B SaaS/IT leaders, enterprise builders.  \nSignal: Sunday phone-call thesis post with replies on 2029 outlook.[[6]](https://x.com/karansingh010/status/2122042896362983452)\n\n**12. AI agent financial infrastructure**  \nExample: “What is $PURser actually building? Think of it as financial infrastructure for AI agents... spending access — but with rules.”  \nAudience: Fintech/AI product investors & builders.  \nSignal: Dedicated post explaining security/controls for agents.[[7]](https://x.com/Levi54978160987/status/2122044799096369614)\n\n**13. Autonomous AI agent experiments**  \nExample: “Scientists built a virtual town, moved in AI agents... left them completely alone for 15 days.” (with tools, jobs, voting).  \nAudience: AI researchers, product/enterprise teams.  \nSignal: Detailed experiment recap requesting follow-ups (e.g., rule variations).[[8]](https://x.com/pjcolbeck/status/2122044699196154189)\n\n**14. Mobile control of coding AI agents**  \nExample: “You can now message Claude Code directly from Telegram... control your coding workflow from your phone.”  \nAudience: Developers, AI agent users/builders.  \nSignal: Demo post highlighting flexibility for agents.[[9]](https://x.com/bykushnir/status/2122043232779456928)\n\n**15. AI agents in virtual economies/cities**  \nExample: “Synth City is a city AI agents live in and build... give it a job: fishing pays it, building speeds up... research.”  \nAudience: AI creators, simulation/gaming builders.  \nSignal: Practical how-to post on agent autonomy.[[10]](https://x.com/trysynths/status/2122042409764696508)\n\n**16. Perplexity Teammates / team AI agents**  \nExample: “Perplexity Teammates is now available in the Mac app... autonomous AI agents.”  \nAudience: Productivity/AI tool users & builders.  \nSignal: News-style post on expanding agent features.[[11]](https://x.com/bretance/status/2122042882928574624)\n\n**17. B2B SaaS shifts to agent governance**  \nExample: “The regular IT work moves to AI agents... Who is the agent, what is it allowed to touch... can you prove it to an auditor?”  \nAudience: B2B SaaS founders, CIOs/enterprise buyers.  \nSignal: Thesis on commoditized execution vs. control moats.[[6]](https://x.com/karansingh010/status/2122042896362983452)\n\n**18. Equity research on AI infrastructure winners**  \nExample: Discussions of Anthropic IPO, Amazon/Google stakes, and infrastructure plays (e.g., $NBIS models).  \nAudience: Investors, equity researchers.  \nSignal: Threads with financing models, valuations, and 2026-2030 projections.[[12]](https://x.com/ThesisAndMetric/status/2122044426403164289)\n\n**19. Creator/UGC tools for AI video & monetization**  \nExample: Posts on AI viral videos, clones, UGC portfolios, and monetizing AI skills via phone/laptop.  \nAudience: Creators, UGC marketers.  \nSignal: Multiple how-to/registration posts on AI-enhanced UGC.[[13]](https://x.com/shanielcreation/status/2122031146166841801)\n\n**20. Local business or DTC adaptation to agents**  \nExample: Broader commerce agent discussions implying shifts for local/services apps (e.g., APIs, distribution).  \nAudience: Local/DTC business owners, e-commerce operators.  \nSignal: Tied to larger agent commerce and API-opening themes in high-engagement posts.[[5]](https://x.com/nikesharora/status/2102061935516881135)\n\nThese reflect 2026-specific shifts (e.g., agentic everything, new app growth levers, monetization experiments) drawn directly from dated posts. AI agents dominate as the standout “much bigger” theme versus prior years."
+}

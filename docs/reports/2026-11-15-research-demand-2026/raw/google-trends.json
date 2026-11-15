@@ -1,0 +1,172 @@
+{
+ "note": "Relative Google Trends indices (0-100 within each request), not search volume. Each request is normalised on its own; never compare values across requests.",
+ "series": [
+  {
+   "tool": "google_trends (SearchAPI via Prowl)",
+   "q": "market research,competitor analysis,market size,swot analysis,keyword research",
+   "time": "today 5-y",
+   "geo": "worldwide",
+   "retrieved_at": "2026-11-15",
+   "window_first": "Nov 14\u2009\u2013\u200920, 2021",
+   "window_last": "Nov 15\u2009\u2013\u200921, 2026",
+   "compare_weeks": 26,
+   "terms": [
+    {
+     "query": "market research",
+     "average": 13,
+     "first_weeks_mean": 5.1,
+     "last_weeks_mean": 26.9
+    },
+    {
+     "query": "competitor analysis",
+     "average": 1,
+     "first_weeks_mean": 1.0,
+     "last_weeks_mean": 2.3
+    },
+    {
+     "query": "market size",
+     "average": 16,
+     "first_weeks_mean": 3.9,
+     "last_weeks_mean": 31.1
+    },
+    {
+     "query": "swot analysis",
+     "average": 6,
+     "first_weeks_mean": 7.1,
+     "last_weeks_mean": 5.1
+    },
+    {
+     "query": "keyword research",
+     "average": 2,
+     "first_weeks_mean": 1.0,
+     "last_weeks_mean": 4.3
+    }
+   ]
+  },
+  {
+   "tool": "google_trends (SearchAPI via Prowl)",
+   "q": "generative engine optimization,ai visibility,llm seo,answer engine optimization,chatgpt seo",
+   "time": "today 12-m",
+   "geo": "worldwide",
+   "retrieved_at": "2026-11-15",
+   "window_first": "Nov 9\u2009\u2013\u200915, 2025",
+   "window_last": "Nov 15\u2009\u2013\u200921, 2026",
+   "compare_weeks": 8,
+   "terms": [
+    {
+     "query": "generative engine optimization",
+     "average": 12,
+     "first_weeks_mean": 5.6,
+     "last_weeks_mean": 8.9
+    },
+    {
+     "query": "ai visibility",
+     "average": 43,
+     "first_weeks_mean": 24.5,
+     "last_weeks_mean": 34.1
+    },
+    {
+     "query": "llm seo",
+     "average": 5,
+     "first_weeks_mean": 2.9,
+     "last_weeks_mean": 2.1
+    },
+    {
+     "query": "answer engine optimization",
+     "average": 7,
+     "first_weeks_mean": 3.4,
+     "last_weeks_mean": 5.4
+    },
+    {
+     "query": "chatgpt seo",
+     "average": 8,
+     "first_weeks_mean": 8.2,
+     "last_weeks_mean": 4.4
+    }
+   ]
+  },
+  {
+   "tool": "google_trends (SearchAPI via Prowl)",
+   "q": "tiktok shop,app store optimization,pricing strategy,meta ad library,ai agents",
+   "time": "today 12-m",
+   "geo": "worldwide",
+   "retrieved_at": "2026-11-15",
+   "window_first": "Nov 9\u2009\u2013\u200915, 2025",
+   "window_last": "Nov 15\u2009\u2013\u200921, 2026",
+   "compare_weeks": 8,
+   "terms": [
+    {
+     "query": "tiktok shop",
+     "average": 48,
+     "first_weeks_mean": 52.4,
+     "last_weeks_mean": 35.8
+    },
+    {
+     "query": "app store optimization",
+     "average": 1,
+     "first_weeks_mean": 1.0,
+     "last_weeks_mean": 0.1
+    },
+    {
+     "query": "pricing strategy",
+     "average": 9,
+     "first_weeks_mean": 7.8,
+     "last_weeks_mean": 2.4
+    },
+    {
+     "query": "meta ad library",
+     "average": 3,
+     "first_weeks_mean": 1.6,
+     "last_weeks_mean": 1.5
+    },
+    {
+     "query": "ai agents",
+     "average": 52,
+     "first_weeks_mean": 31.8,
+     "last_weeks_mean": 23.6
+    }
+   ]
+  }
+ ],
+ "related_queries": {
+  "market research (today 12-m)": {
+   "top": [
+    "ai market research 100",
+    "what is market research 85",
+    "market research company 62",
+    "online market research 40",
+    "market research analysis 39",
+    "ai for market research 38",
+    "market research services 35",
+    "grand view research 33",
+    "market research software 28"
+   ],
+   "rising": [
+    "research dossier for target company: Breakout",
+    "cagr +80%",
+    "what is market research +60%",
+    "primary market research +50%",
+    "market research jobs +40%"
+   ]
+  },
+  "competitor analysis (today 12-m)": {
+   "top": [
+    "seo competitor analysis 100",
+    "competitor analysis tools 71",
+    "what is competitor analysis 61",
+    "competitor price analysis 54",
+    "business competitor analysis 46",
+    "competitor website analysis 45",
+    "keyword competitor analysis 44"
+   ],
+   "rising": [
+    "keyword competitor analysis +90%",
+    "competitor keyword analysis +80%",
+    "competitor website analysis +60%",
+    "online competitor analysis +60%",
+    "competitor analysis for seo +60%"
+   ]
+  }
+ },
+ "noise_dropped": "Rising lists also carried unrelated breakouts (walmart near me, lidl near me, 1001games, 02 phone, best pizza near me); they are Google Trends noise and are not used."
+}
