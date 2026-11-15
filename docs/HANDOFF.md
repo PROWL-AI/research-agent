@@ -1,6 +1,22 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-15: Appvillis Prowl account at 1000 USD, deploy route without Studio's Heroku login (supersedes every "Exact next task" below)
+## Current entry, 2026-11-15 (evening): xAI search and what people research in 2026 (supersedes every "Exact next task" below)
+
+The operator asked to add the xAI API for searching X trends and to find, across all sources, the 30 research types
+people look for in 2026. Done: [the report](reports/2026-11-15-research-demand-2026/README.md) with
+`research-types-2026.json` (30 types, evidence tier, runbook and playbook per type) and the raw X and Google Trends data.
+X search works today through OpenRouter (`x-ai/grok-4.3`, plugin `web`, `engine: native`, `x_search`) with the agent's
+own key `RESEARCH_LLM_API_KEY`: 13 x.com citations per call, 0.23 to 0.25 USD. No xAI key exists in Observatory.
+
+The Prowl side (provider `xai_search`, tools `xai_x_search` and `xai_web_search`, direct xAI API when `XAI_API_KEY` is
+set, OpenRouter otherwise) is a PR in `PROWL-AI/prowl-app`; merging it deploys prowl.chat, which waits the operator's
+word. The runbook `x-trend-pulse` 1.0 is on branch `feat/x-trend-pulse` (B-141).
+
+**Exact next tasks:** (1) when the Prowl xAI PR is deployed: `scripts/validate_runbooks.py --online`, refresh
+`evals/fixtures/live_catalog_snapshot.json`, rebase `feat/x-trend-pulse`, run the suite (T1 then passes), merge, release;
+(2) B-123 by 2026-11-17 17:18 CET (human gate); (3) B-142 to B-146 by priority.
+
+## Entry, 2026-11-15: Appvillis Prowl account at 1000 USD, deploy route without Studio's Heroku login (supersedes every "Exact next task" below)
 
 The Appvillis Prowl account holds 1000.00 USD (`extra_balance_usd`, read through its own key 2026-11-15 01:42 UTC):
 Prowl credited 898.83 USD on the operator's order (board thread `7951869c`, reply `bde4b732`, idempotency key

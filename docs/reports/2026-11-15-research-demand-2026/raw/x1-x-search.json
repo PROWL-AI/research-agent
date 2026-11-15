@@ -1,0 +1,92 @@
+{
+ "tool": "OpenRouter x-ai/grok-4.3, plugin web engine native + x_search {from_date: 2026-01-01}",
+ "retrieved_at": "2026-11-15",
+ "question": "Research types founders, marketers, growth people and investors ask on X in 2026",
+ "model": "x-ai/grok-4.3",
+ "usage": {
+  "prompt_tokens": 30036,
+  "completion_tokens": 2977,
+  "cost": 0.2296659
+ },
+ "citations": [
+  {
+   "url": "https://x.com/nexusai_techs/status/2120752996950966736",
+   "title": "1",
+   "start_index": 515,
+   "end_index": 576
+  },
+  {
+   "url": "https://x.com/tysyrrr/status/2055252114075763165",
+   "title": "2",
+   "start_index": 576,
+   "end_index": 631
+  },
+  {
+   "url": "https://x.com/aigleeson/status/2018594479104782626",
+   "title": "3",
+   "start_index": 1392,
+   "end_index": 1449
+  },
+  {
+   "url": "https://x.com/AndrewBolis/status/2120128110570135679",
+   "title": "4",
+   "start_index": 1449,
+   "end_index": 1508
+  },
+  {
+   "url": "https://x.com/socialwithaayan/status/2021233369967956076",
+   "title": "5",
+   "start_index": 1970,
+   "end_index": 2033
+  },
+  {
+   "url": "https://x.com/DanniChenGTM/status/2103717429562228897",
+   "title": "6",
+   "start_index": 2500,
+   "end_index": 2560
+  },
+  {
+   "url": "https://x.com/realroseceline/status/2112224667532730487",
+   "title": "7",
+   "start_index": 3049,
+   "end_index": 3111
+  },
+  {
+   "url": "https://x.com/OSerafimaA/status/2120503859076305141",
+   "title": "8",
+   "start_index": 3527,
+   "end_index": 3585
+  },
+  {
+   "url": "https://x.com/wowolili/status/2120026165952053369",
+   "title": "9",
+   "start_index": 3992,
+   "end_index": 4048
+  },
+  {
+   "url": "https://x.com/TheThevaluetrad/status/2119780144844038483",
+   "title": "10",
+   "start_index": 4443,
+   "end_index": 4507
+  },
+  {
+   "url": "https://x.com/MohapatraHemant/status/2032676245788565880",
+   "title": "11",
+   "start_index": 4892,
+   "end_index": 4956
+  },
+  {
+   "url": "https://x.com/sachi_gkp/status/2120330892891893828",
+   "title": "12",
+   "start_index": 6564,
+   "end_index": 6622
+  },
+  {
+   "url": "https://x.com/AvinashSingh_20/status/2120188154078720429",
+   "title": "13",
+   "start_index": 6622,
+   "end_index": 6686
+  }
+ ],
+ "answer": "**Recurring research types in 2026 X posts (drawn from founder, marketer, growth, and investor discussions) cluster around structured competitive intelligence, market quantification, customer insight mining, positioning/differentiation, and investor-style economic analysis.** These often appear as shareable prompts, frameworks, or \"how-to\" advice, frequently leveraging AI tools like Claude or Perplexity for execution. GEO (Generative Engine Optimization/AI search visibility) emerges as a distinct new category.[[1]](https://x.com/nexusai_techs/status/2120752996950966736)[[2]](https://x.com/tysyrrr/status/2055252114075763165)\n\nHere are key recurring **research TYPES** (synthesized from prominent 2026 examples; ~15 core ones highlighted due to available post patterns, with notes on frequency/engagement):\n\n1. **Competitor Teardown / Deep Competitive Intelligence**  \n   One-line: Comprehensive reverse-engineering of a rival’s strategy, product, GTM, vulnerabilities, and roadmap using structured prompts or data pulls.  \n   Example phrasings: “I reverse-engineered my competitor’s entire strategy with this Claude prompt”; “Conduct deep competitive intelligence on [COMPETITOR NAME]”; “Analyze [Competitor] website, social, news, reviews... outline business model, pricing, product direction.”  \n   Popularity: Very high; detailed prompts see 500+ likes and widespread sharing/reuse.[[3]](https://x.com/aigleeson/status/2018594479104782626)[[4]](https://x.com/AndrewBolis/status/2120128110570135679)\n\n2. **TAM / Market Sizing Analysis**  \n   One-line: Top-down/bottom-up calculation of Total Addressable Market, SAM, SOM with CAGR, assumptions, and investor-ready formatting.  \n   Example phrasings: “McKinsey-level market analyst... TAM analysis for [INDUSTRY]”; “Provide TAM, SAM, SOM breakdown with dollar figures, growth rate projections.”  \n   Popularity: High; dedicated prompts and breakdowns frequently shared with strong engagement (hundreds of likes).[[5]](https://x.com/socialwithaayan/status/2021233369967956076)\n\n3. **Mining Competitor Complaints / Customer Pain Points**  \n   One-line: Systematically scraping reviews, Reddit, G2, forums, etc., to identify unsolved complaints and build opportunity tables.  \n   Example phrasings: “Mine your competitors’ complaints before you build your roadmap”; “Build one simple table: complaint | frequency | severity | competitor | still unsolved?”  \n   Popularity: High engagement (400+ likes); positioned as high-leverage and practical.[[6]](https://x.com/DanniChenGTM/status/2103717429562228897)\n\n4. **Investor-Style Economic Questions**  \n   One-line: Probing capital intensity, reinvestment needs, free cash flow conversion, barriers to returns erosion, and growth economics beyond top-line numbers.  \n   Example phrasings: “How much capital is required to generate that growth? What returns will that capital earn?”; “An experienced investor asks what that growth is worth.”  \n   Popularity: Strong among investors/founders; thoughtful threads garner hundreds of likes and replies.[[7]](https://x.com/realroseceline/status/2112224667532730487)\n\n5. **Positioning & Differentiation Audit**  \n   One-line: Checking targeting, promised problems solved, proof points, objections addressed, and calls-to-action versus alternatives.  \n   Example phrasings: “Check 5 things: Who are they targeting? What problem do they promise to solve?... Look for gaps, not ideas to copy.”  \n   Popularity: Common in marketing/growth circles; practical checklists shared regularly.[[8]](https://x.com/OSerafimaA/status/2120503859076305141)\n\n6. **Cross-Industry / Non-Traditional Competitor Identification**  \n   One-line: Looking beyond direct industry peers to anyone solving the same customer problem differently (e.g., convenience or process substitutes).  \n   Example phrasings: “Your Competitors May Not Come from the Same Industry”; “Who is solving my customer’s problem in another way?”  \n   Popularity: Recurring strategic reminder posts.[[9]](https://x.com/wowolili/status/2120026165952053369)\n\n7. **Porter’s Five Forces / Industry Structure Analysis**  \n   One-line: Applying rivalry, new entrants, buyer/supplier power, and substitutes to assess attractiveness.  \n   Example phrasings: Frameworks listing the five forces with questions on each (e.g., “How easy is it for a new business to enter...”).  \n   Popularity: Standard business education refresh; moderate but consistent shares.[[10]](https://x.com/TheThevaluetrad/status/2119780144844038483)\n\n8. **GTM / Brand vs. Product Gap Assessment**  \n   One-line: Evaluating whether brand, GTM, or team advantages (vs. pure product superiority) explain competitive leads in crowded categories.  \n   Example phrasings: Discussions on gaps between brand/GTM/team widening faster than product gaps, and implications for early-stage founders.  \n   Popularity: Notable in VC/founder threads.[[11]](https://x.com/MohapatraHemant/status/2032676245788565880)\n\n9. **AI-Powered Research Prompts & Workflows**  \n   One-line: Using LLMs for structured analysis of competitors, markets, or customer data at scale.  \n   Example phrasings: Multiple detailed Claude/Perplexity-style prompts for teardowns or TAM.  \n   Popularity: Ubiquitous; prompts are shared as ready-to-copy assets with high reuse.[[3]](https://x.com/aigleeson/status/2018594479104782626)\n\n10. **Review & Forum Scraping for Roadmap Input**  \n    One-line: Aggregating user complaints, feature requests, and churn signals from public sources.  \n    Example phrasings: “Crawl Reddit, X, G2, YouTube comments... build one simple table.”  \n    Popularity: Practical growth hack; high shares among product/growth people.[[6]](https://x.com/DanniChenGTM/status/2103717429562228897)\n\nAdditional recurring types (lower volume in results but evident patterns) include **customer intelligence via reviews/forums**, **threat assessment/early warning signals**, **partnership & ecosystem mapping**, **pricing history & tier analysis**, **ICP/target customer profiling**, and **roadmap clue extraction** (e.g., from job postings/patents). Engagement varies but AI-assisted versions trend higher.\n\n**10 hottest new 2026 research topics/trends** (minimal or absent in 2025 contexts, based on 2026 posts):  \n1. **GEO / Generative Engine Optimization (AI search visibility)** — Optimizing for citations/mentions in ChatGPT, Perplexity, etc., alongside traditional SEO; practical guides and tools emerging.[[1]](https://x.com/nexusai_techs/status/2120752996950966736)[[2]](https://x.com/tysyrrr/status/2055252114075763165)[[12]](https://x.com/sachi_gkp/status/2120330892891893828)[[13]](https://x.com/AvinashSingh_20/status/2120188154078720429)  \n2. **Hybrid SEO + GEO workflows** — Tools and strategies for dual visibility in search engines and AI answer engines.  \n3. **AI agent-enabled research/execution boundaries** — Questions around permissions for AI agents in analysis vs. trading/execution.  \n4. **Complaint mining with modern scraping stacks** (ActionBook, Exa, Firecrawl, etc.) — Scaled, automated versions of prior manual methods.  \n5. **Options flow + news/insider integration** for market research.  \n6. **Geospatial reasoning agents** for complex spatial/prediction analysis.  \n7. **Prediction market data feeds** for sentiment/attention mapping.  \n8. **Creator economy review/contest mechanics** tied to product research.  \n9. **Real-time trading journal + market intelligence platforms**.  \n10. **Startup discovery in AI conversations** (e.g., getting featured in ChatGPT business features).[[13]](https://x.com/AvinashSingh_20/status/2120188154078720429)\n\nThese reflect a shift toward AI-augmented, multi-source, and generative-visibility-focused research. Posts often emphasize ethical, primary-source-driven approaches and investor-grade outputs."
+}

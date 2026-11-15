@@ -4,6 +4,12 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## Unreleased
+
+- A study of what people research in 2026 (`docs/reports/2026-11-15-research-demand-2026/`): 30 research types from X
+  (searched through xAI Grok), Google Trends, Reddit and the web, each mapped to a runbook here and a Prowl playbook,
+  with `research-types-2026.json` for agents. Gaps filed as B-142 to B-146; the X pulse runbook is B-141.
+
 ## 0.6.18 (2026-11-14)
 
 - A refused handshake with Prowl closes its transport in the task that opened it (B-140): when prowl.chat answered
