@@ -1,6 +1,28 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-14 (night, last): every board row we can move is moved (supersedes every "Exact next task" below)
+## Current entry, 2026-11-15: Appvillis Prowl account at 1000 USD, deploy route without Studio's Heroku login (supersedes every "Exact next task" below)
+
+The Appvillis Prowl account holds 1000.00 USD (`extra_balance_usd`, read through its own key 2026-11-15 01:42 UTC):
+Prowl credited 898.83 USD on the operator's order (board thread `7951869c`, reply `bde4b732`, idempotency key
+`appvillis-topup-1000-2026-11-14`); the first 100 USD were Prowl's own on 2026-11-14. The key `a72a9e5e` keeps its 10 USD
+daily cap. All six instances answer (clouds and MacBook at 0.6.18, `degraded: []`; Studio ports 18765 to 18767 answer 200).
+
+Deploy route: the Heroku CLI on `studio-sshlg` answers "Invalid credentials provided" (2026-11-15), so `heroku auth:token`
+there no longer feeds `scripts/cloud.py deploy`. The MacBook's CLI is signed in and reaches both apps
+(`heroku apps:info -a prowl-research`, `-a appvillis-prowl-research`): take the token from the MacBook (pipe it to the
+Studio run over ssh stdin, or deploy from a MacBook worktree). No Heroku key is in Observatory for these projects.
+
+B-123 is narrower than its row said: since B-106 the Studio spaces run their own instances, so a suspension stops only
+the personal cloud and its clients (jobs and Fabric Dashboards sessions still reach it, router log 2026-11-15). The
+account is still delinquent ("we'll suspend it on Tue Nov 17 2026 17:18:10 GMT+0100", `heroku auth:whoami` on the
+MacBook, 2026-11-15).
+
+**Exact next tasks:** (1) B-123: the operator pays Heroku by 2026-11-17 17:18 CET at
+https://dashboard.heroku.com/account/billing (human gate; reminded through the communicator 2026-11-15), else the
+personal cloud stops; (2) B-017 when the operator labels a report; (3) B-095 when CT-125 lands; (4) B-001 when a Fabric
+binding carries model profiles; (5) the next R31 measurement from 2026-11-27.
+
+## Entry, 2026-11-14 (night, last): every board row we can move is moved (supersedes every "Exact next task" below)
 
 0.6.18 (`c785b06`) runs on all six instances, `ready`, `degraded: []`. B-139 closed: each cloud runs on its own Prowl
 key with a 10 USD daily cap; B-067 closed: fixed at Prowl (T435) and checked live.
