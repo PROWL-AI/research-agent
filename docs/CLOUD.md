@@ -115,10 +115,25 @@ goes from the MacBook's vault to the Studio run on ssh stdin, never in argv:
 
 ```sh
 python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent \
-  HEROKU_API_KEY -- sh -c 'printf "%s\n" "$HEROKU_API_KEY" | ssh studio-sshlg \
+  HEROKU_API_KEY -- sh -c 'printf "%s\n" "$HEROKU_API_KEY" | ssh <studio host> \
   "read -r K; export HEROKU_API_KEY=\"\$K\"; cd ~/DATA/0xDEV/research-agent && git fetch -q && \
    ~/DATA/_worktrees/ra-sdk2/.venv/bin/python scripts/cloud.py deploy --app prowl-research --ref <sha>"'
 ```
+
+The `deploy` preset (scopes `read`, `write`) cannot start a build through the Builds API: the build fails at once with
+"Couldn't find that user" (2026-11-16, build `4b0b6b18` of `prowl-research`). The same key pushes over Heroku's git
+endpoint, which builds and releases (0.6.19 on 2026-11-16). Run the suite on the commit first (that is the gate
+`cloud.py deploy` would have run), then push the commit with the key handed to git by an askpass script that prints
+`$HEROKU_API_KEY` from the environment (never in argv or the URL):
+
+```sh
+python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent \
+  HEROKU_API_KEY -- env GIT_ASKPASS=<askpass script> GIT_TERMINAL_PROMPT=0 \
+  git push https://git.heroku.com/prowl-research.git <sha>:refs/heads/main
+```
+
+Read the result with the service token (`prowl-research-cloud/prod/FABRIC_SERVICE_TOKEN`) on
+`/.well-known/fabric-service`: `service.version`, `status`, `degraded`.
 
 ## Team copy
 
