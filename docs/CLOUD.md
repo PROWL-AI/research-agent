@@ -103,6 +103,23 @@ python "$(project-observatory full-path)/tools/use_secret.py" run --env prod <pr
 
 The team copy deploys from the copy: the same `scripts/cloud.py deploy` in its checkout.
 
+The Heroku key of each cloud is a deploy authorization the Observatory door issued (2026-11-15, expires 2027-02-13,
+`tools/heroku.py issue --preset deploy`): `prowl-research-agent/prod/HEROKU_API_KEY` for `prowl-research`,
+`appvillis-com-appvillis-prowl-research/prod/HEROKU_API_KEY` for `appvillis-prowl-research`. Renew one with
+`tools/heroku.py rotate <slot>`; no deploy depends on a signed-in `heroku` CLI.
+
+The deploy gate runs the commit's suite with the interpreter that runs `cloud.py` (`sys.executable`), so it needs
+`pytest` and the service's dependencies; the release venv of a local install has neither `pytest` nor dev tools. The
+Mac Studio holds that interpreter (`~/DATA/_worktrees/ra-sdk2/.venv`), and the vault lives on the MacBook, so the key
+goes from the MacBook's vault to the Studio run on ssh stdin, never in argv:
+
+```sh
+python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent \
+  HEROKU_API_KEY -- sh -c 'printf "%s\n" "$HEROKU_API_KEY" | ssh studio-sshlg \
+  "read -r K; export HEROKU_API_KEY=\"\$K\"; cd ~/DATA/0xDEV/research-agent && git fetch -q && \
+   ~/DATA/_worktrees/ra-sdk2/.venv/bin/python scripts/cloud.py deploy --app prowl-research --ref <sha>"'
+```
+
 ## Team copy
 
 ```sh
