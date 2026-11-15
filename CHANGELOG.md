@@ -4,7 +4,14 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
-## Unreleased
+## 0.6.19 (2026-11-16)
+
+- New runbook `x-trend-pulse` 1.0 (B-141): what people say and ask on X about a topic, read with Prowl's new
+  `xai_x_search` and `xai_web_search` (xAI Grok, live on prowl.chat since 2026-11-15, `ad8464bd`) and cross-checked
+  with Google Trends, news and Reddit; a theme seen only on X is reported as "talk only, early". The catalog snapshot
+  `evals/fixtures/live_catalog_snapshot.json` is refreshed from the live catalog: `xai_x_search` and `xai_web_search`
+  added, `dataforseo_biz_social_pinterest` and `dataforseo_biz_social_reddit` gone (no runbook named them);
+  `scripts/validate_runbooks.py --online` passes for all 15 runbooks.
 
 - The compiled wiki of the agents database (`patterns/compiled-wiki` 1.0.0, decision D-51) is vendored unedited as
   `research_agent/agent/compiled_wiki.py` and bound in `research_agent/agent/research_wiki.py` to this agent's untrusted

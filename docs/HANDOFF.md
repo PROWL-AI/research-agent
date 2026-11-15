@@ -1,5 +1,17 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-16: 0.6.19, X trend pulse over xAI Grok (supersedes every "Exact next task" below)
+
+Prowl's xAI provider (T437, `xai_x_search` and `xai_web_search`) is live on prowl.chat (`ad8464bd`, DigitalOcean
+deployment `1abf321b` ACTIVE); a production call of `xai_x_search` returned 9 x.com citations through OpenRouter for
+0.118 USD. 0.6.19 ships the runbook `x-trend-pulse` 1.0 (B-141 closed) with the catalog snapshot refreshed from the live
+catalog (`scripts/validate_runbooks.py --online`: 15 runbooks valid), and the vendored compiled wiki (B-147, not on the
+answer path). Prowl's own session adds the five missing playbooks (PR #31, T438), which closes B-146 except equities.
+
+**Exact next tasks:** (1) 0.6.19 on every instance (the clouds with `scripts/cloud.py deploy`, the MacBook and the
+Studio spaces with `scripts/install-fabric-service.py`), then an `x-trend-pulse` acceptance run on one instance;
+(2) B-146 when Prowl PR #31 is merged; (3) B-123 by 2026-11-17 17:18 CET (human gate); (4) B-142 to B-145 by priority.
+
 ## Current entry, 2026-11-15 (night): compiled wiki vendored, board request d2495699 (supersedes every "Exact next task" below)
 
 The agents database recommended its compiled wiki (`patterns/compiled-wiki` 1.0.0, D-51; board request `d2495699`, thread
@@ -12,7 +24,7 @@ the wiki in `corpus-desk` only, and the floor and outbound guard are missing. Th
 
 **Exact next tasks:** unchanged from the entry below, plus B-147 by priority (design step first).
 
-## Current entry, 2026-11-15 (evening): xAI search and what people research in 2026 (supersedes every "Exact next task" below)
+## Entry, 2026-11-15 (evening): xAI search and what people research in 2026 (supersedes every "Exact next task" below)
 
 The operator asked to add the xAI API for searching X trends and to find, across all sources, the 30 research types
 people look for in 2026. Done: [the report](reports/2026-11-15-research-demand-2026/README.md) with
