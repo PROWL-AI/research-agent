@@ -27,6 +27,28 @@ The gate: `python scripts/check_add_only.py` (in the suite as `tests/test_add_on
 `--base HEAD^1`) refuses an edited or deleted shipped entry and a lock that lost a name. After adding an entry, run
 `python scripts/check_add_only.py --write`: it adds new names to `catalog/shipped.lock.json` and never rewrites one.
 
+## Telegram: two channels by who the message is for (rule R33 O9, operator 2026-11-15)
+
+Operator, 2026-11-15, verbatim (agents database rule R33 O9, decision D-50, board request 58c0bcf0): «давай определим
+когда нам шлюз нуден а когда коммуникатор и на ввсе агентов через базу агентов правила распространим».
+
+- **To the operator himself: the communicator** (`communicator_notify` of the `personal-communicator` MCP; it reaches
+  only his private chat). Results, build and release links, approval requests, failures, recoveries, and a question
+  (`kind: question` with `questionId`, `revision`, `expiresAt`; the question itself also through `fabric_question_ask`).
+  One stable `eventId` per event, the same on every retry; text only, at most 3500 characters, so a file goes as a link
+  (a Fabric Dashboards `open_link`, private storage), never an attachment. Read `communicator_status` first; when it is
+  not connected, say so in your reply and keep the link there. Never the gateway for this: it acts as the operator's
+  own account, so the message would come from him to himself.
+- **To anyone else, or acting as an account: the gateway** (`telegram-gateway.default`, `telegram.messages.send`, under
+  this agent's own grant, allowlist and approvals): another person, a group, a team chat (the operator being a member
+  changes nothing), a channel, a bot the gateway holds, reading chats and admin acts. Never the communicator for these.
+- A file the operator explicitly orders delivered to him in Telegram goes through the gateway to the chat he names.
+- The team copy (Appvillis) reports to its own administrator through its organization's channel, never the operator's.
+
+This service sends nothing to Telegram itself today: it only marks an event `notify` (`research_agent/service/store.py`,
+`Store.event`), and the operator's notification reaches him outside this repository. Any code that starts sending
+follows the two routes above.
+
 ## Opening the dashboard (operator rule, 2026-10-24)
 
 The service's pages open **only in Fabric Dashboards**, never in a browser (Safari, Dia or Chrome), in links you
