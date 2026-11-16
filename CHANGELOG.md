@@ -6,6 +6,8 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## 0.6.20 (2026-11-16)
 
+- AGENTS.md carries the Telegram channel rule R33 O9 (D-50): to the operator through the communicator, to anyone
+  else through the gateway (B-151). No code path changes: the service sends nothing to Telegram itself.
 - A writer that plans aloud before the report's `# ` title no longer ships its plan (B-150). The x-trend-pulse
   acceptance `pr-79599e56126e9a0c071d` (writer `moonshotai/kimi-k3.1-pro`) put 211 lines of the model's planning
   before the title in report.md and report.html; the lint passed them because they cite real claims.
