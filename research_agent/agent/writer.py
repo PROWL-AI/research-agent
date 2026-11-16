@@ -330,6 +330,24 @@ def is_report(text: str) -> bool:
     return bool(_HEADING_RE.search(text or ""))
 
 
+_TITLE_RE = re.compile(r"^# \S", re.MULTILINE)
+
+
+def strip_preface(text: str) -> str:
+    """The report without what the writer said before its `# ` title (B-150). Seen 2026-11-16 on
+    `pr-79599e56126e9a0c071d`: kimi-k3.1-pro planned aloud for 211 lines before the title, and the lint passed it
+    because it cites real claims. A text that starts with its title, or has no title at all, is returned as is."""
+    text = text or ""
+    if not text.strip() or text.lstrip().startswith("# "):
+        return text
+    match = _TITLE_RE.search(text)
+    if match is None:
+        return text
+    log.warning("writer answered with %d words before the report's title; dropped (B-150)",
+                len(text[:match.start()].split()))
+    return text[match.start():]
+
+
 def _without_reasoning(messages: list[dict[str, str]]) -> list[dict[str, str]]:
     """The same request with the no-preface line on the last user message (B-135)."""
     out = [dict(m) for m in messages]
@@ -615,8 +633,8 @@ async def write_report(
 
     async def draft(max_tokens: int, reasoning: bool | None) -> str:
         sent = _without_reasoning(messages) if reasoning is False else messages
-        text = await llm.complete(sent, tier="strong", max_tokens=max_tokens, temperature=0.3, stage="writer",
-                                  reasoning=reasoning)
+        text = strip_preface(await llm.complete(sent, tier="strong", max_tokens=max_tokens, temperature=0.3,
+                                                stage="writer", reasoning=reasoning))
         if reasoning is not False or is_report(text):
             return text
         # B-135: an answer written without reasoning that has no heading is not a report (seen only there); the
@@ -632,7 +650,7 @@ async def write_report(
     except LLMError as exc:
         if exc.retryable or exc.finish_reason != "length":
             raise
-        first_truncated = (exc.content or "").strip()
+        first_truncated = strip_preface((exc.content or "").strip())
         # A truncated first draft arrives after the run's entire tool spend —
         # dying here loses the ledger and the money. Retry once with a larger
         # output budget before giving up on the report.
@@ -822,6 +840,7 @@ async def write_and_repair(
             )
             break
         passes = pass_no
+        repaired = strip_preface(repaired)
         if _repair_collapsed(repaired, report):
             # An empty or gutted repair lints trivially clean — shipping it
             # would turn a failed pass into a silent success.

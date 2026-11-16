@@ -1,6 +1,24 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-16: 0.6.19, X trend pulse over xAI Grok (supersedes every "Exact next task" below)
+## Current entry, 2026-11-16 (night): 0.6.20 and the x-trend-pulse acceptance (supersedes every "Exact next task" below)
+
+0.6.19 ran on all six instances (MacBook 18764, Studio 18765, 18766, 18767, clouds `prowl-research` and
+`appvillis-prowl-research`; each `ready`, `degraded: []`). The clouds took it by git push (B-148: the Observatory
+`deploy` preset key cannot start a Builds API build). Prowl T438 is live (13 playbooks), so B-146 closed and equities
+moved to B-149.
+
+x-trend-pulse acceptance on the MacBook: the first run `pr-f09ef86c3f960eb2f4ac` ended partial because the agent's
+Prowl key (`prowl-research-agent`, id `37148713`) had reached its total limit of 10 USD; the limits were raised to
+10 USD a day and 100 USD in total (the operator's default of 100 USD per agent). The rerun `pr-79599e56126e9a0c071d`
+(approved through the service's operator API, worst case 8 USD) made 18 data calls for 2.11 USD, 158 claims, citation
+fidelity 286 of 293, four of five xAI calls answered; one `xai_x_search` ended with "SSE stream ended without a
+response" while prowl.chat was being redeployed for T438. Its report carried the writer's planning before the title,
+fixed in 0.6.20 (B-150).
+
+**Exact next tasks:** (1) 0.6.20 on every instance the same way as 0.6.19; (2) B-148 (deploy key scope or
+`cloud.py deploy` over git); (3) B-123 by 2026-11-17 17:18 CET (human gate); (4) B-142 to B-145, B-149 by priority.
+
+## Entry, 2026-11-16: 0.6.19, X trend pulse over xAI Grok (supersedes every "Exact next task" below)
 
 Prowl's xAI provider (T437, `xai_x_search` and `xai_web_search`) is live on prowl.chat (`ad8464bd`, DigitalOcean
 deployment `1abf321b` ACTIVE); a production call of `xai_x_search` returned 9 x.com citations through OpenRouter for
