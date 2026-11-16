@@ -4,6 +4,15 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.20 (2026-11-16)
+
+- A writer that plans aloud before the report's `# ` title no longer ships its plan (B-150). The x-trend-pulse
+  acceptance `pr-79599e56126e9a0c071d` (writer `moonshotai/kimi-k3.1-pro`) put 211 lines of the model's planning
+  before the title in report.md and report.html; the lint passed them because they cite real claims.
+  `writer.strip_preface` drops what stands before the title in the draft, a cut draft and every repair pass; a text
+  that starts with its title or has no title is kept as is. On that report: 683 lines to 472, the first line the title
+  (`tests/test_writer_preface.py`).
+
 ## 0.6.19 (2026-11-16)
 
 - New runbook `x-trend-pulse` 1.0 (B-141): what people say and ask on X about a topic, read with Prowl's new

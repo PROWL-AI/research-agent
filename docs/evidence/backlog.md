@@ -25,6 +25,8 @@
 
 ## Closed
 
+- **B-150 · The writer's planning shipped before the report's title** · closed 2026-11-16 · found by the x-trend-pulse acceptance `pr-79599e56126e9a0c071d`: 211 lines of kimi-k3.1-pro's planning stood before `# ` in report.md and report.html, citing real claims, so the lint passed them. 0.6.20: `writer.strip_preface` on the draft, a cut draft and each repair pass; that report goes from 683 to 472 lines (`tests/test_writer_preface.py`).
+
 - **B-146 · Five research types had a runbook here and no Prowl playbook** · closed 2026-11-16 · Prowl T438 (PR #31, merge `f68c928e`): playbooks market-sizing-study, trend-pulse, x-conversation-pulse, ad-creative-intelligence and competitor-growth-watch (`prowl_list_playbooks` 8 to 13 on prowl.chat), with the section x-conversation-pulse over `xai_x_search`. Equities split to B-149.
 
 - **B-141 · Runbook `x-trend-pulse` 1.0 over X through xAI Grok** · closed 2026-11-16 · 0.6.19: the runbook reads X with `xai_x_search` and `xai_web_search` (Prowl T437, live on prowl.chat `ad8464bd`; a production call returned 9 x.com citations for 0.118 USD) and cross-checks themes with Google Trends, news and Reddit; `scripts/validate_runbooks.py --online` valid for 15 runbooks ([report](../reports/2026-11-15-research-demand-2026/README.md)).
