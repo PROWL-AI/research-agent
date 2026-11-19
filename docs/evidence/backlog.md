@@ -25,6 +25,7 @@
 
 ## Closed
 
+- **B-152 · Carry the etalon rule R33 O11 (D-61)** · closed 2026-11-19 · AGENTS.md section «Etalons live on PassionCode.ai»; no `template-receipt.json` here yet, so the section names the route (base first, then render, then the receipt). Board request 511ced95 (rollout rows RO-651, RO-654).
 - **B-151 · Carry the Telegram channel rule R33 O9 (D-50)** · closed 2026-11-16 · AGENTS.md section «Telegram: two channels by who the message is for»; no code here sends to Telegram (only `Store.event(notify=True)` marks), so nothing to reroute. Board request 58c0bcf0.
 - **B-150 · The writer's planning shipped before the report's title** · closed 2026-11-16 · found by the x-trend-pulse acceptance `pr-79599e56126e9a0c071d`: 211 lines of kimi-k3.1-pro's planning stood before `# ` in report.md and report.html, citing real claims, so the lint passed them. 0.6.20: `writer.strip_preface` on the draft, a cut draft and each repair pass; that report goes from 683 to 472 lines (`tests/test_writer_preface.py`).
 
