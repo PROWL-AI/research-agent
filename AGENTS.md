@@ -49,6 +49,28 @@ This service sends nothing to Telegram itself today: it only marks an event `not
 `Store.event`), and the operator's notification reaches him outside this repository. Any code that starts sending
 follows the two routes above.
 
+## Etalons live on PassionCode.ai (rule R33 O11, operator 2026-11-17)
+
+Operator, 2026-11-17, verbatim (agents database rule R33 O11, decision D-61, relayed in board request e081ef6d, thread
+940acb50; rolled out here by board request 511ced95): «все синхронизируем, проверяем, что наша главная фабрика,
+эталонная, находится на passion коде, как и все остальные, передать всем агентам, которых я вот тут разрабатываю, что
+эталоны всегда на passion коде находятся, мы от них всегда строим и в базе данных агентов храним, пометьте это где-то
+на уровне моих правил».
+
+- The etalon of this agent's kind is its template repository on PassionCode.ai (`passioncode-ai/template-<agent>`),
+  rendered from PassionCode's agents database. For this agent the base names the template `research` (version 1.8.6
+  carries O11; rollout rows RO-651 for this agent, RO-654 for its team copy).
+- This agent and every organization copy of it (the Appvillis team copy included) are built, adapted, cloned or
+  restored from the etalon at the template's current version, never from another copy or a personal repository.
+- An improvement found here goes to the base first (an `agents_db.contribute` or `agents.improve` request to the
+  fabric-agents-database project), then every etalon of the template is rendered again, then this agent and its copies
+  take the version and record it in their `template-receipt.json`.
+- A change to this agent ends with `python3 ~/DATA/fabric-agents-database/tools/template_repo.py stale` listing nothing
+  for its template.
+
+This repository predates its etalon and carries no `template-receipt.json` yet; until it takes a rendered version, a
+change here that the template should carry is sent to the base as above, never copied into another copy by hand.
+
 ## Opening the dashboard (operator rule, 2026-10-24)
 
 The service's pages open **only in Fabric Dashboards**, never in a browser (Safari, Dia or Chrome), in links you

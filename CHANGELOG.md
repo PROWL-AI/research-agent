@@ -6,6 +6,8 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## 0.6.20 (2026-11-16)
 
+- AGENTS.md carries rule R33 O11 (D-61): the etalon is the template repository on PassionCode.ai; this agent and
+  its copies are built from it, and improvements go to the agents database first (B-152). No code path changes.
 - AGENTS.md carries the Telegram channel rule R33 O9 (D-50): to the operator through the communicator, to anyone
   else through the gateway (B-151). No code path changes: the service sends nothing to Telegram itself.
 - A writer that plans aloud before the report's `# ` title no longer ships its plan (B-150). The x-trend-pulse
