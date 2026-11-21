@@ -60,7 +60,8 @@ def test_a_desk_gives_read_keys_at_the_floor_by_default(clients):
 
 async def test_the_desk_tools_over_mcp_and_a_desk_key_reads_no_data(client, clients):
     desk = clients.add_desk("ania", ["read", "research.run", "tools.call"], 10)
-    tools = (await client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+    # the desk's tools sit behind the two doors (B-154); the full surface still lists each by its own name
+    tools = (await client.post("/mcp?surface=capabilities", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
                                headers={"Authorization": "Bearer " + desk})).json()["result"]["tools"]
     assert {"client.issue", "client.rotate", "client.revoke", "client.list"} <= {t["name"] for t in tools}
     issued = (await call(client, desk, "client.issue", {"name": "esim-vm", "scopes": ["read", "research.run"]}))["structuredContent"]

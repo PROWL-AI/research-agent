@@ -1,14 +1,20 @@
 """Small dual-era JSON MCP surface, implemented from the public wire contract."""
 from __future__ import annotations
 import base64
+import difflib
 import json
+import logging
 from urllib.parse import quote
 from jsonschema import Draft202012Validator
 from .delegation import Refused, recorded, refusal_tool_result, require_owner
 from .runtime import child_trace, run_dir_name, runbooks
 from .store import Conflict
 from research_agent import __version__
+from research_agent.agent import compact_mcp
+from research_agent.events import emit
 from .identity import SERVICE_ID, SERVICE_NAME
+
+log = logging.getLogger(__name__)
 
 VERSION = "2026-07-28"
 SUPPORTED = [VERSION, "2025-11-25", "2025-06-18", "2025-03-26"]
@@ -102,6 +108,85 @@ def tools_list(desk=False):
     return tools
 
 
+# --- the compact surface: two doors, search and execute (R33 O15, patterns/compact-mcp 1.2.0; B-154) -------------
+SEARCH_TOOL, EXECUTE_TOOL = "research.search", "research.execute"
+#: the date the operations' own tool names left tools/list; a call by one still answers, marked retired (R28)
+RETIRED_SINCE = "2026-11-21"
+#: `/mcp?surface=capabilities` keeps the full listing for a host or probe that reads every capability's schema
+FULL_SURFACE = "capabilities"
+#: the fabric-interop job tools stay listed beside the doors: the protocol requires them by name, so they take
+#: seats of the three exceptions (the pattern's ruling). Measured on this service's gateway as well:
+#: fabric.job.get, 289 of 374 calls, 2026-10-10 to 2026-11-16 (agents database rollout row RO-816).
+JOB_TOOLS = ("fabric.job.get", "fabric.job.cancel")
+#: one written line per operation, read against its handler (the contract's CM-3: at most 200 characters)
+PURPOSES = {
+ "research.run": "Run a research runbook as a durable job; starts within the caller's daily allowance, above it waits for the operator.",
+ "research.tools.call": "Call one Prowl data tool with its parameters as a durable paid job, under the same allowance rule as research.run.",
+ "research.tutorial": "Create a clearly labeled synthetic learning job; it never contacts a provider and costs nothing.",
+ "research.list_runbooks": "List the runbooks with their typed inputs and tool budgets.",
+ "research.artifact.get": "Read one artifact (report.md, ledger.json, checkpoint.json, result.json) of the caller's own job.",
+ "client.issue": "Issue a client key within this desk's grants and ceiling; the key is in the answer once. Desk keys only.",
+ "client.rotate": "Rotate a key this desk issued; the new key is in the answer once. Desk keys only.",
+ "client.revoke": "Revoke a key this desk issued, for good. Desk keys only.",
+ "client.list": "List the keys this desk issued: names, classes, scopes, ceilings, prefixes and dates, never a key. Desk keys only.",
+}
+EXAMPLES = {
+ "research.run": {"runbook": "market-pulse", "inputs": {"market": "AI SDR tools"}, "idempotencyKey": "market-pulse-2026-11-21"},
+ "research.tools.call": {"tool": "google_news", "params": {"q": "ai agents"}, "idempotencyKey": "news-2026-11-21"},
+ "research.tutorial": {"idempotencyKey": "tutorial-1"},
+ "research.list_runbooks": {},
+ "research.artifact.get": {"id": "pr-0123456789abcdef0123", "name": "report.md"},
+ "client.issue": {"name": "anna-laptop", "scopes": ["read", "research.run"], "class": "interactive"},
+ "client.rotate": {"name": "anna-laptop"},
+ "client.revoke": {"name": "anna-laptop"},
+ "client.list": {},
+}
+#: the pattern's effect class per operation; the delegation gate keeps reading EFFECTS (charge, draft, none)
+COMPACT_EFFECTS = {"research.run": "money", "research.tools.call": "money", "research.tutorial": "write",
+                   "client.issue": "write", "client.rotate": "write", "client.revoke": "delete"}
+
+
+def operation_idempotency(name):
+    """The key the operation's own tool takes (CM-4): the three job capabilities require `idempotencyKey`,
+    every other operation takes none, so a key sent to it through execute is ignored as by its own name."""
+    return "required" if name in JOBS else "none"
+
+
+def operation_names(desk=False):
+    """Every operation behind the doors, in declared order: the capabilities, then the desk's when it is served."""
+    return list(CAPABILITIES) + (list(DESK_SCHEMAS) if desk else [])
+
+
+def compact_surface(desk=False, usage=None):
+    """The pattern's surface over this service's operations. It answers search; execute re-enters the service's
+    own call path (`Protocol.handle`), so the gate, the schema, the idempotency and the job record are the
+    operation's own."""
+    full = {t["name"]: t for t in tools_list(desk)}
+    ops = [compact_mcp.operation(
+        name, PURPOSES[name], full[name]["inputSchema"], None, example=EXAMPLES[name],
+        effect=COMPACT_EFFECTS.get(name, "read"), idempotency=operation_idempotency(name),
+        output_schema=full[name].get("outputSchema"), words=full[name]["description"])
+        for name in operation_names(desk)]
+    return compact_mcp.CompactSurface(ops, domain="research", job_tools=JOB_TOOLS, retired=RETIRED_SINCE, usage=usage)
+
+
+def compact_tools(desk=False):
+    """tools/list on the door agents register: research.search and research.execute, then the protocol's job tools."""
+    full = {t["name"]: t for t in tools_list(desk)}
+    search, execute = compact_surface(desk).tools()
+    search = {**search, "outputSchema": compact_mcp.SEARCH_ANSWER_SCHEMA,
+              "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}}
+    execute = {**execute, "annotations": {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False,
+                                          "openWorldHint": True}}
+    return [search, execute] + [full[name] for name in JOB_TOOLS]
+
+
+def typed_refusal(code, message, data=None):
+    """A compact-surface refusal as an MCP error result: `{error: {code, message, data}}`."""
+    body = {"error": {"code": code, "message": message, "data": data or {}}}
+    return {"content": [{"type": "text", "text": code}], "structuredContent": body, "isError": True}
+
+
 def interop_error(error):
     """The job error in the shape the pinned interop schema accepts: code, message and
     data only. A job a build before B-075 stored carries terminalCode beside them."""
@@ -159,11 +244,15 @@ class Protocol:
         self.runtime = runtime
         self.desk = desk  # the cloud instance's client store; None on the local service (no desk tools)
         self.dashboard_service = dashboard_service
+        # calls per operation and UTC day (no call text, no caller): what a direct seat would be measured by
+        root = getattr(getattr(runtime, "store", None), "root", None)
+        self.usage = compact_mcp.UsageCounter(root / "mcp-usage.json") if root is not None else None
 
-    async def handle(self, body, headers, authorize=None):
+    async def handle(self, body, headers, authorize=None, surface=None):
         """`authorize(tool)` answers the delegation verdict for one tools/call
         (service.delegation.DelegationPolicy.check); a refusal is the call's
-        result, never a transport error."""
+        result, never a transport error. `surface`: FULL_SURFACE lists every
+        capability as its own tool; otherwise tools/list is the two doors."""
         if not isinstance(body, dict) or body.get("jsonrpc") != "2.0" or not isinstance(body.get("method"), str):
             return self.error(None, -32600, "Invalid Request"), 400
         rid, method, params = body.get("id"), body["method"], body.get("params", {})
@@ -194,40 +283,41 @@ class Protocol:
             trace = child_trace(meta.get("traceparent"))
             info = {"name": SERVICE_ID, "version": __version__, "title": SERVICE_NAME}
             if method == "initialize":
-                result = {"protocolVersion": params.get("protocolVersion") if params.get("protocolVersion") in SUPPORTED else "2025-11-25", "capabilities": {"tools": {}}, "serverInfo": info, "instructions": "Start with research.list_runbooks. Jobs require operator review. Never retry paid failures blindly. Degraded reasons are at the service well-known endpoint."}
+                result = {"protocolVersion": params.get("protocolVersion") if params.get("protocolVersion") in SUPPORTED else "2025-11-25", "capabilities": {"tools": {}}, "serverInfo": info, "instructions": "Call research.search for the operations, then research.execute to run one (start with research.list_runbooks). Jobs require operator review. Never retry paid failures blindly. Degraded reasons are at the service well-known endpoint."}
             elif method == "server/discover":
-                result = {"resultType": "complete", "_meta": {META + "serverInfo": info}, "supportedVersions": SUPPORTED, "capabilities": {"tools": {}}, "instructions": "Use jobs and poll fabric.job.get; operator approval in Fabric Dashboards."}
+                result = {"resultType": "complete", "_meta": {META + "serverInfo": info}, "supportedVersions": SUPPORTED, "capabilities": {"tools": {}}, "instructions": "research.search lists the operations, research.execute runs one. Use jobs and poll fabric.job.get; operator approval in Fabric Dashboards."}
             elif method == "ping":
                 result = {}
             elif method == "tools/list":
-                result = {"tools": tools_list(desk=self.desk is not None)}
+                desk = self.desk is not None
+                result = {"tools": tools_list(desk) if surface == FULL_SURFACE else compact_tools(desk)}
                 if modern:
                     result["resultType"] = "complete"
             elif method == "tools/call":
                 name, args = params.get("name"), params.get("arguments", {})
-                schemas = SCHEMAS | (DESK_SCHEMAS if self.desk is not None else {})
-                if name not in schemas:
-                    return self.error(rid, -32602, "Unknown tool"), 400
-                verdict = authorize(name) if authorize is not None else {"ok": True}
-                if not verdict.get("ok"):
-                    result = refusal_tool_result(verdict, child_trace(meta.get("traceparent")))
-                    if modern:
-                        result["resultType"] = "complete"
-                    return {"jsonrpc": "2.0", "id": rid, "result": result}, 200
-                try:
-                    Draft202012Validator(schemas[name]).validate(args)
-                    data, stored_trace = self.call(name, args, meta.get("traceparent"), recorded(verdict))
+                desk = self.desk is not None
+                settled = False  # a gate's refusal carries its own trace
+                if name == SEARCH_TOOL:
+                    operation, via = name, "search"
+                    result = self.search(args, authorize, desk, trace)
+                elif name == EXECUTE_TOOL:
+                    via = "execute"
+                    operation, result, stored_trace, settled = self.execute(args, meta, authorize, desk)
                     trace = stored_trace or trace
-                    result = {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False)}], "structuredContent": data, "isError": False}
-                except Refused as exc:
-                    result = refusal_tool_result(exc.verdict, trace)
-                except (ValueError, KeyError, Conflict) as exc:
-                    code = exc.args[0] if isinstance(exc, KeyError) else "request-rejected"
-                    result = {"content": [{"type": "text", "text": str(code)}], "structuredContent": {"error": {"code": str(code), "message": str(exc)[:300]}}, "isError": True}
-                except Exception as exc:
-                    result = {"content": [{"type": "text", "text": "Request validation failed: " + type(exc).__name__}], "isError": True}
+                elif name in SCHEMAS or (desk and name in DESK_SCHEMAS):
+                    # a job tool is listed; an operation's own name left the listing and still answers (R28)
+                    operation, via = name, "direct" if name in JOB_TOOLS or surface == FULL_SURFACE else "name"
+                    result, stored_trace, settled = self.run_tool(name, args, meta, authorize, desk)
+                    trace = stored_trace or trace
+                    if via == "name":
+                        result.setdefault("_meta", {})["retired"] = {"since": RETIRED_SINCE, "replacedBy": EXECUTE_TOOL}
+                else:
+                    return self.error(rid, -32602, "Unknown tool"), 400
+                self.audit(operation, via, result)
                 if modern:
                     result["resultType"] = "complete"
+                if settled:
+                    return {"jsonrpc": "2.0", "id": rid, "result": result}, 200
             else:
                 return self.error(rid, -32601, "Method not found"), 404
             if trace:
@@ -235,6 +325,79 @@ class Protocol:
             return {"jsonrpc": "2.0", "id": rid, "result": result}, 200
         except ValueError as exc:
             return self.error(rid, -32602, str(exc)), 400
+
+    def run_tool(self, name, args, meta, authorize, desk):
+        """One operation by its own name, the one path every route takes: the caller's gate for this operation,
+        its input schema, then the call. Answers (result, the stored trace, whether a gate refused)."""
+        schemas = SCHEMAS | (DESK_SCHEMAS if desk else {})
+        trace = child_trace(meta.get("traceparent"))
+        verdict = authorize(name) if authorize is not None else {"ok": True}
+        if not verdict.get("ok"):
+            return refusal_tool_result(verdict, child_trace(meta.get("traceparent"))), None, True
+        stored_trace = None
+        try:
+            Draft202012Validator(schemas[name]).validate(args)
+            data, stored_trace = self.call(name, args, meta.get("traceparent"), recorded(verdict))
+            result = {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False)}], "structuredContent": data, "isError": False}
+        except Refused as exc:
+            result = refusal_tool_result(exc.verdict, trace)
+        except (ValueError, KeyError, Conflict) as exc:
+            code = exc.args[0] if isinstance(exc, KeyError) else "request-rejected"
+            result = {"content": [{"type": "text", "text": str(code)}], "structuredContent": {"error": {"code": str(code), "message": str(exc)[:300]}}, "isError": True}
+        except Exception as exc:
+            result = {"content": [{"type": "text", "text": "Request validation failed: " + type(exc).__name__}], "isError": True}
+        return result, stored_trace, False
+
+    def search(self, args, authorize, desk, trace):
+        """research.search: the catalogue, the contract's closed `compact-mcp-search/1`; each operation's effect
+        and the key execute applies travel beside it in `_meta.hints`. Any authenticated caller may read it: it
+        names operations and opens none of them."""
+        verdict = authorize(SEARCH_TOOL) if authorize is not None else {"ok": True}
+        if not verdict.get("ok"):
+            return refusal_tool_result(verdict, trace)
+        problems = compact_mcp.validate(args, compact_mcp.SEARCH_INPUT_SCHEMA) if isinstance(args, dict) else ["arguments is not an object"]
+        if problems:
+            return typed_refusal("invalid-arguments", "; ".join(problems))
+        surface = compact_surface(desk, self.usage)
+        answer = surface.search(args.get("query"), args.get("limit", compact_mcp.SEARCH_LIMIT),
+                                names=args.get("names"), cursor=args.get("cursor"))
+        return {"content": [{"type": "text", "text": json.dumps(answer, ensure_ascii=False)}], "structuredContent": answer,
+                "isError": False, "_meta": {"hints": surface.hints(answer)}}
+
+    def execute(self, args, meta, authorize, desk):
+        """research.execute: `{operation, arguments?, idempotencyKey?}`. It checks its own arguments, then takes
+        the operation's own path (`run_tool`), so execute never opens what the operation's own tool refuses.
+        Answers (operation, result, the stored trace, whether a gate refused)."""
+        problems = compact_mcp.validate(args, compact_mcp.EXECUTE_INPUT_SCHEMA) if isinstance(args, dict) else ["arguments is not an object"]
+        if problems:
+            return None, typed_refusal("invalid-arguments", "; ".join(problems)), None, False
+        name, known = args["operation"], operation_names(desk)
+        if name not in known:
+            return name, typed_refusal("unknown-operation", f"No operation {name}; {SEARCH_TOOL} lists them.",
+                                       {"near": difflib.get_close_matches(name, known, 3, 0.5)}), None, False
+        inner, key = dict(args.get("arguments") or {}), args.get("idempotencyKey")
+        if operation_idempotency(name) == "required":
+            own = inner.get("idempotencyKey")
+            if own is None and key is None:
+                return name, typed_refusal("idempotency-required", f"{name} takes an idempotencyKey."), None, False
+            if own is not None and key is not None and own != key:
+                return name, typed_refusal("invalid-arguments", "idempotencyKey and arguments.idempotencyKey differ; send one."), None, False
+            inner["idempotencyKey"] = own if own is not None else key
+        result, stored_trace, settled = self.run_tool(name, inner, meta, authorize, desk)
+        return name, result, stored_trace, settled
+
+    def audit(self, operation, via, result):
+        """One record per call: the operation, the route it came by (`search`, `execute`, `direct` for a listed
+        job tool, `name` for an operation's own retired tool name) and the outcome; an answered call is counted."""
+        failed = bool(result.get("isError"))
+        error = (result.get("structuredContent") or {}).get("error") if failed else None
+        outcome = (error.get("code") if isinstance(error, dict) else "error") if failed else "ok"
+        emit(log, "mcp.call", operation=operation, via=via, outcome=outcome)
+        if self.usage is not None and operation and not failed and via != "search":
+            try:
+                self.usage.count(operation)
+            except OSError:  # a full disk loses a count, never the answer
+                pass
 
     @staticmethod
     def error(rid, code, message, data=None):

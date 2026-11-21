@@ -28,6 +28,28 @@ Fabric owns ordering between agents. Prowl owns one bounded job. The journal kee
 
 ## Tools and parameters
 
+**The listing is two doors (rule R33 O15, agents database D-72, `patterns/compact-mcp` 1.2.0; B-154, since 0.6.21).**
+`tools/list` on `/mcp` answers four tools: `research.search`, `research.execute`, `fabric.job.get` and
+`fabric.job.cancel`. `research.search {query?, names?, limit?, cursor?}` answers the catalogue (the contract's closed
+`compact-mcp-search/1`: each operation's name, one-line purpose, input and output schema, gate, example and measured
+calls; its effect and the key execute applies travel in the result's `_meta.hints`). `research.execute {operation,
+arguments?, idempotencyKey?}` runs one operation through that operation's own path: the caller's scope or delegation
+is checked against the operation, never against `execute`; its input schema validates the arguments; a job capability
+takes the key its own tool takes (`idempotencyKey` beside `operation` or inside `arguments`, the same key either way,
+`idempotency-required` without one). Typed refusals: `invalid-arguments`, `unknown-operation` (with `data.near`),
+`idempotency-required`. The two job tools stay listed because the fabric-interop protocol requires them by name; they
+take seats of the pattern's three exceptions (and `fabric.job.get` has its own measured case: 289 of 374 calls on this
+service's gateway, 2026-10-10 to 2026-11-16). No other operation is listed directly: none has a measurement.
+
+An operation's own tool name left the listing on 2026-11-21 and is never refused (R28): `tools/call` with
+`research.run` and the others answers as before, with `_meta.retired: {since, replacedBy}` on the result. The full
+listing, one tool per capability with its schemas, stays at `/mcp?surface=capabilities` for a host or a probe that
+reads every capability. Every call writes one log record `event=mcp.call operation=… via=search|execute|direct|name
+outcome=…`; answered calls are counted per operation and UTC day in `mcp-usage.json` in the service's data folder
+(no call text, no caller), which is what a direct seat would be measured by. The release gate:
+`python research_agent/agent/compact_mcp.py check <tools/list answer>` exits 0 (`tests/test_two_doors.py` runs the
+same check). The table below is the operations, reached through `research.execute` or their own names.
+
 | MCP tool | Input | Result |
 |---|---|---|
 | `research.run` | runbook, inputs, idempotencyKey, optional context, optional `max_llm_usd` (the run's LLM cap), optional `resumeJobId` (continue an ended, unfinished research job's run with the same runbook and inputs: saved raw, attempt ledger and cap carry over; nothing already paid is dispatched again; the operator still approves; see *Resume* below) | durable job handle |
@@ -125,7 +147,7 @@ the Fabric surfaces only. Its descriptor is written by `scripts/cloud.py registe
 
 ## Names
 
-This provider is service `prowl-research.default`, repository `PROWL-AI/research-agent`, provider id `https://prowl.chat/fabric/providers/research-agent` (`fabric-agent.json`). Its tools are `research.run`, `research.tools.call`, `research.list_runbooks`, `research.artifact.get`, `research.tutorial`, `fabric.job.get` and `fabric.job.cancel`. The legacy stdio server (`prowl-research mcp`) is a separate surface of the same core and exposes `research.run`, `research.list_runbooks`, `research.get_status` and `research.get_report`.
+This provider is service `prowl-research.default`, repository `PROWL-AI/research-agent`, provider id `https://prowl.chat/fabric/providers/research-agent` (`fabric-agent.json`). Its listed tools are `research.search`, `research.execute`, `fabric.job.get` and `fabric.job.cancel`; its operations, behind the two doors, are `research.run`, `research.tools.call`, `research.list_runbooks`, `research.artifact.get` and `research.tutorial`. The legacy stdio server (`prowl-research mcp`) is a separate surface of the same core and exposes `research.run`, `research.list_runbooks`, `research.get_status` and `research.get_report`.
 
 Other agents on the same estate may also publish `research.*` tools, so a bare tool name is ambiguous: always address this one by its service id or repository, never by the tool name alone. The names are not renamed, because the provider revision's `contentHash` binds them; a rename would be a new provider revision every caller has to re-pin.
 

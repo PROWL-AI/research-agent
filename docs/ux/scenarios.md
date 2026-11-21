@@ -536,3 +536,19 @@
 - **Failure outcome:** `dailyUsd` вместе с классом `interactive` или неизвестный класс: отказ, ключ не создан; `client limit` для такого ключа: отказ.
 - **Wave:** K1 (DEC-0074 Ани)
 - **Coverage:** `tests/test_key_classes.py`
+
+### CORE-27: MCP сервиса: две двери, `research.search` и `research.execute`
+- **Status:** UNVERIFIED
+- **Actor:** вызывающий агент (свой токен, токен делегирования или клиентский ключ облака)
+- **Trigger:** `tools/list`, затем `tools/call` на `/mcp` сервиса
+- **Preconditions:** сервис запущен; у вызывающего действующий токен или ключ.
+- **Steps:**
+  1. Вызвать `tools/list`.
+  2. Вызвать `research.search` без аргументов, затем с `query`.
+  3. Вызвать `research.execute` с `operation` из ответа поиска; для задания передать `idempotencyKey`.
+  4. Вызвать операцию по её прежнему имени (`research.list_runbooks`).
+- **Expected result:** в списке четыре инструмента: `research.search`, `research.execute`, `fabric.job.get`, `fabric.job.cancel`. Поиск отвечает каталогом `compact-mcp-search/1`: у каждой операции имя, назначение в одну строку, схемы, пример; эффект и правило ключа лежат рядом в `_meta.hints`. `research.execute` выполняет операцию по её собственным правилам: права проверяются для операции, а не для двери; аргументы проверяет схема операции; задание принимает тот же ключ идемпотентности, что и по собственному имени, и повтор отвечает тем же заданием. Прежнее имя операции в списке не показано, но вызов по нему отвечает как раньше, с пометкой `_meta.retired` (дата и замена). Полный список по одной способности на инструмент остаётся на `/mcp?surface=capabilities`. Каждый вызов оставляет запись в журнале (`event=mcp.call`, операция, путь, исход), успешные считаются по операциям и суткам UTC.
+- **Failure outcome:** неизвестная операция: `unknown-operation` с близкими именами в `data.near`; неверные аргументы двери: `invalid-arguments`; задание без ключа: `idempotency-required`; два разных ключа: `invalid-arguments`; операция вне прав ключа: `scope-not-granted`, как по собственному имени; ключ выдачи (desk) находит и вызывает только операции `client.*` и не читает данные; имя, которого нет ни среди инструментов, ни среди операций: ошибка протокола «Unknown tool», как раньше.
+- **Wave:** правило R33 O15 (база агентов D-72), B-154
+- **Coverage:** `tests/test_two_doors.py` (все тесты файла); `tests/test_cloud_service.py::test_mcp_takes_only_client_keys`; `tests/test_issuing_desk.py::test_the_desk_tools_over_mcp_and_a_desk_key_reads_no_data`
+

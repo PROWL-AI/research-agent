@@ -4,6 +4,20 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.21 (2026-11-21)
+
+- The service's MCP listing is two doors (B-154; rule R33 O15, agents database D-72, `patterns/compact-mcp` 1.2.0,
+  board request f9ec9aad, rollout row RO-816). `tools/list` on `/mcp` answered seven tools and answers four:
+  `research.search` (the catalogue: each operation's purpose, schemas, gate and example), `research.execute` (run
+  one by name, under that operation's own scope, schema and idempotency key) and the protocol's `fabric.job.get` and
+  `fabric.job.cancel`. The cloud's four desk tools sit behind the same doors. Nothing that shipped is refused (R28):
+  a call by an operation's own name answers as before, marked `_meta.retired`, and the full listing stays at
+  `/mcp?surface=capabilities`. Every call is logged with its route (`event=mcp.call`) and answered calls are counted
+  per operation and day (`mcp-usage.json`). Proof: `tests/test_two_doors.py` (11 tests, the base's `compact_mcp.py
+  check` among them), the suite 992 passed, was 981. The pattern module is vendored unedited
+  (`research_agent/agent/compact_mcp.py`, sha256 checked). Not in this change: the stdio server's four tools (B-156)
+  and the well-known `surfaces.mcp.compact` declaration, which waits for a contract pin that carries DEC-0180 (B-157).
+
 ## 0.6.20 (2026-11-16)
 
 - AGENTS.md carries rule R33 O10 (D-56): a wait is improvement time. With no ready task, the agent exchanges with
