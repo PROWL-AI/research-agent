@@ -11,9 +11,12 @@ It is a CLI for humans and has two MCP surfaces for agents:
 
 - the **Fabric service** (`prowl-research-service`, HTTP MCP at
   `http://127.0.0.1:18764/mcp`, the connection `fabric-agent.json` declares) —
-  7 tools: `research.run`, `research.tools.call`, `research.tutorial`,
-  `research.list_runbooks`, `research.artifact.get`, `fabric.job.get`,
-  `fabric.job.cancel` (see [Fabric service](#fabric-service-and-operator-dashboard));
+  two doors, `research.search` (the catalogue of operations) and
+  `research.execute` (run one by name), beside the protocol's job tools
+  `fabric.job.get` and `fabric.job.cancel`. The operations behind the doors:
+  `research.run`, `research.tools.call`, `research.tutorial`,
+  `research.list_runbooks`, `research.artifact.get` (see
+  [Fabric service](#fabric-service-and-operator-dashboard));
 - the legacy local **stdio MCP server** (`prowl-research mcp`) — 4 tools:
   `research.run`, `research.list_runbooks`, `research.get_status`,
   `research.get_report`.
@@ -102,8 +105,9 @@ Register the agent as an MCP server (stdio) in any MCP client:
 
 The stdio server exposes four tools: `research.run`, `research.list_runbooks`,
 `research.get_status`, `research.get_report`. It is the legacy local surface;
-the Fabric bundle points at the HTTP service, which exposes seven (listed at
-the top of this file).
+the Fabric bundle points at the HTTP service, which lists two doors and the two
+job tools (at the top of this file). The stdio server keeps its four tools
+until it takes the same shape (B-156).
 
 Proving tool call (verifies install and registration; needs **no keys** and
 makes **no billed calls**):

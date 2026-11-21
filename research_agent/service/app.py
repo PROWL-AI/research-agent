@@ -20,7 +20,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from . import allowance
 from .delegation import DelegationPolicy, is_loopback, refusal_http
 from .identity import HEADER, SERVICE_ID, SERVICE_NAME
-from .protocol import CLOUD_DASHBOARD_SERVICE, DASHBOARD_SERVICE, EFFECTS, Protocol, CAPABILITIES, artifact
+from .protocol import CLOUD_DASHBOARD_SERVICE, DASHBOARD_SERVICE, EFFECTS, SEARCH_TOOL, Protocol, CAPABILITIES, artifact
 from .runtime import JOB_FLOOR_BYTES, Runtime, runbooks
 from .store import Store, Conflict, now
 from .runtime import run_dir_name
@@ -153,7 +153,8 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
 
     def client_verdict(client, tool):
         needed = SCOPE_OF.get(tool)
-        if needed is None and "keys.issue" in client["scopes"] and tool.startswith("research."):
+        # the catalogue (research.search) names operations and opens none: any live client key reads it
+        if needed is None and tool != SEARCH_TOOL and "keys.issue" in client["scopes"] and tool.startswith("research."):
             needed = "read"  # a desk key reads no data (B-121)
         if needed is not None and needed not in client["scopes"]:
             return {"ok": False, "code": "scope-not-granted", "detail": "client-key-scope"}
@@ -223,7 +224,8 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
                 logging.getLogger("research_agent.service.clients").info("client key refused: %s", reason)
                 return refused(delegation_refusal("unauthenticated", "no-client-key"))
             message = await body(request)
-            data, status = await proto.handle(message, request.headers, authorize=lambda tool: client_verdict(client, tool))
+            data, status = await proto.handle(message, request.headers, authorize=lambda tool: client_verdict(client, tool),
+                                              surface=request.query_params.get("surface"))
             return JSONResponse(data, status) if data is not None else Response(status_code=status)
         if path == "/mcp":
             own = token_matches(request, agent_token)
@@ -238,9 +240,19 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
                 return refused(delegation_refusal(code, "token-not-verified" if delegation.configured else "no-trusted-issuer"))
 
             def authorize(tool):
-                return delegation.check(tool, request.headers, own_token=own, loopback=loopback)
+                if tool == SEARCH_TOOL and not own:
+                    # the catalogue names no capability a token could carry: an authentic, current token reads it,
+                    # as it reads tools/list
+                    if delegation.authenticate(request.headers):
+                        return {"ok": True, "tier": "T2", "principal": None, "caller": None, "chain": [], "claims": None, "kid": None}
+                    code = "unauthenticated" if delegation.configured else "issuer-unavailable"
+                    return delegation_refusal(code, "token-not-verified" if delegation.configured else "no-trusted-issuer")
+                # the service's own token reads the catalogue as it reads the runbooks (effect none)
+                return delegation.check("research.list_runbooks" if tool == SEARCH_TOOL else tool, request.headers,
+                                        own_token=own, loopback=loopback)
 
-            data, status = await proto.handle(message, request.headers, authorize=authorize)
+            data, status = await proto.handle(message, request.headers, authorize=authorize,
+                                              surface=request.query_params.get("surface"))
             return JSONResponse(data, status) if data is not None else Response(status_code=status)
         if path.startswith("/static/"):
             name = path.removeprefix("/static/")

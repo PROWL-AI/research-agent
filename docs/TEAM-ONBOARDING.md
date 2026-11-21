@@ -27,10 +27,12 @@ claude mcp add --transport http prowl-research https://<адрес агента>
 ```
 
 Адрес агента пришлёт владелец вместе с ключом. Проверка: в Claude Code выполните `/mcp`, сервер `prowl-research`
-должен быть подключён, инструменты `research.*` видны.
+должен быть подключён, инструменты `research.search` и `research.execute` видны.
 
 ## 3. Как работать
 
+- Claude сам находит нужную операцию через `research.search` и запускает её через `research.execute`; названия
+  операций ниже остались прежними.
 - Список сценариев: попросите Claude вызвать `research.list_runbooks`.
 - Исследование: `research.run` с названием сценария и входными данными. Один инструмент: `research.tools.call`.
 - Ответ приходит заданием: Claude следит за ним через `fabric.job.get`.

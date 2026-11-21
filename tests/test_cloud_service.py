@@ -63,7 +63,9 @@ async def test_mcp_takes_only_client_keys(client, clients):
     assert (await client.post("/mcp", json=body, headers=bearer("prc_" + "x" * 43))).status_code == 401
     key = clients.add("anna", ["read"])
     r = await client.post("/mcp", json=body, headers=bearer(key))
-    assert r.status_code == 200 and any(t["name"] == "research.run" for t in r.json()["result"]["tools"])
+    assert r.status_code == 200 and any(t["name"] == "research.execute" for t in r.json()["result"]["tools"])
+    full = await client.post("/mcp?surface=capabilities", json=body, headers=bearer(key))
+    assert any(t["name"] == "research.run" for t in full.json()["result"]["tools"])
     clients.revoke("anna")
     assert (await client.post("/mcp", json=body, headers=bearer(key))).status_code == 401
 
