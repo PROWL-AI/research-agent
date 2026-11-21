@@ -6,6 +6,9 @@ One version for the package, the service's well-known document and MCP `initiali
 
 ## 0.6.20 (2026-11-16)
 
+- AGENTS.md carries rule R33 O10 (D-56): a wait is improvement time. With no ready task, the agent exchanges with
+  the agent architect (what it learned, what it has not taken) and files what applies in the backlog; copies exchange
+  only through the architect and no organization's data crosses (B-153, added 2026-11-21). No code path changes.
 - AGENTS.md carries rule R33 O11 (D-61): the etalon is the template repository on PassionCode.ai; this agent and
   its copies are built from it, and improvements go to the agents database first (B-152). No code path changes.
 - AGENTS.md carries the Telegram channel rule R33 O9 (D-50): to the operator through the communicator, to anyone

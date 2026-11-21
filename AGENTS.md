@@ -71,6 +71,34 @@ Operator, 2026-11-17, verbatim (agents database rule R33 O11, decision D-61, rel
 This repository predates its etalon and carries no `template-receipt.json` yet; until it takes a rendered version, a
 change here that the template should carry is sent to the base as above, never copied into another copy by hand.
 
+## A wait is improvement time (rule R33 O10, operator 2026-11-16)
+
+Operator, 2026-11-16 (about 22:25 UTC), verbatim (agents database rule R33 O10, decision D-56, base commit 1cc6d383,
+relayed in board request 4358a2d3, thread ff09e8b4; rolled out here by board request befc42f4): «пока ждем переносим
+улучшения между агентами ПМ разны организаций, это сделай правило все наши агентов чтобы пока они ждут они обменивались
+информацией с агентом аритектором как они себя могут улучшить».
+
+When this agent waits (for a person, another agent, a build, a run or an order) and no independent task is ready by
+priority in [`docs/evidence/backlog.md`](docs/evidence/backlog.md), it:
+
+1. gives the agent architect what it learned since its last exchange (a trap, a fix, a pattern, a measured win) with
+   its evidence (a commit, a `file:line`, a test), through the `recording-insights` skill or an `agents.improve`
+   request to the fabric-agents-database project on the board (a solved tooling problem as an `agents_db.contribute`
+   fix);
+2. asks the architect's consult (`python3 ~/DATA/fabric-agents-database/tools/audit.py consult "<need>"`,
+   `agents_db.consult`, or the board) what of the base and of the other copies of the `research` template it has not
+   taken: the version in its template receipt against the current one, new patterns, new traps;
+3. takes what applies as rows of its own backlog, done by priority.
+
+- The architect advises and never holds (D-41): nothing waits on its answer, and the exchange never displaces a ready
+  task.
+- This agent and its team copy (Appvillis) exchange only through the architect: a fix in one copy becomes a feedback
+  row of the `research` template that the others take by the template update, never by copying another copy's code.
+  An organization's data (people, keys, clients, chats, records, research requests and their reports) never crosses.
+- The request names template `research` 1.8.2 as the version that carries O10. This repository predates its etalon
+  and carries no `template-receipt.json` (see the section above), so there is no receipt version to compare yet: step 2
+  compares against the base's current `research` version by consult until a rendered version is taken.
+
 ## Opening the dashboard (operator rule, 2026-10-24)
 
 The service's pages open **only in Fabric Dashboards**, never in a browser (Safari, Dia or Chrome), in links you
