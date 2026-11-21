@@ -51,6 +51,25 @@ try{
  await page.getByText('Учебный отчёт',{exact:false}).waitFor();
  await page.locator('[data-nav="costs"]').click();
  await page.getByRole('heading',{name:'Расходов пока нет'}).waitFor();
+ // B-155 (rule R33 O16): the limits, the weekly and monthly charts, and one edit with its history.
+ await page.getByRole('heading',{name:'Лимиты',exact:true}).waitFor();
+ await page.getByRole('heading',{name:'Расходы по неделям'}).waitFor();
+ await page.getByRole('heading',{name:'Расходы по месяцам'}).waitFor();
+ const limits=page.locator('table',{hasText:'Аварийный стоп за сутки'});
+ assert.match(await limits.locator('tr',{hasText:'Аварийный стоп за сутки'}).textContent(),/\$500\.00.*Действует/);
+ assert.match(await limits.locator('tr',{hasText:'Аварийный стоп за месяц'}).textContent(),/\$1000\.00.*Действует/);
+ const dayRow=limits.locator('tr').filter({hasText:/^За сутки/});
+ assert.match(await dayRow.textContent(),/Не задан/);
+ await dayRow.getByRole('button',{name:'Изменить'}).click();
+ await page.getByRole('heading',{name:'За сутки',exact:true}).waitFor();
+ await page.locator('#limit-form [name=amount]').fill('25');
+ await page.locator('#limit-form [name=reason]').fill('День исследований укладывается в 25 долларов');
+ await page.getByRole('button',{name:'Сохранить лимит'}).click();
+ await page.locator('#toast',{hasText:'Лимит сохранён'}).waitFor();
+ assert.match(await limits.locator('tr').filter({hasText:/^За сутки/}).textContent(),/\$25\.00.*Действует/);
+ await page.getByRole('heading',{name:'История изменений лимитов'}).waitFor();
+ await page.getByText('День исследований укладывается в 25 долларов').waitFor();
+ await page.screenshot({path:evidence+'/costs-limits-desktop.png',fullPage:true});
  await page.locator('[data-nav="chains"]').click();
  await page.getByRole('heading',{name:'Учебная цепочка'}).waitFor();
  await page.locator('[data-nav="settings"]').click();

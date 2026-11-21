@@ -1,33 +1,45 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-21: 0.6.21, the MCP listing is two doors (supersedes every "Exact next task" below)
+## Current entry, 2026-11-21: 0.6.22, two doors and the Costs section's limits (supersedes every "Exact next task" below)
 
 **Objective.** Board request `f9ec9aad` from the agents database (thread `f8f63930`, due 2026-12-09): take rule R33
 O15 (two doors, `patterns/compact-mcp`) and rule R33 O16 (the Costs section, `patterns/costs-panel`).
 
 **Done.** O15, as B-154 in 0.6.21: `/mcp` lists `research.search`, `research.execute`, `fabric.job.get` and
 `fabric.job.cancel`; the operations keep their own gates, schemas and keys; old tool names still answer, marked
-retired; the full listing is at `/mcp?surface=capabilities`. See [FABRIC.md](FABRIC.md), "Tools and parameters", and
-scenario CORE-27.
+retired; the full listing is at `/mcp?surface=capabilities` (scenario CORE-27). O16, as B-155 in 0.6.22: limits for
+an order, a UTC day, an ISO week and a month, unset until set, and the emergency stop (USD 500 a day, USD 1000 a
+month) on from the start, all checked before every paid tool and model call; `costs.panel` and `spend.limits.set`
+behind the doors; the dashboard's «Расходы» with limits, weekly and monthly charts, the edit and its history
+(scenarios SCN-006 and CORE-28). Both are described in [FABRIC.md](FABRIC.md), "Tools and parameters".
 
-**Open.** O16 is B-155, not started. B-156 (the stdio server's four tools) and B-157 (the well-known
-`surfaces.mcp.compact` declaration, waits for the contract pin).
+**Open.** B-156 (the stdio server's four tools), B-157 (the well-known `surfaces.mcp.compact` declaration, waits for
+the contract pin), B-158 (the usage report's `budgets[]`, `limitChanges[]`, `months[]`, waits for the same pin),
+B-159 (an empty chart column draws as a grey oval).
 
-**Decisions.** The job tools stay listed (the pattern's ruling: the protocol requires them by name). No operation
-has a direct seat: there is no measurement of this service's own calls yet; `mcp-usage.json` starts counting now.
-`research.search` is readable by any authenticated caller (a desk key included): it names operations and opens none.
-An unknown tool name keeps answering the JSON-RPC error "Unknown tool" (behaviour that shipped), not a typed result.
+**Decisions.** The job tools stay listed (the pattern's ruling: the protocol requires them by name); no operation
+has a direct seat, `mcp-usage.json` starts the measurement now. `research.search` is readable by any authenticated
+caller. An unknown tool name keeps answering the JSON-RPC error "Unknown tool". The limits are checked per paid
+call, not at job approval: the allowance still decides whether a job starts without a person, and the order's limit
+is read against what the job has counted so far. A model call's worst case before its tokens are known is 100,000
+prompt tokens and its output budget at the model's price (an assumption that errs high, `costs.py`). The Costs
+operations are the operator's: the service's own token and the dashboard session, never a cloud client key. The
+usage report keeps its pinned shape (B-158). The dashboard's edit is the operator's own act, so it may raise or
+clear a limit with the typed reason as the recorded instruction.
 
-**Checks actually run.** `pytest tests/` on Python 3.11: 992 passed. `ruff check .`: clean.
-`python scripts/check_add_only.py`: `add-only: ok`. `compact_mcp.py check` on the served listing: `within: true`,
-no findings. Not run: `scripts/verify-fabric-contract.py` (needs the contract checkout at its pin), a live instance.
+**Checks actually run.** `pytest tests/` on Python 3.11: 1003 passed. `ruff check .`: clean.
+`python scripts/check_add_only.py`: `add-only: ok`. `node scripts/test-dashboard.mjs` (Playwright WebKit 26.6): exit
+0, the limits flow included. `compact_mcp.py check` on the served listing: `within: true`, no findings. Not run:
+`scripts/verify-fabric-contract.py` (needs the contract checkout at its pin), a paid run against a live provider.
 
-**Not deployed.** No instance runs 0.6.21: the MacBook service, the three Studio spaces and both clouds still serve
-the seven-tool listing until each is updated (0.6.20 was not rolled out either, see the entry below). A cloud deploy
-is a production step and is the operator's or a session he is in.
+**Not deployed.** No instance runs 0.6.21 or 0.6.22: the MacBook service, the three Studio spaces and both clouds
+serve the older build until each is updated (0.6.20 was not rolled out either, see the entry below). 0.6.22 changes
+the money path (the check before every paid call), so watch the first paid run on each instance. A cloud deploy is
+a production step and is the operator's or a session he is in.
 
-**Exact next tasks:** (1) B-155, the Costs section, by 2026-12-09, then answer board request `f9ec9aad` with its
-commit; (2) 0.6.21 on every instance, the way the entry below names for 0.6.20; (3) B-148, B-123, then B-156, B-157.
+**Exact next tasks:** (1) 0.6.22 on every instance, the way the entry below names for 0.6.20, then one paid
+acceptance run and a look at «Расходы»; (2) B-148, B-123; (3) B-158 and B-157 when the contract pin moves; (4) B-156,
+B-159.
 
 ## Current entry, 2026-11-16 (night): 0.6.20 and the x-trend-pulse acceptance (supersedes every "Exact next task" below)
 
