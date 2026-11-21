@@ -287,6 +287,26 @@ class Store:
             self.db.execute("UPDATE calls SET body=? WHERE id=?", (json.dumps(call, ensure_ascii=False), call["id"]))
         return call
 
+    def cost_rows(self, since=None, job_id=None):
+        """What the Costs section counts (B-155): one light row per journaled attempt, tutorial jobs left out,
+        optionally from a UTC time (`YYYY-MM-DDTHH:MM:SS`) or of one job. No arguments, no output."""
+        sql = ("SELECT c.job, json_extract(c.body,'$.kind'), json_extract(c.body,'$.name'), "
+               "json_extract(c.body,'$.startedAt'), json_extract(c.body,'$.costUsd'), "
+               "json_extract(c.body,'$.inputTokens'), json_extract(c.body,'$.outputTokens'), "
+               "json_extract(c.body,'$.arguments.max_tokens') "
+               "FROM calls c JOIN jobs j ON j.id = c.job "
+               "WHERE COALESCE(json_extract(j.body,'$.request.kind'),'') != 'tutorial'")
+        params = []
+        if since:
+            sql += " AND json_extract(c.body,'$.startedAt') >= ?"
+            params.append(since)
+        if job_id:
+            sql += " AND c.job = ?"
+            params.append(job_id)
+        return [{"job": r[0], "kind": r[1], "name": r[2], "at": r[3], "costUsd": r[4], "inputTokens": r[5] or 0,
+                 "outputTokens": r[6] or 0, "maxTokens": r[7] if isinstance(r[7], int) else None}
+                for r in self.db.execute(sql + " ORDER BY json_extract(c.body,'$.startedAt')", params)]
+
     def calls(self, job_id=None):
         rows = self.db.execute("SELECT body FROM calls" + (" WHERE job=?" if job_id else ""), (job_id,) if job_id else ())
         return [json.loads(r[0]) for r in rows]
