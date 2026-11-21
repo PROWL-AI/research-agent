@@ -11,7 +11,7 @@ import pytest
 from research_agent.agent import compact_mcp
 from research_agent.service.app import CloudSettings, create_app
 from research_agent.service.clients import FileClients
-from research_agent.service.protocol import (CAPABILITIES, DESK_SCHEMAS, EXECUTE_TOOL, JOB_TOOLS, PURPOSES,
+from research_agent.service.protocol import (CAPABILITIES, COSTS_SCHEMAS, DESK_SCHEMAS, EXECUTE_TOOL, JOB_TOOLS, PURPOSES,
                                              RETIRED_SINCE, SEARCH_TOOL, compact_surface, compact_tools,
                                              operation_names, tools_list)
 from research_agent.runbook import get_runbook
@@ -88,7 +88,7 @@ async def test_the_full_listing_stays_on_its_own_surface(client):
 
 
 def test_every_operation_has_a_written_purpose_and_a_real_example():
-    assert set(PURPOSES) == set(CAPABILITIES) | set(DESK_SCHEMAS)
+    assert set(PURPOSES) == set(CAPABILITIES) | set(COSTS_SCHEMAS) | set(DESK_SCHEMAS)
     for name, text in PURPOSES.items():
         assert len(text) <= compact_mcp.PURPOSE_MAX and text.endswith(".") and "\n" not in text, name
     surface = compact_surface(desk=True)
@@ -103,7 +103,8 @@ async def test_search_answers_the_closed_catalogue_with_hints_beside_it(client):
     result = await result_of(client, call(SEARCH_TOOL))
     answer = result["structuredContent"]
     assert result["isError"] is False and answer["schema"] == "compact-mcp-search/1"
-    assert [o["name"] for o in answer["operations"]] == list(CAPABILITIES) and answer["total"] == answer["matched"] == 5
+    assert [o["name"] for o in answer["operations"]] == list(CAPABILITIES) + list(COSTS_SCHEMAS)
+    assert answer["total"] == answer["matched"] == 7
     assert "nextCursor" not in answer and set(answer) <= {"schema", "query", "total", "matched", "operations"}
     hints = result["_meta"]["hints"]["operations"]
     assert hints["research.run"] == {"effect": "money", "idempotency": "required"}

@@ -59,6 +59,40 @@ same check). The table below is the operations, reached through `research.execut
 | `research.artifact.get` | id, name | bounded report.md / ledger.json / checkpoint.json / result.json |
 | `fabric.job.get` | id | state, decision link or result envelope |
 | `fabric.job.cancel` | id | terminal cancellation; no promise of upstream refund |
+| `costs.panel` | empty object | the Costs section, `costs-panel/1` (behind the doors; since 0.6.22) |
+| `spend.limits.set` | limitId, limitUsd and/or enforced, reason, idempotencyKey; the operator's words in `_meta.decision` to raise, clear or turn off | `{change, repeated}`; the change as recorded (behind the doors; since 0.6.22) |
+
+### The Costs section and its limits (rule R33 O16, agents database D-74, `patterns/costs-panel` 1.0.0; B-155)
+
+The dashboard's «Расходы» section and the two operations above read and change the same thing
+(`research_agent/service/costs.py`; the pattern module is vendored unchanged in `service/vendor/costs_panel.py`).
+
+- **What is counted.** Every attempt of the call journal, tutorial jobs left out. A call the provider priced counts
+  its price. A call without a price, and a call still in flight, counts its worst case in full and is flagged
+  unpriced, never zero: a tool call USD 1 (`allowance.TOOL_JOB_WORST_USD`), a model call its tokens at the price
+  table, or before any token is known 100,000 prompt tokens and its `max_tokens` (16,000 when unset) at the model's
+  price, an unlisted model at the top of the table. Windows are calendar UTC: the day, the ISO week from Monday, the
+  month.
+- **The limits.** `costs.order`, `costs.day`, `costs.week`, `costs.month` are unset until a person sets them;
+  `emergency.day` (USD 500) and `emergency.month` (USD 1000) are enforced from the start.
+- **The check.** Before every paid tool call and every model call (`runtime.ObservedProwl`, `runtime.ObservedLLM`),
+  before the attempt is journaled: the emergency stop, then the order's limit against what this job has counted,
+  then the day, the week and the month. At the line a call passes; past it the call is not sent, costs nothing and
+  stops the run with "Spend limit reached (…); nothing was sent". A journal or a book that cannot be read refuses
+  the call. This sits beside the allowance (a caller's day ceiling and the agents' month ledger decide whether a job
+  starts without a person) and beside a run's own tool budget and LLM cap.
+- **The edit.** One limit by id: its amount (null clears it), its `enforced`, or both, with a reason and an
+  idempotency key. A first or lower amount and turning a limit on are the caller's own act. Raising, clearing or
+  turning off needs the operator's decision: `_meta.decision` over MCP (`operator-decision-required` without it), or
+  the operator's own session on the dashboard, where the typed reason is the recorded instruction. Every change is a
+  line of `spend-limits.jsonl` in the data folder, appended and never rewritten; `costs.panel` shows the newest 20
+  without the decision's words.
+- **Who.** The service's own token and the operator's dashboard session. A cloud client key reaches neither
+  operation (`scope-not-granted`).
+- **Not yet in the usage report.** `/fabric/v1/usage` keeps its shape: the contract pin this repository verifies
+  against (`7a14a487`) closes that schema and does not carry DEC-0183, so `budgets[]`, `limitChanges[]` and
+  `months[]` are served by `costs.panel` until the pin moves (B-158). The well-known document already names
+  `costs.panel` and `spend.limits.set` in `surfaces.mcp.capabilities`.
 
 Exact schemas: `fabric/schemas/research.*.json`, generated from `service/protocol.py` by `PYTHONPATH=. python scripts/build-fabric-manifest.py`. The schemas are resolved locally by `$id`; their URI identifiers are not a promise of hosted schema publication. Contract revision is pinned in `fabric-contract.lock.json`. The service supports modern per-request MCP metadata and legacy initialization; this does not upgrade the separate legacy stdio server's protocol claim.
 

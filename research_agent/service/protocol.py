@@ -6,6 +6,7 @@ import json
 import logging
 from urllib.parse import quote
 from jsonschema import Draft202012Validator
+from . import costs
 from .delegation import Refused, recorded, refusal_tool_result, require_owner
 from .runtime import child_trace, run_dir_name, runbooks
 from .store import Conflict
@@ -62,6 +63,19 @@ DESK_DESCRIPTIONS = {
  "client.revoke": "Revoke a key this desk issued, for good.",
  "client.list": "The keys this desk issued: names, classes, scopes, ceilings (null for an interactive key, never 0), prefixes and dates, never a key.",
 }
+#: The Costs section's two operations (B-155; rule R33 O16, pattern `costs-panel` 1.0.0, contract DEC-0183): the
+#: dashboard's section and its edit control as capabilities (R33 O8). Behind the two doors, never listed there.
+LIMIT_ID = {"enum": list(costs.cp.LIMIT_IDS)}
+COSTS_SCHEMAS = {
+ "costs.panel": obj(),
+ "spend.limits.set": {**obj({"limitId": LIMIT_ID, "limitUsd": {"oneOf": [{"type": "number", "exclusiveMinimum": 0}, {"type": "null"}]},
+                             "enforced": {"type": "boolean"}, "reason": {"type": "string", "minLength": 1, "maxLength": 500},
+                             "idempotencyKey": STRING}, ["limitId", "reason", "idempotencyKey"]), "minProperties": 4},
+}
+COSTS_DESCRIPTIONS = {
+ "costs.panel": "Spend by UTC day, ISO week and month with chart series, the limits in force, the emergency stop and the last limit changes.",
+ "spend.limits.set": "Change one spending limit: its limitUsd (null clears it), its enforced, or both. Lowering or a first amount is the caller's act; raising, clearing or turning off needs the operator's words in _meta.decision.",
+}
 CAPABILITIES = list(SCHEMAS)[:5]
 for name in CAPABILITIES:
     SCHEMAS[name] = {"$id": BASE + name + ".input.json", **SCHEMAS[name]}
@@ -81,7 +95,7 @@ def tool_effect(name):
     return "charge" if name in {"research.run", "research.tools.call"} else "draft" if name in JOBS else "none"
 
 
-EFFECTS = {name: tool_effect(name) for name in SCHEMAS}
+EFFECTS = {name: tool_effect(name) for name in SCHEMAS} | {"costs.panel": "none", "spend.limits.set": "draft"}
 
 
 def tools_list(desk=False):
@@ -100,6 +114,10 @@ def tools_list(desk=False):
             "inputSchema": schema, "outputSchema": out,
             "annotations": {"readOnlyHint": effect == "none" and name != "fabric.job.cancel", "destructiveHint": effect not in {"none", "draft"},
                             "idempotentHint": True, "openWorldHint": effect == "charge"}})
+    for name, schema in COSTS_SCHEMAS.items():
+        tools.append({"name": name, "description": COSTS_DESCRIPTIONS[name], "inputSchema": schema,
+                      "annotations": {"readOnlyHint": name == "costs.panel", "destructiveHint": False,
+                                      "idempotentHint": True, "openWorldHint": False}})
     if desk:
         for name, schema in DESK_SCHEMAS.items():
             tools.append({"name": name, "description": DESK_DESCRIPTIONS[name], "inputSchema": schema,
@@ -125,6 +143,8 @@ PURPOSES = {
  "research.tutorial": "Create a clearly labeled synthetic learning job; it never contacts a provider and costs nothing.",
  "research.list_runbooks": "List the runbooks with their typed inputs and tool budgets.",
  "research.artifact.get": "Read one artifact (report.md, ledger.json, checkpoint.json, result.json) of the caller's own job.",
+ "costs.panel": "Read the Costs section: spend by UTC day, ISO week and month with chart series, the limits, the emergency stop and the last changes.",
+ "spend.limits.set": "Change one spending limit. Lowering or a first amount is the caller's act; raising, clearing or turning off needs the operator's words in _meta.decision.",
  "client.issue": "Issue a client key within this desk's grants and ceiling; the key is in the answer once. Desk keys only.",
  "client.rotate": "Rotate a key this desk issued; the new key is in the answer once. Desk keys only.",
  "client.revoke": "Revoke a key this desk issued, for good. Desk keys only.",
@@ -136,6 +156,8 @@ EXAMPLES = {
  "research.tutorial": {"idempotencyKey": "tutorial-1"},
  "research.list_runbooks": {},
  "research.artifact.get": {"id": "pr-0123456789abcdef0123", "name": "report.md"},
+ "costs.panel": {},
+ "spend.limits.set": {"limitId": "costs.day", "limitUsd": 25, "reason": "A day's research fits 25 USD.", "idempotencyKey": "day-limit-2026-11-21"},
  "client.issue": {"name": "anna-laptop", "scopes": ["read", "research.run"], "class": "interactive"},
  "client.rotate": {"name": "anna-laptop"},
  "client.revoke": {"name": "anna-laptop"},
@@ -143,18 +165,18 @@ EXAMPLES = {
 }
 #: the pattern's effect class per operation; the delegation gate keeps reading EFFECTS (charge, draft, none)
 COMPACT_EFFECTS = {"research.run": "money", "research.tools.call": "money", "research.tutorial": "write",
-                   "client.issue": "write", "client.rotate": "write", "client.revoke": "delete"}
+                   "spend.limits.set": "write", "client.issue": "write", "client.rotate": "write", "client.revoke": "delete"}
 
 
 def operation_idempotency(name):
     """The key the operation's own tool takes (CM-4): the three job capabilities require `idempotencyKey`,
     every other operation takes none, so a key sent to it through execute is ignored as by its own name."""
-    return "required" if name in JOBS else "none"
+    return "required" if name in JOBS or name == "spend.limits.set" else "none"
 
 
 def operation_names(desk=False):
     """Every operation behind the doors, in declared order: the capabilities, then the desk's when it is served."""
-    return list(CAPABILITIES) + (list(DESK_SCHEMAS) if desk else [])
+    return list(CAPABILITIES) + list(COSTS_SCHEMAS) + (list(DESK_SCHEMAS) if desk else [])
 
 
 def compact_surface(desk=False, usage=None):
@@ -165,6 +187,7 @@ def compact_surface(desk=False, usage=None):
     ops = [compact_mcp.operation(
         name, PURPOSES[name], full[name]["inputSchema"], None, example=EXAMPLES[name],
         effect=COMPACT_EFFECTS.get(name, "read"), idempotency=operation_idempotency(name),
+        gate="relayed" if name == "spend.limits.set" else "none",
         output_schema=full[name].get("outputSchema"), words=full[name]["description"])
         for name in operation_names(desk)]
     return compact_mcp.CompactSurface(ops, domain="research", job_tools=JOB_TOOLS, retired=RETIRED_SINCE, usage=usage)
@@ -304,12 +327,12 @@ class Protocol:
                     via = "execute"
                     operation, result, stored_trace, settled = self.execute(args, meta, authorize, desk)
                     trace = stored_trace or trace
-                elif name in SCHEMAS or (desk and name in DESK_SCHEMAS):
+                elif name in SCHEMAS or name in COSTS_SCHEMAS or (desk and name in DESK_SCHEMAS):
                     # a job tool is listed; an operation's own name left the listing and still answers (R28)
                     operation, via = name, "direct" if name in JOB_TOOLS or surface == FULL_SURFACE else "name"
                     result, stored_trace, settled = self.run_tool(name, args, meta, authorize, desk)
                     trace = stored_trace or trace
-                    if via == "name":
+                    if via == "name" and name not in COSTS_SCHEMAS:  # the Costs operations never had a listed name
                         result.setdefault("_meta", {})["retired"] = {"since": RETIRED_SINCE, "replacedBy": EXECUTE_TOOL}
                 else:
                     return self.error(rid, -32602, "Unknown tool"), 400
@@ -329,7 +352,7 @@ class Protocol:
     def run_tool(self, name, args, meta, authorize, desk):
         """One operation by its own name, the one path every route takes: the caller's gate for this operation,
         its input schema, then the call. Answers (result, the stored trace, whether a gate refused)."""
-        schemas = SCHEMAS | (DESK_SCHEMAS if desk else {})
+        schemas = SCHEMAS | COSTS_SCHEMAS | (DESK_SCHEMAS if desk else {})
         trace = child_trace(meta.get("traceparent"))
         verdict = authorize(name) if authorize is not None else {"ok": True}
         if not verdict.get("ok"):
@@ -337,10 +360,12 @@ class Protocol:
         stored_trace = None
         try:
             Draft202012Validator(schemas[name]).validate(args)
-            data, stored_trace = self.call(name, args, meta.get("traceparent"), recorded(verdict))
+            data, stored_trace = self.call(name, args, meta.get("traceparent"), recorded(verdict), meta.get("decision"))
             result = {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False)}], "structuredContent": data, "isError": False}
         except Refused as exc:
             result = refusal_tool_result(exc.verdict, trace)
+        except costs.cp.Refused as exc:  # spend.limits.set: the contract's typed refusals (DEC-0183 SL-2)
+            result = typed_refusal(exc.code, exc.message)
         except (ValueError, KeyError, Conflict) as exc:
             code = exc.args[0] if isinstance(exc, KeyError) else "request-rejected"
             result = {"content": [{"type": "text", "text": str(code)}], "structuredContent": {"error": {"code": str(code), "message": str(exc)[:300]}}, "isError": True}
@@ -406,8 +431,14 @@ class Protocol:
             err["data"] = data
         return {"jsonrpc": "2.0", "id": rid, "error": err}
 
-    def call(self, name, args, trace, delegation=None):
+    def call(self, name, args, trace, delegation=None, decision=None):
         rt = self.runtime
+        if name == "costs.panel":
+            return costs.panel(rt.store), child_trace(trace)
+        if name == "spend.limits.set":
+            # who asked is kept as an opaque reference; the operator's words, when relayed, travel in _meta.decision
+            who = (delegation or {}).get("principal") or "agent"
+            return costs.set_limit(rt.store, args, via="agent", decision=decision, by_ref=who), child_trace(trace)
         if name in DESK_SCHEMAS:
             return self.desk_call(name, args, delegation), child_trace(trace)
         if name in JOBS:

@@ -21,7 +21,7 @@ from research_agent.service.delegation import require_owner
 from research_agent.llm import LLMClient, LLMError
 from research_agent.prowl_client import ProwlClient, ToolCallError
 from research_agent.runbook import RunbookError, get_runbook, list_runbooks
-from . import allowance
+from . import allowance, costs
 from .store import Store, Conflict, digest, now
 
 SECRET = re.compile(r"(?i)(authorization|password|api[_-]?key|access[_-]?token|secret|cookie)")
@@ -92,6 +92,14 @@ class ObservedProwl(ProwlClient):
             refused.cost_usd = 0.0
             refused.stops_run = True  # every later call hits the same limit
             raise refused
+        # The Costs section's limits (B-155): the emergency stop, the order's, the day's, the week's and the
+        # month's, read before the attempt is journaled. A refused call is never sent.
+        over = costs.refusal(self.store, self.job, allowance.TOOL_JOB_WORST_USD)
+        if over:
+            refused = ToolCallError(over + "; nothing was sent")
+            refused.cost_usd = 0.0
+            refused.stops_run = True  # every later call meets the same line
+            raise refused
         try:
             call = self.store.start_call(self.job["id"], "tool", arguments.get("tool_name", prowl_tool), scrub(arguments.get("params", {})))
         except Exception as exc:  # noqa: BLE001 — journal unavailable: do not dispatch
@@ -135,6 +143,9 @@ class ObservedLLM(LLMClient):
         # nothing and costs nothing, in the journal and the run ledger alike.
         if len(self.store.calls(self.job["id"])) >= 256:
             raise LLMError("Service call limit reached (256); nothing was sent", retryable=False)
+        over = costs.refusal(self.store, self.job, costs.llm_call_worst_usd(self.model_strong))
+        if over:
+            raise LLMError(over + "; nothing was sent", retryable=False)
 
     async def _post(self, payload, request_kwargs):
         call = self.store.start_call(self.job["id"], "llm", payload["model"],

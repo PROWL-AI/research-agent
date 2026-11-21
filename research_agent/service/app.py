@@ -18,6 +18,7 @@ from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Redire
 from starlette.routing import Route
 from starlette.middleware.base import BaseHTTPMiddleware
 from . import allowance
+from . import costs as costs_section
 from .delegation import DelegationPolicy, is_loopback, refusal_http
 from .identity import HEADER, SERVICE_ID, SERVICE_NAME
 from .protocol import CLOUD_DASHBOARD_SERVICE, DASHBOARD_SERVICE, EFFECTS, SEARCH_TOOL, Protocol, CAPABILITIES, artifact
@@ -29,6 +30,9 @@ from research_agent.agent import tool_limits
 from research_agent.evidence.store import COMPLETED, ArtifactStore
 
 STATIC = Path(__file__).parent / "static"
+#: The Costs section's operations, named in the well-known document so a host can offer the limit edit
+#: (pattern `costs-panel`: `spend.limits.set` in `surfaces.mcp.capabilities`, its own tool or behind execute).
+COSTS_CAPABILITIES = ["costs.panel", "spend.limits.set"]
 
 
 def code_digest():
@@ -52,6 +56,8 @@ DASHBOARD_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "
 #: fabric.job.* tools act on the caller's own jobs only (require_owner).
 SCOPE_OF = {"research.list_runbooks": "read", "research.artifact.get": "read", "research.tutorial": "read",
             "research.run": "research.run", "research.tools.call": "tools.call",
+            # the Costs section (B-155) is the operator's: no client key holds these scopes, so every client is refused
+            "costs.panel": "costs.read", "spend.limits.set": "costs.limits",
             # the issuing desk (B-121): only a desk key, and a desk key reaches nothing else
             "client.issue": "keys.issue", "client.rotate": "keys.issue", "client.revoke": "keys.issue", "client.list": "keys.issue"}
 
@@ -138,7 +144,7 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
         reasons = degraded()
         return {"protocol": "fabric-service/0.1", "service": {"id": SERVICE_ID, "instance": instance, "name": SERVICE_NAME, "version": __version__, "build": build},
                 "process": {"pid": os.getpid(), "startedAt": started}, "status": "stopping" if rt.stopping else "degraded" if reasons else "ready", "degraded": reasons,
-                "surfaces": {"dashboard": {"path": "/dashboard", "login": True}, "mcp": {"path": "/mcp", "transport": "streamable-http", "auth": "own", "capabilities": CAPABILITIES},
+                "surfaces": {"dashboard": {"path": "/dashboard", "login": True}, "mcp": {"path": "/mcp", "transport": "streamable-http", "auth": "own", "capabilities": CAPABILITIES + COSTS_CAPABILITIES},
                              "events": {"path": "/fabric/v1/events"}, "usage": {"path": "/fabric/v1/usage"}}, "update": {"available": None},
                 "extensions": {DASHBOARD_EXTENSION: {"minWidth": 360, "appearance": ["scheme", "theme"],
                                                      "themes": list(DASHBOARD_THEMES), "kit": DASHBOARD_KIT}},
@@ -278,7 +284,19 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
                     "delegation": job.get("delegation"), "via": job.get("via"), "runDir": job.get("runDir"),
                     "chainOwner": job.get("chainOwner"), "errorCode": (job.get("error") or {}).get("code"),
                     "costUsd": sum(costs) if costs else None, "unpricedCalls": sum(c["costUsd"] is None for c in calls), "calls": len(calls)})
-            return JSONResponse({"at": now(), "health": health(), "jobs": summaries, "config": store.config(), "usage": store.usage(instance), "runbooks": runbooks()})
+            return JSONResponse({"at": now(), "health": health(), "jobs": summaries, "config": store.config(), "usage": store.usage(instance), "runbooks": runbooks(),
+                                 "costs": costs_section.panel(store)})
+        if path == "/api/costs":
+            return JSONResponse(costs_section.panel(store))
+        if path == "/api/costs/limits" and request.method == "POST":
+            data = await body(request)
+            # The operator's own act in the authenticated dashboard: the typed reason is the recorded instruction.
+            decision = {"by": "operator", "via": "dashboard", "action": "spend.limits.set", "target": str(data.get("limitId")),
+                        "instruction": str(data.get("reason") or ""), "at": now()}
+            try:
+                return JSONResponse(costs_section.set_limit(store, data, via="dashboard", decision=decision, by_ref="operator"))
+            except costs_section.cp.Refused as exc:
+                return JSONResponse({"error": exc.message, "code": exc.code}, 400)
         if path == "/api/jobs" and request.method == "POST":
             data = await body(request)
             return JSONResponse(rt.create(data["request"], data["idempotencyKey"], via="dashboard"), 201)
@@ -304,7 +322,7 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
         ("/.well-known/fabric-service", ["GET"]), ("/fabric/v1/login-code", ["POST"]), ("/fabric/v1/login", ["GET"]),
         ("/fabric/v1/events", ["GET"]), ("/fabric/v1/usage", ["GET"]), ("/mcp", ["POST"]),
         ("/static/{name}", ["GET"]), ("/", ["GET"]), ("/dashboard", ["GET"]), ("/api/state", ["GET"]),
-        ("/api/jobs", ["POST"]), ("/api/jobs/{job_id}", ["GET", "POST"]), ("/api/config", ["POST"]), ("/api/artifact", ["GET"])]]
+        ("/api/jobs", ["POST"]), ("/api/jobs/{job_id}", ["GET", "POST"]), ("/api/config", ["POST"]), ("/api/artifact", ["GET"]), ("/api/costs", ["GET"]), ("/api/costs/limits", ["POST"])]]
     app = Starlette(routes=routes, lifespan=lifespan)
     app.state.runtime, app.state.store = rt, store
 

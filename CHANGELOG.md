@@ -4,6 +4,22 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.22 (2026-11-21)
+
+- The Costs section has limits (B-155; rule R33 O16, agents database D-74, `patterns/costs-panel` 1.0.0, board
+  request f9ec9aad, rollout row RO-865). The dashboard's «Расходы» shows the limits (an order, a UTC day, an ISO
+  week, a month, and the emergency stop for a day and a month) with what is counted against each, charts by week and
+  by month beside the daily one, a form that changes a limit and the history of changes. A limit is unset until a
+  person sets it; the emergency stop of USD 500 a day and USD 1000 a month is on from the start. **New behaviour on
+  the money path:** before every paid tool call and model call the service checks those limits, and a call that
+  would pass one is not sent ("Spend limit reached (…); nothing was sent"). A call without a price counts its worst
+  case, never zero. Two operations behind the doors, `costs.panel` and `spend.limits.set`: lowering is the caller's
+  act; raising, clearing or turning off needs the operator's decision; every change is a line of
+  `spend-limits.jsonl`. A cloud client key reaches neither. Proof: `tests/test_costs_section.py` (11 tests), the
+  suite 1003 passed (992 before), the WebKit dashboard run with the limits flow (`scripts/test-dashboard.mjs`). The
+  pattern module is vendored unchanged. Not in this change: the usage report's `budgets[]`, `limitChanges[]` and
+  `months[]`, which wait for a contract pin that carries DEC-0183 (B-158).
+
 ## 0.6.21 (2026-11-21)
 
 - The service's MCP listing is two doors (B-154; rule R33 O15, agents database D-72, `patterns/compact-mcp` 1.2.0,
