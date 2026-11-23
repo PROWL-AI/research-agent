@@ -1,5 +1,63 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-23: 0.6.23, organization keys and report memory (supersedes every "Exact next task" below)
+
+**Objective.** Board request `39a22ae6` from the Fabric CEO (thread `1e2456ed`, due 2026-11-26), the operator's order
+of 2026-11-23 10:02 UTC (Telegram, communicator message `46af1d97`), verbatim in the request: one key per
+organization from the operator's account, limit 1000, system keys that do not debit the balance and count at cost,
+a shared memory of each organization's reports, delivery through the PM agents, then revoke every old client key
+except the operator's personal one, and update every gateway copy.
+
+**Done.** B-160 in 0.6.23 (PR #136 `80b834d`, PR #137 `248d9f3`): client key class `organization` (`--org`, monthly
+ceiling 1000 USD by default, no daily ceiling, never from a desk), jobs owned by `org:<org>`, `research.reports.list`,
+a ready report of the same runbook and inputs (30 days) answered instead of a new paid run (`fresh: true` to force).
+Deployed and read back `0.6.23 ready degraded []`: prowl-research.cloud (Heroku v32), appvillis-prowl-research.cloud
+(copy `ec329c3`, Heroku v34), MacBook `prowl-research.default` (release `248d9f3507c4`), Studio daemons sshlg 18765
+and passioncode 18766. Keys issued straight into vaults (never printed): `org-appvillis` on the Appvillis cloud into
+studio-appvillis `ania-agent-appvillis/prod/PROWL_RESEARCH_ORG_KEY` and the space's own
+`appvillis-prowl-research/prod/PROWL_RESEARCH_KEY` (rotated); `org-passioncode` on prowl-research.cloud into
+studio-passioncode `passioncode-pm-agent/prod/PROWL_RESEARCH_ORG_KEY` and `prowl-research/prod/PROWL_RESEARCH_KEY`
+(rotated); seo-content-agent's `SEO_CONTENT_PROWL_KEY` rotated to the Appvillis key. Live probe from each space:
+`research.reports.list` answers its own organization. Delivery requests: Аня thread `f1fa76d9` (Zhenya included),
+PassionCode PM thread `822cb5e9`, seo-content-agent thread `0e4c064d`, due 2026-11-24 18:00 UTC.
+
+**Decisions.** `studio-sshlg` is the operator's personal key and stays. `studio-assessment` stays too: the company
+assessment agent is the operator's private agent assessing Appvillis people, and its reports must not land in
+Appvillis's shared memory. Аня's desk `ania` is revoked with the rest (the order: every old key except the personal
+one). Organization fields appear only on organization keys, so every other key reads as before. The Studio
+`assessment` space has no daemon (it uses prowl-research.cloud).
+
+Prowl behind the gateways (done the same day): prowl.chat T444 (PROWL-AI/prowl-app PR #68, `d82727db`, deployment
+`7db8c332` ACTIVE) added billing mode `system` (provider cost, the wallet never debited while the owner is an admin)
+and a monthly key limit. Issued from the operator's account through Observatory's Prowl door straight into the vault,
+then switched to `system` with a monthly limit of 1000 USD and no daily or total limit: `22c0ad1d` (`prowl_bdfc03`,
+slot `prowl-research-cloud/prod/PROWL_API_KEY`) and `769bd1d0` (`prowl_b81377`, slot
+`appvillis-com-appvillis-prowl-research/prod/PROWL_API_KEY`); `PROWL_API_KEY` set on both apps with the config key.
+Acceptance: one `dataforseo_serp_google_organic` call through each organization key started without a person
+(organization allowance), completed, the operator's balance stayed 658.0712, `22c0ad1d` counted 0.002 USD this month,
+`769bd1d0` was used at 10:50:33 (a cached answer, about 0). The old Prowl keys are revoked: `6dc0d905` (the PassionCode
+cloud's, standard price) and `7de4ff9b` (the Appvillis cloud's, on a QA account, standard price, last used before the
+switch).
+
+**Open.** (1) Revocation, after the PM agents confirm and by 2026-11-25 18:00 UTC: on prowl-research.cloud
+`studio-passioncode`; on the Appvillis cloud `ania`, `appvillis-catalogue`, `appvillis-p053da8fc`,
+`appvillis-p16add4a2`, `esim-vm`, `studio-appvillis`, `seo-content-agent` (`scripts/heroku_run.py <app>
+"prowl-research-service client revoke <name>"`). (2) The Observatory Prowl door (`tools/prowl.py issue`) knows only
+`standard` and `at_cost` and calls `/admin/mcp` without the trailing slash prowl.chat now redirects (307); this run
+used it through a wrapper that set the path and then called `admin_api_key_set_billing_mode` and `_set_limits`
+(board request to project-observatory). (3) Prowl's SearchAPI provider is out of its monthly searches
+(`google_news` answered 429 "used all of the searches for the month", job `pr-4ca4c44b541feaef26b5`; board request
+to 0xDEV).
+
+**Checks actually run.** Mac Studio, Python 3.11 (`ra-test` venv): `pytest tests/` 1021 passed, 1 skipped;
+`tests/test_org_keys.py` 19 passed; `ruff check .` clean; `scripts/check_add_only.py` ok; the copy's own suite 1021
+passed; the copy's org-transfer audit `ready` (it refused the first build on a personal key name in a test, fixed in
+PR #137).
+
+**Exact next task:** read the three delivery threads (`f1fa76d9`, `822cb5e9`, `0e4c064d`); on confirmation, and in
+any case by 2026-11-25 18:00 UTC, revoke the keys in Open (1), read both clouds' `client list` back, then complete
+board request `39a22ae6` with the evidence and close B-160.
+
 ## Current entry, 2026-11-21: 0.6.22, two doors and the Costs section's limits (supersedes every "Exact next task" below)
 
 **Objective.** Board request `f9ec9aad` from the agents database (thread `f8f63930`, due 2026-12-09): take rule R33
