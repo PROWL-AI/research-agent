@@ -16,6 +16,9 @@ from research_agent.service.delegation import owned_by
 from research_agent.service.runtime import Runtime
 from research_agent.service.store import Store
 
+#: every test here exercises the allowance itself (conftest turns it off elsewhere)
+pytestmark = pytest.mark.allowance
+
 ORIGIN = "https://research.example.test"
 RESEARCH = {"kind": "research", "runbook": "market-pulse", "inputs": {"market": "eSIM"}}
 
