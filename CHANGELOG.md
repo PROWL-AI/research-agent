@@ -4,6 +4,21 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.23 (2026-11-23)
+
+- Organization keys and the organization's report memory (B-160; the operator's word of 2026-11-23, relayed by the
+  Fabric CEO, board request 39a22ae6). A cloud client key of the new class `organization` belongs to one
+  organization (`--org`), has no daily ceiling and a monthly one per UTC month (1000 USD by default, 10 to 4000,
+  `client monthly`), and is issued only by the operator's tool, never by a desk. Its jobs belong to `org:<org>`, so
+  every key of that organization reads, cancels and resumes them and no other organization does. A paid job that
+  fits what is left of the organization's month starts at once; above it the job waits for the operator. New
+  operation `research.reports.list` (scope `read`, behind the doors) lists the organization's finished reports.
+  `research.run` by an organization key answers a ready report of the same runbook and inputs (case and spacing
+  ignored, at most 30 days old) instead of starting a new paid run, as `{"job": {..., "status": "completed"},
+  "reused": {...}}`; `fresh: true` asks for a new run. Keys of the other classes read as before, byte for byte.
+  `scripts/heroku_run.py` runs a one-off command through the Platform API with the deploy key (the CLI's
+  `heroku run` cannot). Proof: `tests/test_org_keys.py` (22 tests), the suite 1021 passed, 1 skipped (1003 before).
+
 ## 0.6.22 (2026-11-21)
 
 - The Costs section has limits (B-155; rule R33 O16, agents database D-74, `patterns/costs-panel` 1.0.0, board

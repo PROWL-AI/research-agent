@@ -66,6 +66,47 @@ they cost, and each decision keeps who spent (`client:<name>`) and the class. A 
 until it is reissued. A missing ceiling reads as `null` in `client list` and the desk's `client.list`, never 0;
 `client limit` on an interactive key is refused.
 
+## Organization keys (B-160)
+
+The operator's word of 2026-11-23 (relayed by the Fabric CEO, board request `39a22ae6`): one key per organization,
+issued from the operator's tool, shared by all its people through its PM agent, a limit of 1000, and one memory of
+the organization's reports.
+
+```sh
+# through a one-off dyno (scripts/heroku_run.py, the deploy key; see "One-off commands" below)
+prowl-research-service client add org-appvillis --class organization --org appvillis \
+  --scopes read,research.run,tools.call --raw      # --monthly-usd 1000 is the default
+prowl-research-service client monthly org-appvillis --monthly-usd 1500
+```
+
+- **Ceiling.** No daily ceiling; a monthly one per UTC calendar month (1000 USD by default, 10 to 4000), counted over
+  every job of the organization (`org:<org>`), whichever of its keys started it. A paid job whose worst case fits
+  what is left starts at once; above it the job waits for the operator on the cloud page. The service's own month
+  ledger (B-103) does not hold these jobs.
+- **Whose jobs.** A job of an organization key belongs to `org:<org>` (its principal); the key stays the caller. Any
+  key of that organization reads, cancels and resumes it; a key of another organization or a personal key does not
+  (`delegation.owned_by`).
+- **Report memory.** `research.reports.list` (scope `read`, behind the doors) lists the organization's finished
+  reports, newest first: id, runbook, inputs, who ran it, when. Before a new paid research run the service looks for
+  a completed run of the same runbook and inputs (case and spacing ignored, empty fields dropped) with its report,
+  at most 30 days old (`reports.REUSE_DAYS`): if there is one, `research.run` answers it as
+  `{"job": {"id": <that job>, "status": "completed"}, "reused": {...}}` and nothing is spent. `fresh: true` starts a
+  new run anyway. A personal key never reuses.
+- **Cost basis.** The gateway counts what Prowl bills its key. The Prowl key behind an organization's gateway is a
+  `system` key of the operator's account on prowl.chat: billed at provider cost and never debited from the wallet.
+- A desk never issues an organization key.
+
+## One-off commands without the Heroku CLI
+
+The `deploy` key cannot run `heroku run` (the CLI asks for `/account` first and gets "Couldn't find that user"), but
+the Platform API's `POST /apps/<app>/dynos` with `attach: true` accepts it. `scripts/heroku_run.py` creates the dyno
+and streams its output from the rendezvous; the key comes from the environment, never argv:
+
+```sh
+python "$(project-observatory full-path)/tools/use_secret.py" run --vault-only --env prod prowl-research-agent \
+  HEROKU_API_KEY -- python scripts/heroku_run.py prowl-research "prowl-research-service client list"
+```
+
 ## Issuing desk
 
 A team's key steward (for the Appvillis copy, the organization agent Аня) holds a desk key and issues the team's keys
