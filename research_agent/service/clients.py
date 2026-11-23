@@ -149,6 +149,14 @@ def _ceiling_of(key_class, stored) -> float | None:
     return max(float(DAILY_FLOOR_USD if stored is None else stored), DAILY_FLOOR_USD)
 
 
+def _with_org(record: dict, org, monthly_usd) -> dict:
+    """A record as read: an organization key adds its organization and monthly ceiling; any other key reads as
+    before 0.6.23, byte for byte."""
+    if record.get("keyClass") == ORG_CLASS:
+        record["org"], record["monthlyUsd"] = org, monthly_usd
+    return record
+
+
 def _usable(key) -> bool:
     return isinstance(key, str) and key.startswith(PREFIX) and 20 < len(key) < 200
 
@@ -298,9 +306,10 @@ class FileClients(DeskMixin):
         self._write(data)
 
     def list(self) -> list[dict]:
-        return [{"name": n, "scopes": c["scopes"], "prefix": c["prefix"], "createdAt": c["createdAt"], "revokedAt": c["revokedAt"],
-                 "dailyUsd": _ceiling_of(c.get("keyClass"), c.get("dailyUsd")), "keyClass": c.get("keyClass") or DEFAULT_CLASS,
-                 "issuedBy": c.get("issuedBy"), "org": c.get("org"), "monthlyUsd": c.get("monthlyUsd")}
+        return [_with_org({"name": n, "scopes": c["scopes"], "prefix": c["prefix"], "createdAt": c["createdAt"],
+                           "revokedAt": c["revokedAt"], "dailyUsd": _ceiling_of(c.get("keyClass"), c.get("dailyUsd")),
+                           "keyClass": c.get("keyClass") or DEFAULT_CLASS, "issuedBy": c.get("issuedBy")},
+                          c.get("org"), c.get("monthlyUsd"))
                 for n, c in sorted(self._load().items())]
 
     def _find(self, key) -> tuple[str | None, dict | None]:
@@ -329,8 +338,8 @@ class FileClients(DeskMixin):
         name, c = self._find(key)
         if c is None or c["revokedAt"]:
             return None
-        return {"name": name, "scopes": c["scopes"], "dailyUsd": _ceiling_of(c.get("keyClass"), c.get("dailyUsd")),
-                "keyClass": c.get("keyClass") or DEFAULT_CLASS, "org": c.get("org"), "monthlyUsd": c.get("monthlyUsd")}
+        return _with_org({"name": name, "scopes": c["scopes"], "dailyUsd": _ceiling_of(c.get("keyClass"), c.get("dailyUsd")),
+                          "keyClass": c.get("keyClass") or DEFAULT_CLASS}, c.get("org"), c.get("monthlyUsd"))
 
 
 class PostgresClients(DeskMixin):
@@ -463,9 +472,9 @@ class PostgresClients(DeskMixin):
             rows = cur.execute("SELECT name, scopes, prefix, created_at, revoked_at, daily_usd, issued_by, key_class, org, monthly_usd"
                                " FROM prowl_research_clients ORDER BY name").fetchall()
         db.commit()  # end the read transaction: an open one holds a lock that a later ALTER waits on (B-119)
-        return [{"name": r[0], "scopes": json.loads(r[1]), "prefix": r[2], "createdAt": r[3], "revokedAt": r[4],
-                 "dailyUsd": _ceiling_of(r[7], r[5]), "keyClass": r[7] or DEFAULT_CLASS, "issuedBy": r[6], "org": r[8],
-                 "monthlyUsd": r[9]} for r in rows]
+        return [_with_org({"name": r[0], "scopes": json.loads(r[1]), "prefix": r[2], "createdAt": r[3], "revokedAt": r[4],
+                           "dailyUsd": _ceiling_of(r[7], r[5]), "keyClass": r[7] or DEFAULT_CLASS, "issuedBy": r[6]}, r[8], r[9])
+                for r in rows]
 
     def _find(self, key):
         """The row the key is stored under (name, scopes, daily_usd, key_class, revoked_at, org, monthly_usd), rewriting a plain digest
@@ -495,8 +504,8 @@ class PostgresClients(DeskMixin):
         row = self._find(key)
         if row is None or row[4]:
             return None
-        return {"name": row[0], "scopes": json.loads(row[1]), "dailyUsd": _ceiling_of(row[3], row[2]),
-                "keyClass": row[3] or DEFAULT_CLASS, "org": row[5], "monthlyUsd": row[6]}
+        return _with_org({"name": row[0], "scopes": json.loads(row[1]), "dailyUsd": _ceiling_of(row[3], row[2]),
+                          "keyClass": row[3] or DEFAULT_CLASS}, row[5], row[6])
 
 
 def from_env(root: Path, environ=os.environ):
