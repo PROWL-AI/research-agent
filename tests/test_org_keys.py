@@ -81,7 +81,7 @@ def test_an_organizations_jobs_are_shared_by_its_keys_and_closed_to_others():
     assert owned_by(job, org("appvillis", "org-appvillis"))
     assert owned_by(job, org("appvillis", "org-appvillis-2"))  # a second key of the same organization
     assert not owned_by(job, org("passioncode", "org-passioncode"))
-    personal = {"principal": "client:studio-sshlg", "caller": "client:studio-sshlg", "tier": "client"}
+    personal = {"principal": "client:personal-key", "caller": "client:personal-key", "tier": "client"}
     assert not owned_by(job, personal)
     assert not owned_by({"delegation": personal}, org("appvillis", "org-appvillis"))
 
@@ -169,7 +169,7 @@ async def test_no_reuse_across_organizations_other_inputs_or_without_a_report(ru
 
 
 async def test_a_personal_key_never_reuses(runtime):
-    personal = {"principal": "client:studio-sshlg", "caller": "client:studio-sshlg", "tier": "client",
+    personal = {"principal": "client:personal-key", "caller": "client:personal-key", "tier": "client",
                 "keyClass": "interactive"}
     finished(runtime.store, RESEARCH, personal)
     job = runtime.create(RESEARCH, "k-personal", delegation=personal)
