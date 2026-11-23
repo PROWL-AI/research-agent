@@ -17,7 +17,7 @@ One version for the package, the service's well-known document and MCP `initiali
   ignored, at most 30 days old) instead of starting a new paid run, as `{"job": {..., "status": "completed"},
   "reused": {...}}`; `fresh: true` asks for a new run. Keys of the other classes read as before, byte for byte.
   `scripts/heroku_run.py` runs a one-off command through the Platform API with the deploy key (the CLI's
-  `heroku run` cannot). Proof: `tests/test_org_keys.py` (22 tests), the suite 1021 passed, 1 skipped (1003 before).
+  `heroku run` cannot). Proof: `tests/test_org_keys.py` (19 tests), the suite 1021 passed, 1 skipped (1003 before).
 
 ## 0.6.22 (2026-11-21)
 
