@@ -55,6 +55,7 @@ DASHBOARD_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "
 #: Which client-key scope each capability needs in the cloud (B-099 M3). The
 #: fabric.job.* tools act on the caller's own jobs only (require_owner).
 SCOPE_OF = {"research.list_runbooks": "read", "research.artifact.get": "read", "research.tutorial": "read",
+            "research.reports.list": "read",  # an organization's report memory (B-160)
             "research.run": "research.run", "research.tools.call": "tools.call",
             # the Costs section (B-155) is the operator's: no client key holds these scopes, so every client is refused
             "costs.panel": "costs.read", "spend.limits.set": "costs.limits",
@@ -165,8 +166,12 @@ def create_app(root: Path, host_token: str, agent_token: str | None, port=18764,
         if needed is not None and needed not in client["scopes"]:
             return {"ok": False, "code": "scope-not-granted", "detail": "client-key-scope"}
         who = "client:" + client["name"]
-        return {"ok": True, "tier": "client", "principal": who, "caller": who, "chain": [], "claims": None, "kid": None,
-                "dailyUsd": client.get("dailyUsd"), "keyClass": client.get("keyClass") or "automated"}
+        verdict = {"ok": True, "tier": "client", "principal": who, "caller": who, "chain": [], "claims": None, "kid": None,
+                   "dailyUsd": client.get("dailyUsd"), "keyClass": client.get("keyClass") or "automated"}
+        if verdict["keyClass"] == "organization" and client.get("org"):
+            # B-160: the organization is the principal, so its people share its jobs and reports; the key stays the caller
+            verdict.update(principal="org:" + client["org"], org=client["org"], monthlyUsd=client.get("monthlyUsd"))
+        return verdict
 
     def operator(request):
         return store.auth_valid("session", request.cookies.get(cookie, ""))

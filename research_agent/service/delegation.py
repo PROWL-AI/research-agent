@@ -132,12 +132,20 @@ class Refused(Exception):
         self.verdict = {"ok": False, "code": code, "detail": detail}
 
 
+#: The principal prefix of an organization key's jobs (B-160).
+ORG_PRINCIPAL = "org:"
+
+
 def owned_by(job: dict[str, Any], delegation: dict[str, Any] | None) -> bool:
     """A delegated caller acts only on jobs started for the same principal by the
     same caller, or on an operator's continuation of a chain it owns
     (`chainOwner`); the service's own token (no delegation) is the operator's floor."""
     if not delegation:
         return True
+    if str(delegation.get("principal") or "").startswith(ORG_PRINCIPAL):
+        # B-160: an organization's jobs are the organization's: any of its keys reads and reuses them, no other does
+        return any((who or {}).get("principal") == delegation["principal"]
+                   for who in (job.get("delegation"), job.get("chainOwner")) if who)
     me = (delegation["principal"], delegation["caller"])
     return any(((who or {}).get("principal"), (who or {}).get("caller")) == me
                for who in (job.get("delegation"), job.get("chainOwner")) if who)
@@ -158,4 +166,7 @@ def recorded(verdict: dict[str, Any]) -> dict[str, Any] | None:
         kept["dailyUsd"] = verdict["dailyUsd"]  # a cloud client's own ceiling (B-100)
     if verdict.get("keyClass"):
         kept["keyClass"] = verdict["keyClass"]  # interactive: no ceiling (K1)
+    if verdict.get("org"):
+        kept["org"] = verdict["org"]  # an organization key (B-160): its monthly ceiling governs the spend
+        kept["monthlyUsd"] = verdict.get("monthlyUsd")
     return kept

@@ -21,7 +21,7 @@ from research_agent.service.delegation import require_owner
 from research_agent.llm import LLMClient, LLMError
 from research_agent.prowl_client import ProwlClient, ToolCallError
 from research_agent.runbook import RunbookError, get_runbook, list_runbooks
-from . import allowance, costs
+from . import allowance, costs, reports
 from .store import Store, Conflict, digest, now
 
 SECRET = re.compile(r"(?i)(authorization|password|api[_-]?key|access[_-]?token|secret|cookie)")
@@ -192,8 +192,8 @@ def bounded(value, limit=64000):
 
 def validate_request(request):
     if not isinstance(request, dict) or set(request) - {"kind", "runbook", "inputs", "tool", "params", "context",
-                                                         "max_llm_usd", "resumeJobId"}:
-        raise ValueError("Request fields: kind, runbook, inputs, tool, params, context, max_llm_usd, resumeJobId")
+                                                         "max_llm_usd", "resumeJobId", "fresh"}:
+        raise ValueError("Request fields: kind, runbook, inputs, tool, params, context, max_llm_usd, resumeJobId, fresh")
     kind = request.get("kind")
     if kind not in {"research", "tool", "tutorial"}:
         raise ValueError("kind must be research, tool or tutorial")
@@ -217,8 +217,10 @@ def validate_request(request):
         if "resumeJobId" in request and (not isinstance(request["resumeJobId"], str)
                                          or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", request["resumeJobId"])):
             raise ValueError("resumeJobId must be a job id")
-    elif {"max_llm_usd", "resumeJobId"} & set(request):
-        raise ValueError("max_llm_usd and resumeJobId apply to research requests only")
+        if "fresh" in request and not isinstance(request["fresh"], bool):
+            raise ValueError("fresh must be true or false")
+    elif {"max_llm_usd", "resumeJobId", "fresh"} & set(request):
+        raise ValueError("max_llm_usd, resumeJobId and fresh apply to research requests only")
     if kind == "tool":
         if not isinstance(request.get("tool"), str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", request["tool"]):
             raise ValueError("Invalid tool name")
@@ -309,6 +311,12 @@ class Runtime:
         existing = self.store.replay(request, key, delegation)
         if existing is not None:
             return existing
+        # B-160: an organization's ready report of the same research answers instead of a new paid run.
+        ready = reports.ready_report(self.store, delegation, request)
+        if ready is not None:
+            self.store.event("job.reused", f"Готовый отчёт {ready['id']} организации отдан вместо нового прогона.", ready,
+                             "info", False)
+            return {**ready, "reused": True}
         refuse_known_limits(request)
         run_dir = chain_owner = None
         if request.get("resumeJobId"):

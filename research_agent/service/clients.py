@@ -29,8 +29,16 @@ DAILY_FLOOR_USD = 10.0
 #: K1 (the operator's word of 2026-11-13, DEC-0074 of the Appvillis keys plan): a key is `interactive` (a person, or an
 #: agent a person calls in that moment) and has no daily ceiling, or `automated` (a pipeline, a schedule) and keeps its
 #: ceiling. A key without a class reads as `automated`: it behaves as before until it is reissued.
-KEY_CLASSES = ("interactive", "automated")
+KEY_CLASSES = ("interactive", "automated", "organization")
 DEFAULT_CLASS = "automated"
+#: B-160 (the operator's word of 2026-11-23, relayed by the Fabric CEO, board request 39a22ae6): one `organization` key
+#: per organization, shared by all its people. It has no daily ceiling and a monthly one, 1000 USD by default; its jobs
+#: belong to the organization (`org:<org>`), so everyone holding it sees and reuses the organization's reports, and
+#: organizations never see each other's. Only the operator's tool issues one; a desk never does.
+ORG_CLASS = "organization"
+ORG_MONTHLY_DEFAULT_USD = 1000.0
+ORG_MONTHLY_MAX_USD = 4000.0  # the estate's own monthly ceiling (the operator's word of 2026-11-21)
+ORG = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 PREFIX = "prc_"
 NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
@@ -110,16 +118,33 @@ def _classed(key_class, daily_usd) -> tuple[str, float | None]:
     key_class = key_class or DEFAULT_CLASS
     if key_class not in KEY_CLASSES:
         raise ValueError("key class: " + " or ".join(KEY_CLASSES))
-    if key_class == "interactive":
+    if key_class in ("interactive", ORG_CLASS):
         if daily_usd is not None:
-            raise ValueError("an interactive key has no daily ceiling; issue it as automated to give it one")
+            raise ValueError(f"an {key_class} key has no daily ceiling; issue it as automated to give it one")
         return key_class, None
     return key_class, _ceiling(DAILY_FLOOR_USD if daily_usd is None else daily_usd)
 
 
+def _org_fields(key_class, org, monthly_usd) -> tuple[str | None, float | None]:
+    """(org, monthly ceiling) of an organization key; (None, None) for any other class, which takes neither."""
+    if key_class != ORG_CLASS:
+        if org is not None or monthly_usd is not None:
+            raise ValueError("an organization and a monthly ceiling belong to an organization key (class organization)")
+        return None, None
+    if not isinstance(org, str) or not ORG.match(org):
+        raise ValueError("organization: lowercase letters, digits and '-', up to 40 characters")
+    try:
+        monthly = float(ORG_MONTHLY_DEFAULT_USD if monthly_usd is None else monthly_usd)
+    except (TypeError, ValueError):
+        raise ValueError("monthly ceiling: a number of USD") from None
+    if not DAILY_FLOOR_USD <= monthly <= ORG_MONTHLY_MAX_USD:
+        raise ValueError(f"monthly ceiling: at least {DAILY_FLOOR_USD:g} and at most {ORG_MONTHLY_MAX_USD:g} USD per UTC month")
+    return org, monthly
+
+
 def _ceiling_of(key_class, stored) -> float | None:
-    """What a record's ceiling reads as: None for an interactive key, else never below the floor."""
-    if (key_class or DEFAULT_CLASS) == "interactive":
+    """What a record's ceiling reads as: None for an interactive or organization key, else never below the floor."""
+    if (key_class or DEFAULT_CLASS) in ("interactive", ORG_CLASS):
         return None
     return max(float(DAILY_FLOOR_USD if stored is None else stored), DAILY_FLOOR_USD)
 
@@ -162,6 +187,8 @@ class DeskMixin:
         scopes = _check(name, scopes or ["read"])
         if not set(scopes) <= set(d["grants"]):
             raise ValueError("scopes: this desk may give " + ", ".join(d["grants"]))
+        if key_class == ORG_CLASS:
+            raise ValueError("an organization key is issued by the operator's tool only")
         key_class, daily_usd = _classed(key_class, daily_usd)
         if daily_usd is not None and daily_usd > d["maxDailyUsd"]:
             raise ValueError(f"daily ceiling: this desk may give at most {d['maxDailyUsd']:g} USD per UTC day")
@@ -220,15 +247,17 @@ class FileClients(DeskMixin):
         data[name] = {"sha256": self.digests.of(key), "prefix": key[:12], "createdAt": _now(), "revokedAt": None, **record}
         self._write(data)
 
-    def add(self, name: str, scopes, daily_usd: float | None = None, key_class: str | None = None) -> str:
+    def add(self, name: str, scopes, daily_usd: float | None = None, key_class: str | None = None,
+            org: str | None = None, monthly_usd: float | None = None) -> str:
         scopes = _check(name, scopes)
         key_class, daily_usd = _classed(key_class, daily_usd)
+        org, monthly_usd = _org_fields(key_class, org, monthly_usd)
         data = self._load()
         if name in data:
             raise ValueError(f"client {name} exists; rotate it or choose another name")
         key = _new_key()
         data[name] = {"sha256": self.digests.of(key), "scopes": scopes, "prefix": key[:12], "createdAt": _now(), "revokedAt": None,
-                      "dailyUsd": daily_usd, "keyClass": key_class}
+                      "dailyUsd": daily_usd, "keyClass": key_class, "org": org, "monthlyUsd": monthly_usd}
         self._write(data)
         return key
 
@@ -246,9 +275,19 @@ class FileClients(DeskMixin):
         data = self._load()
         if name not in data or data[name]["revokedAt"]:
             raise KeyError(f"no active client {name}")
-        if data[name].get("keyClass") == "interactive":
-            raise ValueError(f"{name} is an interactive key and has no daily ceiling; issue an automated key to limit it")
+        if data[name].get("keyClass") in ("interactive", ORG_CLASS):
+            raise ValueError(f"{name} is an {data[name]['keyClass']} key and has no daily ceiling; issue an automated key to limit it")
         data[name]["dailyUsd"] = daily_usd
+        self._write(data)
+
+    def monthly(self, name: str, monthly_usd: float) -> None:
+        """Set an organization key's monthly ceiling (B-160)."""
+        data = self._load()
+        if name not in data or data[name]["revokedAt"]:
+            raise KeyError(f"no active client {name}")
+        if data[name].get("keyClass") != ORG_CLASS:
+            raise ValueError(f"{name} is not an organization key; only an organization key has a monthly ceiling")
+        data[name]["monthlyUsd"] = _org_fields(ORG_CLASS, data[name]["org"], monthly_usd)[1]
         self._write(data)
 
     def revoke(self, name: str) -> None:
@@ -261,7 +300,8 @@ class FileClients(DeskMixin):
     def list(self) -> list[dict]:
         return [{"name": n, "scopes": c["scopes"], "prefix": c["prefix"], "createdAt": c["createdAt"], "revokedAt": c["revokedAt"],
                  "dailyUsd": _ceiling_of(c.get("keyClass"), c.get("dailyUsd")), "keyClass": c.get("keyClass") or DEFAULT_CLASS,
-                 "issuedBy": c.get("issuedBy")} for n, c in sorted(self._load().items())]
+                 "issuedBy": c.get("issuedBy"), "org": c.get("org"), "monthlyUsd": c.get("monthlyUsd")}
+                for n, c in sorted(self._load().items())]
 
     def _find(self, key) -> tuple[str | None, dict | None]:
         """(name, record) the key is stored under, rewriting a plain digest under the pepper on the way (B-104)."""
@@ -290,7 +330,7 @@ class FileClients(DeskMixin):
         if c is None or c["revokedAt"]:
             return None
         return {"name": name, "scopes": c["scopes"], "dailyUsd": _ceiling_of(c.get("keyClass"), c.get("dailyUsd")),
-                "keyClass": c.get("keyClass") or DEFAULT_CLASS}
+                "keyClass": c.get("keyClass") or DEFAULT_CLASS, "org": c.get("org"), "monthlyUsd": c.get("monthlyUsd")}
 
 
 class PostgresClients(DeskMixin):
@@ -309,7 +349,9 @@ class PostgresClients(DeskMixin):
     DESK_COLUMNS = (("issued_by", "TEXT"), ("grants", "TEXT"), ("max_daily_usd", "DOUBLE PRECISION"),
                     # Added in 0.6.3 (K1): NULL reads as automated. `daily_usd` stays NOT NULL; an interactive key keeps
                     # the floor there and reads it as no ceiling.
-                    ("key_class", "TEXT"))
+                    ("key_class", "TEXT"),
+                    # Added in 0.6.23 (B-160): an organization key's organization and monthly ceiling, NULL otherwise.
+                    ("org", "TEXT"), ("monthly_usd", "DOUBLE PRECISION"))
 
     def __init__(self, connect: Callable, pepper: str | None = None):
         self.connect = connect
@@ -354,17 +396,20 @@ class PostgresClients(DeskMixin):
                          record.get("keyClass") or DEFAULT_CLASS))
         db.commit()
 
-    def add(self, name: str, scopes, daily_usd: float | None = None, key_class: str | None = None) -> str:
+    def add(self, name: str, scopes, daily_usd: float | None = None, key_class: str | None = None,
+            org: str | None = None, monthly_usd: float | None = None) -> str:
         scopes = _check(name, scopes)
         key_class, daily_usd = _classed(key_class, daily_usd)
+        org, monthly_usd = _org_fields(key_class, org, monthly_usd)
         db = self._db()
         with db.cursor() as cur:
             if cur.execute("SELECT 1 FROM prowl_research_clients WHERE name=%s", (name,)).fetchone():
                 raise ValueError(f"client {name} exists; rotate it or choose another name")
             key = _new_key()
-            cur.execute("INSERT INTO prowl_research_clients(name, sha256, scopes, prefix, created_at, revoked_at, daily_usd, key_class)"
-                        " VALUES (%s,%s,%s,%s,%s,NULL,%s,%s)", (name, self.digests.of(key), json.dumps(scopes), key[:12], _now(),
-                                                               DAILY_FLOOR_USD if daily_usd is None else daily_usd, key_class))
+            cur.execute("INSERT INTO prowl_research_clients(name, sha256, scopes, prefix, created_at, revoked_at, daily_usd, key_class,"
+                        " org, monthly_usd) VALUES (%s,%s,%s,%s,%s,NULL,%s,%s,%s,%s)",
+                        (name, self.digests.of(key), json.dumps(scopes), key[:12], _now(),
+                         DAILY_FLOOR_USD if daily_usd is None else daily_usd, key_class, org, monthly_usd))
         db.commit()
         return key
 
@@ -385,9 +430,23 @@ class PostgresClients(DeskMixin):
             row = cur.execute("SELECT key_class FROM prowl_research_clients WHERE name=%s AND revoked_at IS NULL", (name,)).fetchone()
             if not row:
                 raise KeyError(f"no active client {name}")
-            if row[0] == "interactive":
-                raise ValueError(f"{name} is an interactive key and has no daily ceiling; issue an automated key to limit it")
+            if row[0] in ("interactive", ORG_CLASS):
+                raise ValueError(f"{name} is an {row[0]} key and has no daily ceiling; issue an automated key to limit it")
             cur.execute("UPDATE prowl_research_clients SET daily_usd=%s WHERE name=%s", (daily_usd, name))
+        db.commit()
+
+    def monthly(self, name: str, monthly_usd: float) -> None:
+        """Set an organization key's monthly ceiling (B-160)."""
+        db = self._db()
+        with db.cursor() as cur:
+            row = cur.execute("SELECT key_class, org FROM prowl_research_clients WHERE name=%s AND revoked_at IS NULL",
+                              (name,)).fetchone()
+            if not row:
+                raise KeyError(f"no active client {name}")
+            if row[0] != ORG_CLASS:
+                raise ValueError(f"{name} is not an organization key; only an organization key has a monthly ceiling")
+            cur.execute("UPDATE prowl_research_clients SET monthly_usd=%s WHERE name=%s",
+                        (_org_fields(ORG_CLASS, row[1], monthly_usd)[1], name))
         db.commit()
 
     def revoke(self, name: str) -> None:
@@ -401,18 +460,19 @@ class PostgresClients(DeskMixin):
     def list(self) -> list[dict]:
         db = self._db()
         with db.cursor() as cur:
-            rows = cur.execute("SELECT name, scopes, prefix, created_at, revoked_at, daily_usd, issued_by, key_class"
+            rows = cur.execute("SELECT name, scopes, prefix, created_at, revoked_at, daily_usd, issued_by, key_class, org, monthly_usd"
                                " FROM prowl_research_clients ORDER BY name").fetchall()
         db.commit()  # end the read transaction: an open one holds a lock that a later ALTER waits on (B-119)
         return [{"name": r[0], "scopes": json.loads(r[1]), "prefix": r[2], "createdAt": r[3], "revokedAt": r[4],
-                 "dailyUsd": _ceiling_of(r[7], r[5]), "keyClass": r[7] or DEFAULT_CLASS, "issuedBy": r[6]} for r in rows]
+                 "dailyUsd": _ceiling_of(r[7], r[5]), "keyClass": r[7] or DEFAULT_CLASS, "issuedBy": r[6], "org": r[8],
+                 "monthlyUsd": r[9]} for r in rows]
 
     def _find(self, key):
-        """The row the key is stored under (name, scopes, daily_usd, key_class, revoked_at), rewriting a plain digest
+        """The row the key is stored under (name, scopes, daily_usd, key_class, revoked_at, org, monthly_usd), rewriting a plain digest
         under the pepper on the way (B-104)."""
         wanted, legacy = self.digests.of(key), self.digests.legacy(key)
         db = self._db()
-        query = "SELECT name, scopes, daily_usd, key_class, revoked_at FROM prowl_research_clients WHERE sha256=%s"
+        query = "SELECT name, scopes, daily_usd, key_class, revoked_at, org, monthly_usd FROM prowl_research_clients WHERE sha256=%s"
         with db.cursor() as cur:
             row = cur.execute(query, (wanted,)).fetchone()
             if row is None and legacy is not None:
@@ -436,7 +496,7 @@ class PostgresClients(DeskMixin):
         if row is None or row[4]:
             return None
         return {"name": row[0], "scopes": json.loads(row[1]), "dailyUsd": _ceiling_of(row[3], row[2]),
-                "keyClass": row[3] or DEFAULT_CLASS}
+                "keyClass": row[3] or DEFAULT_CLASS, "org": row[5], "monthlyUsd": row[6]}
 
 
 def from_env(root: Path, environ=os.environ):
