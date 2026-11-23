@@ -6,7 +6,7 @@ import json
 import logging
 from urllib.parse import quote
 from jsonschema import Draft202012Validator
-from . import costs
+from . import costs, reports
 from .delegation import Refused, recorded, refusal_tool_result, require_owner
 from .runtime import child_trace, run_dir_name, runbooks
 from .store import Conflict
@@ -37,7 +37,11 @@ SCHEMAS = {
                                                       "unset: the service's RESEARCH_MAX_LLM_USD, the runbook's, else 5."},
                           resumeJobId={"type": "string", "minLength": 1, "maxLength": 128,
                                        "description": "Continue the run of an ended research job of the same runbook: "
-                                                      "saved evidence is reused, nothing already paid is dispatched again."}),
+                                                      "saved evidence is reused, nothing already paid is dispatched again."},
+                          fresh={"type": "boolean",
+                                 "description": "Organization keys: true starts a new paid run even when the organization "
+                                                "already holds a ready report of the same runbook and inputs; unset, that "
+                                                "report is answered (reused) and nothing is spent."}),
                      ["idempotencyKey", "runbook", "inputs"]),
  "research.tools.call": obj(dict(COMMON, tool=STRING, params={"type": "object"}), ["idempotencyKey", "tool", "params"]),
  "research.tutorial": obj(COMMON, ["idempotencyKey"]),
@@ -72,6 +76,15 @@ COSTS_SCHEMAS = {
                              "enforced": {"type": "boolean"}, "reason": {"type": "string", "minLength": 1, "maxLength": 500},
                              "idempotencyKey": STRING}, ["limitId", "reason", "idempotencyKey"]), "minProperties": 4},
 }
+#: An organization's report memory (B-160): read with any key holding `read`; an organization key lists its
+#: organization's reports, any other key its own.
+REPORTS_SCHEMAS = {
+ "research.reports.list": obj({"runbook": STRING, "query": {"type": "string", "maxLength": 200},
+                               "limit": {"type": "integer", "minimum": 1, "maximum": 100}}),
+}
+REPORTS_DESCRIPTIONS = {
+ "research.reports.list": "List the finished research reports of the caller's organization (an organization key) or its own, newest first: id, runbook, inputs, who ran it, when. Read one with research.artifact.get.",
+}
 COSTS_DESCRIPTIONS = {
  "costs.panel": "Spend by UTC day, ISO week and month with chart series, the limits in force, the emergency stop and the last limit changes.",
  "spend.limits.set": "Change one spending limit: its limitUsd (null clears it), its enforced, or both. Lowering or a first amount is the caller's act; raising, clearing or turning off needs the operator's words in _meta.decision.",
@@ -84,7 +97,9 @@ JOBS = {"research.run", "research.tools.call", "research.tutorial"}
 # their complete constraints. This self-contained union keeps clients usable offline.
 RESULT_SCHEMA = {"type": "object", "required": ["id", "contractVersion", "outcome", "done", "proof", "scope", "notVerified", "artifacts", "createdAt", "producer", "output", "usage"],
                  "properties": {"output": {"type": "object"}}}
-HANDLE_SCHEMA = obj({"job": obj({"id": dict(STRING, pattern="^[A-Za-z0-9._:-]+$"), "status": {"const": "working"}}, ["id", "status"])}, ["job"])
+HANDLE_SCHEMA = obj({"job": obj({"id": dict(STRING, pattern="^[A-Za-z0-9._:-]+$"), "status": {"enum": ["working", "completed"]}}, ["id", "status"]),
+                    # B-160: an organization's ready report answered instead of a new run (status completed)
+                    "reused": obj({"id": STRING, "completedAt": {"type": "string"}, "by": {"type": ["string", "null"]}})}, ["job"])
 
 
 OUTPUTS = {name: {"$id": BASE + name + ".output.json", **({"type": "object"} if name in JOBS else RESULT_SCHEMA)} for name in CAPABILITIES}
@@ -95,7 +110,8 @@ def tool_effect(name):
     return "charge" if name in {"research.run", "research.tools.call"} else "draft" if name in JOBS else "none"
 
 
-EFFECTS = {name: tool_effect(name) for name in SCHEMAS} | {"costs.panel": "none", "spend.limits.set": "draft"}
+EFFECTS = {name: tool_effect(name) for name in SCHEMAS} | {"costs.panel": "none", "spend.limits.set": "draft",
+                                                            "research.reports.list": "none"}
 
 
 def tools_list(desk=False):
@@ -114,6 +130,10 @@ def tools_list(desk=False):
             "inputSchema": schema, "outputSchema": out,
             "annotations": {"readOnlyHint": effect == "none" and name != "fabric.job.cancel", "destructiveHint": effect not in {"none", "draft"},
                             "idempotentHint": True, "openWorldHint": effect == "charge"}})
+    for name, schema in REPORTS_SCHEMAS.items():
+        tools.append({"name": name, "description": REPORTS_DESCRIPTIONS[name], "inputSchema": schema,
+                      "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True,
+                                      "openWorldHint": False}})
     for name, schema in COSTS_SCHEMAS.items():
         tools.append({"name": name, "description": COSTS_DESCRIPTIONS[name], "inputSchema": schema,
                       "annotations": {"readOnlyHint": name == "costs.panel", "destructiveHint": False,
@@ -143,6 +163,7 @@ PURPOSES = {
  "research.tutorial": "Create a clearly labeled synthetic learning job; it never contacts a provider and costs nothing.",
  "research.list_runbooks": "List the runbooks with their typed inputs and tool budgets.",
  "research.artifact.get": "Read one artifact (report.md, ledger.json, checkpoint.json, result.json) of the caller's own job.",
+ "research.reports.list": "List the finished reports of the caller's organization (or its own), newest first, to reuse one before ordering a new run.",
  "costs.panel": "Read the Costs section: spend by UTC day, ISO week and month with chart series, the limits, the emergency stop and the last changes.",
  "spend.limits.set": "Change one spending limit. Lowering or a first amount is the caller's act; raising, clearing or turning off needs the operator's words in _meta.decision.",
  "client.issue": "Issue a client key within this desk's grants and ceiling; the key is in the answer once. Desk keys only.",
@@ -156,6 +177,7 @@ EXAMPLES = {
  "research.tutorial": {"idempotencyKey": "tutorial-1"},
  "research.list_runbooks": {},
  "research.artifact.get": {"id": "pr-0123456789abcdef0123", "name": "report.md"},
+ "research.reports.list": {"runbook": "market-pulse", "query": "ai sdr"},
  "costs.panel": {},
  "spend.limits.set": {"limitId": "costs.day", "limitUsd": 25, "reason": "A day's research fits 25 USD.", "idempotencyKey": "day-limit-2026-11-21"},
  "client.issue": {"name": "anna-laptop", "scopes": ["read", "research.run"], "class": "interactive"},
@@ -176,7 +198,7 @@ def operation_idempotency(name):
 
 def operation_names(desk=False):
     """Every operation behind the doors, in declared order: the capabilities, then the desk's when it is served."""
-    return list(CAPABILITIES) + list(COSTS_SCHEMAS) + (list(DESK_SCHEMAS) if desk else [])
+    return list(CAPABILITIES) + list(REPORTS_SCHEMAS) + list(COSTS_SCHEMAS) + (list(DESK_SCHEMAS) if desk else [])
 
 
 def compact_surface(desk=False, usage=None):
@@ -327,12 +349,12 @@ class Protocol:
                     via = "execute"
                     operation, result, stored_trace, settled = self.execute(args, meta, authorize, desk)
                     trace = stored_trace or trace
-                elif name in SCHEMAS or name in COSTS_SCHEMAS or (desk and name in DESK_SCHEMAS):
+                elif name in SCHEMAS or name in COSTS_SCHEMAS or name in REPORTS_SCHEMAS or (desk and name in DESK_SCHEMAS):
                     # a job tool is listed; an operation's own name left the listing and still answers (R28)
                     operation, via = name, "direct" if name in JOB_TOOLS or surface == FULL_SURFACE else "name"
                     result, stored_trace, settled = self.run_tool(name, args, meta, authorize, desk)
                     trace = stored_trace or trace
-                    if via == "name" and name not in COSTS_SCHEMAS:  # the Costs operations never had a listed name
+                    if via == "name" and name not in COSTS_SCHEMAS and name not in REPORTS_SCHEMAS:  # never had a listed name
                         result.setdefault("_meta", {})["retired"] = {"since": RETIRED_SINCE, "replacedBy": EXECUTE_TOOL}
                 else:
                     return self.error(rid, -32602, "Unknown tool"), 400
@@ -352,7 +374,7 @@ class Protocol:
     def run_tool(self, name, args, meta, authorize, desk):
         """One operation by its own name, the one path every route takes: the caller's gate for this operation,
         its input schema, then the call. Answers (result, the stored trace, whether a gate refused)."""
-        schemas = SCHEMAS | COSTS_SCHEMAS | (DESK_SCHEMAS if desk else {})
+        schemas = SCHEMAS | COSTS_SCHEMAS | REPORTS_SCHEMAS | (DESK_SCHEMAS if desk else {})
         trace = child_trace(meta.get("traceparent"))
         verdict = authorize(name) if authorize is not None else {"ok": True}
         if not verdict.get("ok"):
@@ -441,10 +463,18 @@ class Protocol:
             return costs.set_limit(rt.store, args, via="agent", decision=decision, by_ref=who), child_trace(trace)
         if name in DESK_SCHEMAS:
             return self.desk_call(name, args, delegation), child_trace(trace)
+        if name == "research.reports.list":
+            return reports.listing(rt.store, delegation, args.get("runbook"), args.get("query"),
+                                   args.get("limit") or reports.LIST_LIMIT), child_trace(trace)
         if name in JOBS:
             req = {k: v for k,v in args.items() if k != "idempotencyKey"}
             req["kind"] = {"research.run": "research", "research.tools.call": "tool", "research.tutorial": "tutorial"}[name]
             job = rt.create(req, args["idempotencyKey"], trace, delegation=delegation)
+            if job.get("reused"):
+                summary = reports.summary(job)
+                return ({"job": {"id": job["id"], "status": "completed"},
+                         "reused": {"id": job["id"], "completedAt": summary["completedAt"], "by": summary["by"]}},
+                        job.get("traceparent"))
             return {"job": {"id": job["id"], "status": "working"}}, job.get("traceparent")
         if name.startswith("fabric.job."):
             if args.get("inputResponses"):

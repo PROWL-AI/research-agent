@@ -59,6 +59,7 @@ same check). The table below is the operations, reached through `research.execut
 | `research.artifact.get` | id, name | bounded report.md / ledger.json / checkpoint.json / result.json |
 | `fabric.job.get` | id | state, decision link or result envelope |
 | `fabric.job.cancel` | id | terminal cancellation; no promise of upstream refund |
+| `research.reports.list` | runbook?, query?, limit? | the caller's organization's finished reports, newest first (behind the doors; since 0.6.23, B-160) |
 | `costs.panel` | empty object | the Costs section, `costs-panel/1` (behind the doors; since 0.6.22) |
 | `spend.limits.set` | limitId, limitUsd and/or enforced, reason, idempotencyKey; the operator's words in `_meta.decision` to raise, clear or turn off | `{change, repeated}`; the change as recorded (behind the doors; since 0.6.22) |
 

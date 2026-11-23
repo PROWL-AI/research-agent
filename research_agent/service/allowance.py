@@ -15,6 +15,10 @@ job waits for the operator as before.
   person or an agent a person calls in that moment, has no ceiling. Its job starts at once, whatever it costs, and its
   decision keeps who spent (the principal) and the class. An `automated` key, and a key without a class, keeps its
   ceiling.
+- B-160 (the operator's word of 2026-11-23, relayed by the Fabric CEO, board request 39a22ae6): an `organization` key
+  has no daily ceiling and a monthly one (1000 USD by default). Its job starts at once when its worst case fits what
+  is left of the organization's UTC month, counted over every job of `org:<org>`; above it the job waits for the
+  operator. The service's own month ledger (B-103) does not hold it: the key's own ceiling governs it.
 - B-103: every job the allowance approves for the service's own agents (not a cloud client key, which keeps the
   ceiling issued with it) also reserves its worst case in the month ledger (the agents database pattern
   `spend-ledger` 1.3.0, vendored unchanged): one UTC-month stop across those agents at 95 % of
@@ -149,6 +153,15 @@ def spent_today(store, principal: str, day: str | None = None) -> float:
     return total
 
 
+def this_month() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m")
+
+
+def spent_this_month(store, principal: str, month: str | None = None) -> float:
+    """What a principal's approved jobs of a UTC month cost (their worst case while a call is unpriced)."""
+    return spent_today(store, principal, month or this_month())
+
+
 def ceiling_for(job: dict[str, Any], settings: dict[str, Any]) -> float | None:
     """A cloud client's own ceiling (never below the floor), none for its interactive key (K1), else the service's
     setting for local agents."""
@@ -168,6 +181,14 @@ def verdict(store, job: dict[str, Any]) -> dict[str, Any] | None:
     worst = worst_case_usd(job["request"])
     if worst == 0.0:
         return {"by": "allowance", "principal": principal, "worstCaseUsd": 0.0, "reason": "free"}
+    delegation = job.get("delegation") or {}
+    if delegation.get("tier") == "client" and delegation.get("keyClass") == "organization":
+        monthly = float(delegation.get("monthlyUsd") or 0.0)
+        spent_month = spent_this_month(store, principal)
+        if monthly <= OFF or spent_month + worst > monthly:
+            return None
+        return {"by": "allowance", "principal": principal, "worstCaseUsd": round(worst, 4), "keyClass": "organization",
+                "spentMonthUsd": round(spent_month, 4), "monthlyCeilingUsd": monthly}
     ceiling = ceiling_for(job, job.get("config") or {})
     spent = spent_today(store, principal)
     if ceiling is None:  # an interactive key: measured and shown, never held (K1)

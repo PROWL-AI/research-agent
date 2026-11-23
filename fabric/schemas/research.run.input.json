@@ -53,6 +53,10 @@
       "minLength": 1,
       "maxLength": 128,
       "description": "Continue the run of an ended research job of the same runbook: saved evidence is reused, nothing already paid is dispatched again."
+    },
+    "fresh": {
+      "type": "boolean",
+      "description": "Organization keys: true starts a new paid run even when the organization already holds a ready report of the same runbook and inputs; unset, that report is answered (reused) and nothing is spent."
     }
   },
   "required": [
