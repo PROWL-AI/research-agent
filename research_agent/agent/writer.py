@@ -677,7 +677,7 @@ async def write_report(
                 raise
             log.warning("writer draft still truncated at max_tokens=%d; shipping the partial draft",
                         _DRAFT_ESCALATED_MAX_TOKENS)
-            return truncated + "\n\n*(Report truncated at the model's output limit.)*"
+            return strip_preface(truncated) + "\n\n*(Report truncated at the model's output limit.)*"
         # B-122 and B-128: the larger budget went to reasoning, and the draft came back empty (moonshotai/kimi-k3.1-pro
         # on the 90-step teardown) or cut (the same model, accept-subscription-20261021b, shipped partial with 4 lint
         # issues). The same request once more with reasoning off, as the repair pass does (B-062); if that is cut too,
@@ -704,7 +704,7 @@ async def write_report(
             "writer draft still truncated at max_tokens=%d; shipping the partial draft",
             _DRAFT_ESCALATED_MAX_TOKENS,
         )
-        return truncated + "\n\n*(Report truncated at the model's output limit.)*"
+        return strip_preface(truncated) + "\n\n*(Report truncated at the model's output limit.)*"
 
 
 _REPAIR_MAX_LINES = 60
