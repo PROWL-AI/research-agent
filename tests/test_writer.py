@@ -343,6 +343,30 @@ async def test_an_empty_patch_deletes_its_line(tmp_path):
     assert (await repair_report(Delete(), draft, lint, Ledger(tmp_path / "ledger.json"))).rstrip() == "# R\n\nKeep."
 
 
+async def test_a_repair_that_thinks_aloud_keeps_the_draft(tmp_path):
+    """B-163: `pr-7babcb17c97b4ea396a3` shipped the repair model's reasoning as its report.md: no `L<n>:` line at the
+    start of a line, so it was taken as a whole-report rewrite."""
+    from research_agent.agent.writer import LintIssue, LintResult, repair_report
+    from research_agent.evidence.ledger import Ledger
+
+    draft = "# R\n\nKeep.\n\n2. \"A quoted title,\" dated 2026-11-10 [C1].\n"
+    lint = LintResult(issues=[LintIssue(kind="quote_not_in_ledger", text="A quoted title", detail="paraphrase",
+                                        context="A quoted title")])
+
+    class Thinks:
+        async def complete(self, messages, **kwargs):
+            return ("I need repair line L4 only. Could write: `L4: 2. A news item, dated 2026-11-10 [C1].` "
+                    "But maybe paraphrase more.")
+
+    class Rewrites:
+        async def complete(self, messages, **kwargs):
+            return "# R\n\nKeep.\n\n2. A news item, dated 2026-11-10 [C1].\n"
+
+    ledger = Ledger(tmp_path / "ledger.json")
+    assert await repair_report(Thinks(), draft, lint, ledger) == draft
+    assert (await repair_report(Rewrites(), draft, lint, ledger)).startswith("# R")
+
+
 def test_drafting_residue_inside_a_citation_is_a_lint_issue(tmp_path):
     """B-068: accept-subscription-20261021b shipped a hesitation inside a citation."""
     from research_agent.agent.writer import lint_report
