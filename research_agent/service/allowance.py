@@ -26,9 +26,19 @@ job waits for the operator as before.
   operator, as above the day ceiling. When the job ends the hold settles to what it cost (the worst case while a call
   is unpriced), or is released when it ended before any call. Every change is a line of a hash-chained journal,
   `spend-ledger.jsonl` in the data root. Interactive keys (K1) and the operator's own jobs are not held.
+- B-167, development mode (the operator's word of 2026-11-23, «режим разработки ... всё выпускаем по готовности, без
+  каких-либо задержек», and of 2026-11-24, relayed by the Fabric CEO after the hanging-approvals audit of request
+  8bbb6559: «не должно быть такого, что работа где-то там стопается и зависает»; the run line of 2026-11-17,
+  «лимит в 100 долларов за ролик. Если выше заходим, тогда спрашиваем, действительно мы хотим или это ошибка»):
+  with `PROWL_RESEARCH_APPROVAL_MODE=none`, the default, every job whose worst case is within the run line
+  (`PROWL_RESEARCH_RUN_LINE_USD`, 100 by default) starts at once, whoever created it, the dashboard included; the
+  daily, monthly and month-ledger ceilings above do not hold it. Only a job over the line waits, asking whether it is
+  meant. The emergency stop is still checked before every paid call (`costs.py`). `operator` is the production mode:
+  everything above, as before.
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -46,6 +56,22 @@ UNREADABLE_WORST_USD = 1_000_000.0
 OFF = 0.0
 
 TERMINAL = {"completed", "failed", "cancelled"}
+#: B-167: the approval mode (`none`: development, the default; `operator`: production) and the run line, USD per job.
+APPROVAL_MODES = ("none", "operator")
+RUN_LINE_DEFAULT_USD = 100.0
+
+
+def approval_mode(environ=os.environ) -> str:
+    mode = (environ.get("PROWL_RESEARCH_APPROVAL_MODE") or "none").strip().lower()
+    return mode if mode in APPROVAL_MODES else "operator"  # an unknown word is read as the stricter mode
+
+
+def run_line_usd(environ=os.environ) -> float:
+    try:
+        line = float(environ.get("PROWL_RESEARCH_RUN_LINE_USD") or RUN_LINE_DEFAULT_USD)
+    except ValueError:
+        return RUN_LINE_DEFAULT_USD
+    return line if line > 0 else RUN_LINE_DEFAULT_USD
 #: The month ledger's journal in the data root (the cloud's snapshot keeps it with the job store).
 LEDGER_FILE = "spend-ledger.jsonl"
 
@@ -176,6 +202,12 @@ def ceiling_for(job: dict[str, Any], settings: dict[str, Any]) -> float | None:
 def verdict(store, job: dict[str, Any]) -> dict[str, Any] | None:
     """The allowance's decision for a new job, or None when the job waits for the operator."""
     principal = principal_of(job)
+    if approval_mode() == "none":  # B-167: development mode, the run line alone
+        worst, line = worst_case_usd(job["request"]), run_line_usd()
+        if worst > line:
+            return None
+        return {"by": "development-mode", "principal": principal or "operator", "worstCaseUsd": round(worst, 4),
+                "runLineUsd": line}
     if principal is None:
         return None
     worst = worst_case_usd(job["request"])

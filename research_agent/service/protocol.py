@@ -328,7 +328,7 @@ class Protocol:
             trace = child_trace(meta.get("traceparent"))
             info = {"name": SERVICE_ID, "version": __version__, "title": SERVICE_NAME}
             if method == "initialize":
-                result = {"protocolVersion": params.get("protocolVersion") if params.get("protocolVersion") in SUPPORTED else "2025-11-25", "capabilities": {"tools": {}}, "serverInfo": info, "instructions": "Call research.search for the operations, then research.execute to run one (start with research.list_runbooks). Jobs require operator review. Never retry paid failures blindly. Degraded reasons are at the service well-known endpoint."}
+                result = {"protocolVersion": params.get("protocolVersion") if params.get("protocolVersion") in SUPPORTED else "2025-11-25", "capabilities": {"tools": {}}, "serverInfo": info, "instructions": "Call research.search for the operations, then research.execute to run one (start with research.list_runbooks). In development mode a job within the run line (USD 100) starts at once; a job over it waits to be confirmed. Never retry paid failures blindly. Degraded reasons are at the service well-known endpoint."}
             elif method == "server/discover":
                 result = {"resultType": "complete", "_meta": {META + "serverInfo": info}, "supportedVersions": SUPPORTED, "capabilities": {"tools": {}}, "instructions": "research.search lists the operations, research.execute runs one. Use jobs and poll fabric.job.get; operator approval in Fabric Dashboards."}
             elif method == "ping":

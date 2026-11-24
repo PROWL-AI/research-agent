@@ -179,6 +179,8 @@ class Store:
                 text = "Запрос отклонён до выполнения."
             elif decision["by"] == "allowance" and decision.get("keyClass") == "interactive":
                 text = "Запуск по ключу без лимита: трата записана на вызывающего."
+            elif decision["by"] == "development-mode":
+                text = "Запуск в режиме разработки: без проверки человеком, в пределах линии за прогон."
             elif decision["by"] == "allowance":
                 text = "Запуск разрешён дневным лимитом вызывающего агента."
             else:

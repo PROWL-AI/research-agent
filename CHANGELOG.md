@@ -4,6 +4,19 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.27 (2026-11-24)
+
+- Development mode: no job waits for a person within the run line (B-167; the operator's word of 2026-11-24, relayed by
+  the Fabric CEO after the hanging-approvals audit of request 8bbb6559, «не должно быть такого, что работа где-то там
+  стопается и зависает»). `PROWL_RESEARCH_APPROVAL_MODE` is `none` by default: every paid job whose worst case is
+  within `PROWL_RESEARCH_RUN_LINE_USD` (100 by default) starts at once, whoever created it, the dashboard included,
+  recorded as `{"by": "development-mode", "runLineUsd": ...}`; a key's daily or monthly ceiling and the agents' month
+  ledger do not hold it. A job over the line waits to be confirmed. The emergency stop (USD 500 a day, 1000 a month)
+  is still checked before every paid call. `operator` is production mode, the previous behaviour; an unknown value
+  reads as `operator`. The MCP `initialize` instructions say so instead of "Jobs require operator review". Proof:
+  `tests/test_dev_mode_approval.py` (7 tests); the older tests run in production mode (`tests/conftest.py`); the
+  suite 1038 passed, 1 skipped.
+
 ## 0.6.26 (2026-11-24)
 
 - A draft still cut at the output limit ships without the writer's thinking before its title (B-165). The rerun of
