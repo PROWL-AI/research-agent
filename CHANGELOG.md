@@ -4,6 +4,16 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.25 (2026-11-24)
+
+- A repair pass that thinks aloud no longer replaces the report (B-163). Found by the delivery probe of 2026-11-24
+  (`pr-7babcb17c97b4ea396a3`, market-pulse on the Appvillis cloud): the line-repair model, asked without reasoning,
+  answered with its reasoning and no `L<n>:` line at the start of a line, and `repair_report` took that answer as a
+  whole-report rewrite, so report.md held the model's notes instead of the report. Now an answer without line
+  patches replaces a titled draft only when it has a `# ` title itself; otherwise the draft is kept and a warning is
+  logged. A draft without a title is handled as before. Proof:
+  `tests/test_writer.py::test_a_repair_that_thinks_aloud_keeps_the_draft`, the suite 1030 passed, 1 skipped.
+
 ## 0.6.24 (2026-11-24)
 
 - An organization key reads its own organization's spend (B-162; the operator's word of 2026-11-24 09:05 UTC,

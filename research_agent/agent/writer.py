@@ -763,8 +763,13 @@ async def repair_report(
     )
     patches = {int(n): text for n, text in _PATCH_RE.findall(answer) if int(n) in by_line}
     if not patches:
-        # No line patches: the model rewrote the whole report. Take it as before;
-        # the caller's collapse check refuses a gutted answer.
+        # No line patches: a model that rewrote the whole report is taken as before (the caller's collapse check
+        # refuses a gutted one). B-163: an answer that is not a report is the model thinking aloud about the lines;
+        # seen 2026-11-24 on `pr-7babcb17c97b4ea396a3`, where it replaced the whole report.md. Keep the draft.
+        if _TITLE_RE.search(draft) and not _TITLE_RE.search(answer or ""):
+            log.warning("repair answered with neither line patches nor a report (%d words); keeping the draft (B-163)",
+                        len((answer or "").split()))
+            return draft
         return answer
     patched = [patches.get(i, line) for i, line in enumerate(lines)]
     return "\n".join(line for i, line in enumerate(patched) if not (i in patches and not line.strip()))
