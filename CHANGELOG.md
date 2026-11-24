@@ -4,6 +4,15 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.26 (2026-11-24)
+
+- A draft still cut at the output limit ships without the writer's thinking before its title (B-165). The rerun of
+  the delivery probe (`pr-a197435d5ee43dea5bd5`, Appvillis cloud) shipped 31,184 characters of the writer's notes
+  before `# Market Pulse`: the two still-truncated branches of `write_report` returned the cut text without
+  `strip_preface`, which B-150 applied everywhere else. The thinking the model writes after the report is not cut
+  (B-166). Proof: `tests/test_audit_r3_writer.py::...::test_a_still_truncated_draft_ships_without_the_thinking_before_its_title`,
+  the suite 1031 passed, 1 skipped.
+
 ## 0.6.25 (2026-11-24)
 
 - A repair pass that thinks aloud no longer replaces the report (B-163). Found by the delivery probe of 2026-11-24

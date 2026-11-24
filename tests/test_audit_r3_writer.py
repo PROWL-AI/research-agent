@@ -149,6 +149,23 @@ class TestWriterDraftTruncation:
             writer._DRAFT_MAX_TOKENS, writer._DRAFT_ESCALATED_MAX_TOKENS, writer._DRAFT_ESCALATED_MAX_TOKENS,
         ]
 
+    async def test_a_still_truncated_draft_ships_without_the_thinking_before_its_title(self, patched_runbooks, tmp_path):
+        """B-165: `pr-a197435d5ee43dea5bd5` shipped 31,184 characters of the writer's thinking before the report's
+        title, through the still-truncated branch that did not strip the preface (B-150 stripped the others)."""
+        from research_agent.agent import writer
+        from research_agent.runbook import get_runbook
+
+        cut = "I need produce final markdown report. Should cite.\n\n# Market Pulse\n\n## 1. Summary\nText."
+        llm = _QueueLLM([
+            LLMError("cut", retryable=False, finish_reason="length", content="first"),
+            LLMError("cut", retryable=False, finish_reason="length", content=cut),
+            LLMError("cut", retryable=False, finish_reason="length", content=cut),
+        ])
+        draft = await writer.write_report(
+            llm, get_runbook("mini-teardown"), _one_claim_ledger(tmp_path), {"competitors": ["a.com"]},
+        )
+        assert draft.startswith("# Market Pulse") and "I need produce" not in draft and "truncated" in draft
+
     async def test_a_cut_draft_is_asked_once_more_with_reasoning_off(self, patched_runbooks, tmp_path):
         """B-128: a draft cut at the ceiling (not empty) gets one request with reasoning off; its answer ships."""
         from research_agent.agent import writer
