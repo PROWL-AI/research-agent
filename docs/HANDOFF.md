@@ -1,5 +1,38 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-24 (evening): revocation of the old keys, confirmations read, keys gate on task resume
+
+**Objective.** Fabric task `778fb057` (revoke the old Prowl Research client keys after the organizations moved to
+their own keys), resumed by Fabric's board supervisor (workflow `wf_1c148a7c6a9c92c0`) once the PM agents'
+confirmations were due (2026-11-24 18:00 UTC). The order: board request `39a22ae6`, the operator's words of
+2026-11-23 10:02 UTC, «Отзовем его везде, кроме моего личного ключа».
+
+**Confirmations (read 18:36 UTC).**
+- Аня (thread `f1fa76d9`, reply `ce4b9c97`, request `78e9e944` completed): `org-appvillis` delivered to both people
+  and the VM slot; `appvillis-p053da8fc`, `appvillis-p16add4a2` and the desk `ania` may go now. `esim-vm` only after
+  the VM holds the new key (studio-agent STU-223, due 2026-11-25). `appvillis-catalogue` is not hers.
+- seo-content-agent (thread `0e4c064d`, reply `d5711d43`): runs on the organization key; `seo-content-agent` may go.
+  Its `nicegram` pipeline calls prowl.chat directly with the operator's Prowl key, so this revocation does not touch it.
+- Морфеус (thread `822cb5e9`): no answer; request `1069414c` expired.
+
+**Decisions.** `studio-passioncode` is revoked on the deadline without Морфеус's list: it was the space's own key, the
+space's slot `prowl-research/prod/PROWL_RESEARCH_KEY` already holds `org-passioncode` (2026-11-23), and the
+operator's order covers every old key but his own. `studio-appvillis` goes with the Appvillis set for the same reason.
+`appvillis-catalogue` is this gateway's own catalogue key: before revoking it, find where it is configured (the
+Appvillis cloud's config vars or the copy's catalogue settings) and point it at the organization key.
+
+**Blocked.** This run got no keys: `use_secret.py run` answered `packet-incomplete (missing board-request)`, because a
+`board.resume` dispatch carries a task, not a board request. The guard was not bypassed. Request `d21dd452` to
+project-observatory (thread `9541dec2`, due 2026-11-25 12:00 UTC) asks that a task resume get its project's keys.
+
+**Exact next task.** In a session that holds `prowl-research-agent/prod/HEROKU_API_KEY` (a resumed run once
+`d21dd452` is fixed, or any session the operator is in), by 2026-11-25 18:00 UTC: read both clouds' `client list`
+(`docs/CLOUD.md`, "One-off commands"); on prowl-research revoke `studio-passioncode`; on appvillis-prowl-research
+move `appvillis-catalogue` to the organization key, then revoke `appvillis-catalogue`, `appvillis-p053da8fc`,
+`appvillis-p16add4a2`, `studio-appvillis`, `seo-content-agent`, `ania`; revoke `esim-vm` once STU-223 reports the
+VM's key (else on the owner's deadline 2026-11-26). Keep `studio-sshlg`, `studio-assessment` and the four `org-*`
+keys. Read both lists back, complete `39a22ae6` with the evidence, close B-160 and B-162.
+
 ## Current entry, 2026-11-24 (late morning): 0.6.27, development mode for approvals (supersedes every "Exact next task" below)
 
 **Objective.** The Fabric CEO's addition of 10:40 UTC to request `1f46162c`: the hanging-approvals audit (request
