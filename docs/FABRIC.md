@@ -60,7 +60,7 @@ same check). The table below is the operations, reached through `research.execut
 | `fabric.job.get` | id | state, decision link or result envelope |
 | `fabric.job.cancel` | id | terminal cancellation; no promise of upstream refund |
 | `research.reports.list` | runbook?, query?, limit? | the caller's organization's finished reports, newest first (behind the doors; since 0.6.23, B-160) |
-| `costs.panel` | empty object | the Costs section, `costs-panel/1` (behind the doors; since 0.6.22) |
+| `costs.panel` | empty object | the Costs section, `costs-panel/1` (behind the doors; since 0.6.22); by an organization key, its own organization's spend (since 0.6.24, B-162) |
 | `spend.limits.set` | limitId, limitUsd and/or enforced, reason, idempotencyKey; the operator's words in `_meta.decision` to raise, clear or turn off | `{change, repeated}`; the change as recorded (behind the doors; since 0.6.22) |
 
 ### The Costs section and its limits (rule R33 O16, agents database D-74, `patterns/costs-panel` 1.0.0; B-155)
@@ -88,8 +88,11 @@ The dashboard's «Расходы» section and the two operations above read and
   the operator's own session on the dashboard, where the typed reason is the recorded instruction. Every change is a
   line of `spend-limits.jsonl` in the data folder, appended and never rewritten; `costs.panel` shows the newest 20
   without the decision's words.
-- **Who.** The service's own token and the operator's dashboard session. A cloud client key reaches neither
-  operation (`scope-not-granted`).
+- **Who.** The service's own token and the operator's dashboard session. A cloud client key never reaches
+  `spend.limits.set` (`scope-not-granted`). Since 0.6.24 (B-162) an organization key holds the scope `costs.read` and
+  its `costs.panel` is its own organization's: the windows and series over the jobs of `org:<org>`, `organization`
+  with the month's ceiling, spent and left (at cost, as the monthly ceiling counts it), and the emergency stop; never
+  the instance's limits, the edit or the change history (`costs.org_panel`). Any other client key is refused.
 - **Not yet in the usage report.** `/fabric/v1/usage` keeps its shape: the contract pin this repository verifies
   against (`7a14a487`) closes that schema and does not carry DEC-0183, so `budgets[]`, `limitChanges[]` and
   `months[]` are served by `costs.panel` until the pin moves (B-158). The well-known document already names

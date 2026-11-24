@@ -4,6 +4,19 @@ One version for the package, the service's well-known document and MCP `initiali
 `research_agent.__version__` (`tests/test_version.py`). Row ids (B-NNN, KA-NN, FD-NN) are in
 [`docs/evidence/backlog.md`](docs/evidence/backlog.md).
 
+## 0.6.24 (2026-11-24)
+
+- An organization key reads its own organization's spend (B-162; the operator's word of 2026-11-24 09:05 UTC,
+  Telegram, relayed by the Fabric CEO, request 1f46162c). New client scope `costs.read`, held by an organization key
+  alone: every organization key is issued with it, and `client grant <name> --scopes costs.read` adds it to a key
+  already delivered without rotating it (any other class is refused, a desk key too). `costs.panel` by such a key
+  answers the same `costs-panel/1` windows and chart series counted over the organization's own jobs (`org:<org>`),
+  plus `scope` and `organization` (the month, its ceiling, spent and left at cost, counted as the monthly ceiling
+  counts it) and the instance's emergency stop as it stands. It leaves out the instance's window limits, the edit
+  and the history of limit changes; `spend.limits.set` stays the operator's (`scope-not-granted`). Every other caller
+  reads the panel as before, byte for byte. Proof: `tests/test_org_costs_read.py` (9 tests), the suite 1029 passed,
+  1 skipped (1021 before).
+
 ## 0.6.23 (2026-11-23)
 
 - Organization keys and the organization's report memory (B-160; the operator's word of 2026-11-23, relayed by the
