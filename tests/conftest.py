@@ -297,6 +297,9 @@ def _allowance_off_unless_asked(request, monkeypatch):
     """B-100: most service tests exercise the operator's approval, which still decides every job above a caller's
     daily allowance. They run with the allowance off; a test of the allowance itself carries `@pytest.mark.allowance`
     (or lives in test_allowance.py)."""
+    # B-167: the tests written for the operator's approval path run in production mode; the development mode's own
+    # tests (tests/test_dev_mode_approval.py) set it themselves.
+    monkeypatch.setenv("PROWL_RESEARCH_APPROVAL_MODE", "operator")
     if request.node.get_closest_marker("allowance") or request.node.module.__name__.endswith("test_allowance"):
         return
     from research_agent.service import allowance
