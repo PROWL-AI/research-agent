@@ -1,6 +1,6 @@
 # Research-agent handoff
 
-## Current entry, 2026-11-24: 0.6.24, every organization holds its key, organizations read their spend (supersedes every "Exact next task" below)
+## Current entry, 2026-11-24: 0.6.26, every organization holds its key, organizations read their spend (supersedes every "Exact next task" below)
 
 **Objective.** Fabric request `1f46162c` from the Fabric CEO (result line to thread `bbd9139a`), the operator's word
 of 2026-11-24 09:05 UTC (Telegram), verbatim: «Смотри, я ставил задачу, чтобы для каждой организации proof-типа мы
@@ -30,7 +30,7 @@ PM is Кира (`kira-agent`); she was told the key never reaches the virtual nu
 use (`family-agent` names neither Prowl nor research), so no key was issued; the virtual number side gets nothing, by
 the isolation rule. `studio-sshlg` (the operator's personal key) and `studio-assessment` stay, as decided 2026-11-23.
 
-**Done.** B-162 in 0.6.24 (PR #140, `8de47fe`): scope `costs.read`, held by an organization key alone and issued with
+**Done.** B-162 in 0.6.24 (PR #140, `8de47fe`), B-163 in 0.6.25 (PR #141), B-165 in 0.6.26 (PR #142, `f32e23f`): scope `costs.read`, held by an organization key alone and issued with
 each; `client grant` adds a scope to a delivered key without rotating it; `costs.panel` by an organization key answers
 `costs.org_panel` (its own jobs' windows and series, the month's ceiling, spent and left at cost, the emergency stop;
 never the instance's limits, edit or history). Deployed: prowl-research Heroku v34 (`0.6.24 ready degraded []`),
@@ -40,7 +40,12 @@ appvillis-prowl-research Heroku v36 from copy `52a0aeb` (org-transfer audit `rea
 **Delivery.** Аня delivered `org-appvillis` on 2026-11-23 16:19 UTC to Анастасия Башкунова (was `appvillis-p053da8fc`)
 and Женя Парфианович (was `appvillis-p16add4a2`, the `prc_e1…` key of his `prowl-research.key`), and rotated the VM
 slot (`esim-vm` waits for studio-agent's VM access, STU-223). A research run under the key in Аня's slot started
-without a person: job `pr-7babcb17c97b4ea396a3` (market-pulse, travel eSIM apps), RESULT_LINE. The answer to Zhenya
+without a person: job `pr-7babcb17c97b4ea396a3` (market-pulse, travel eSIM apps), completed in 20 minutes, 0.81 USD counted on Appvillis,
+listed in its report memory. Its report.md was the repair model's notes (B-163, fixed in 0.6.25); the rerun
+`pr-a197435d5ee43dea5bd5` (`fresh: true`, 0.82 USD) shipped 31,184 characters of the writer's notes before the title
+and more after it, cut at the output limit (B-165 fixed the part before the title in 0.6.26; B-166, the writer model
+thinking in its answer, is the open cause). Both clouds run 0.6.26 (prowl-research v36, Appvillis v38 from copy
+`2b46287`), `ready`, `degraded: []`. The answer to Zhenya
 went to Аня as request `7fb22b7e` (thread `f1fa76d9`, due 2026-11-24 18:00 UTC). Морфеус was asked again for the
 PassionCode delivery list with a ready command (thread `822cb5e9`, message `072abbae`); Кира was told about `org-sshlg`
 (thread `7ea5e86b`).
@@ -50,11 +55,14 @@ passed, 1 skipped; `tests/test_org_costs_read.py` 9 passed; `ruff check .` clean
 `scripts/build-fabric-manifest.py` regenerated nothing. Live: `costs.panel` and `research.reports.list` with each of the
 four organization keys from its own space.
 
-**Open.** (1) Revocation by 2026-11-25 18:00 UTC, unchanged from the entry below (`esim-vm` only after the VM has the
+**Open.** (0) B-166 first: reports from the clouds are not usable until the writer stops thinking in its
+answer (both runs of 2026-11-24). (1) Revocation by 2026-11-25 18:00 UTC, unchanged from the entry below (`esim-vm` only after the VM has the
 new key). (2) `appvillis-catalogue`: Аня holds no such slot; it is this gateway's own catalogue key, to be moved to the
 organization key by us before revocation. (3) Prowl's SearchAPI monthly searches (429) still degrade news steps.
 
-**Exact next task:** read threads `f1fa76d9`, `822cb5e9`, `7ea5e86b`; by 2026-11-25 18:00 UTC revoke the keys in Open
+**Exact next task:** B-166 (measure a writer that keeps reasoning out of its answer against Kimi, per the wiki
+model map, switch `RESEARCH_LLM_MODEL_STRONG` on both clouds, rerun market-pulse with `fresh: true`); then read threads
+`f1fa76d9`, `822cb5e9`, `7ea5e86b`; by 2026-11-25 18:00 UTC revoke the keys in Open
 (1) of the entry below, read both clouds' `client list` back, complete board request `39a22ae6`, close B-160 and B-162.
 
 ## Current entry, 2026-11-23: 0.6.23, organization keys and report memory (supersedes every "Exact next task" below)
