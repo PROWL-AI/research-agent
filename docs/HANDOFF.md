@@ -1,5 +1,31 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-24 (late morning): 0.6.27, development mode for approvals (supersedes every "Exact next task" below)
+
+**Objective.** The Fabric CEO's addition of 10:40 UTC to request `1f46162c`: the hanging-approvals audit (request
+`8bbb6559`, mobile-publisher-agent `docs/reports/2026-11-24-hanging-approvals` section 4) found that every Prowl
+Research job waits for the operator. The operator: «не должно быть такого, что работа где-то там стопается и
+зависает». In development mode jobs go without a person; only the USD 100 run line and the emergency stop remain.
+Finish the waiting jobs.
+
+**Done.** B-167 in 0.6.27 (PR #144, `f37c1e8`): `PROWL_RESEARCH_APPROVAL_MODE` (`none` by default, `operator` is
+production) and `PROWL_RESEARCH_RUN_LINE_USD` (100). Within the line every job starts at once, the dashboard's included,
+recorded `by: development-mode`; over it, it waits; the emergency stop is checked before every paid call. Deployed and
+read back `0.6.27 ready []`: prowl-research (Heroku v37), appvillis-prowl-research (v39, copy `e56f591`), Studio
+`sshlg` 18765 and `passioncode` 18766. Waiting jobs: none on any of the five instances (operator API `/api/state`,
+11:15 UTC: clouds 9 and 35 jobs, MacBook 152, Studio 6 and 1, none `input_required` or stuck `working`), and no job ever
+failed on an expired approval. The MacBook's 36 failures since 2026-11-17 are SearchAPI's quota (Open (3) below).
+
+**Trap hit.** `install-fabric-service.py --background --port N` without `--vault-project prowl-research-agent` left both
+Studio spaces degraded (no Prowl, no model key) for about five minutes; reinstalled with it, both `ready []`. B-168.
+
+**Waiting.** The MacBook instance (`prowl-research.default`, 18764) still runs 0.6.23: the disk sentry holds installs
+on the MacBook below 12 GB free (10.4 GB at 11:00 UTC). When free space is above 14 GB:
+`python3 scripts/install-fabric-service.py --vault-project prowl-research-agent` (vault folder as named by its
+descriptor), then read `/.well-known/fabric-service`. Until then a dashboard job there waits for the operator as before.
+
+**Exact next task:** B-166 (writer model), then the entry below.
+
 ## Current entry, 2026-11-24: 0.6.26, every organization holds its key, organizations read their spend (supersedes every "Exact next task" below)
 
 **Objective.** Fabric request `1f46162c` from the Fabric CEO (result line to thread `bbd9139a`), the operator's word
