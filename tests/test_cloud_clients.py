@@ -120,8 +120,9 @@ def test_a_revoked_name_cannot_be_rotated_back(clients):
         clients.rotate("anna")
 
 
-def test_scopes_are_the_three_capabilities_groups():
-    assert SCOPES == ("read", "research.run", "tools.call")
+def test_scopes_are_the_three_capabilities_groups_and_an_organizations_costs_read():
+    # B-162 added costs.read, held by an organization key alone (tests/test_org_costs_read.py)
+    assert SCOPES == ("read", "research.run", "tools.call", "costs.read")
 
 
 def test_file_store_is_0600(tmp_path):

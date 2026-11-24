@@ -22,7 +22,10 @@ from typing import Callable
 #: `research.run`: create research jobs. `tools.call`: create single Prowl tool jobs.
 #: A paid job starts on its own when it fits the key's daily ceiling, else it waits for the operator (B-100); a job of an
 #: interactive key starts on its own whatever it costs (K1).
-SCOPES = ("read", "research.run", "tools.call")
+SCOPES = ("read", "research.run", "tools.call", "costs.read")
+#: B-162 (the operator's word of 2026-11-24, relayed by the Fabric CEO, request 1f46162c): an organization key reads its
+#: own organization's spend through `costs.panel`. Only an organization key holds it, and every one is issued with it.
+COSTS_READ_SCOPE = "costs.read"
 #: Every key carries a daily USD ceiling of at least this, 10 by default: the operator's word recorded in the agents
 #: database (intake in-20261112-996c34, research template 1.6.0). A smaller one is refused.
 DAILY_FLOOR_USD = 10.0
@@ -125,6 +128,17 @@ def _classed(key_class, daily_usd) -> tuple[str, float | None]:
     return key_class, _ceiling(DAILY_FLOOR_USD if daily_usd is None else daily_usd)
 
 
+def _class_scopes(key_class, scopes) -> list[str]:
+    """B-162: `costs.read` belongs to an organization key alone (it reads that organization's spend), and an
+    organization key always carries it."""
+    scopes = list(scopes)
+    if COSTS_READ_SCOPE in scopes and key_class != ORG_CLASS:
+        raise ValueError(f"scope {COSTS_READ_SCOPE} belongs to an organization key (class organization) only")
+    if key_class == ORG_CLASS and COSTS_READ_SCOPE not in scopes:
+        scopes.append(COSTS_READ_SCOPE)
+    return scopes
+
+
 def _org_fields(key_class, org, monthly_usd) -> tuple[str | None, float | None]:
     """(org, monthly ceiling) of an organization key; (None, None) for any other class, which takes neither."""
     if key_class != ORG_CLASS:
@@ -198,6 +212,7 @@ class DeskMixin:
         if key_class == ORG_CLASS:
             raise ValueError("an organization key is issued by the operator's tool only")
         key_class, daily_usd = _classed(key_class, daily_usd)
+        scopes = _class_scopes(key_class, scopes)
         if daily_usd is not None and daily_usd > d["maxDailyUsd"]:
             raise ValueError(f"daily ceiling: this desk may give at most {d['maxDailyUsd']:g} USD per UTC day")
         if self._get(name) is not None:
@@ -260,6 +275,7 @@ class FileClients(DeskMixin):
         scopes = _check(name, scopes)
         key_class, daily_usd = _classed(key_class, daily_usd)
         org, monthly_usd = _org_fields(key_class, org, monthly_usd)
+        scopes = _class_scopes(key_class, scopes)
         data = self._load()
         if name in data:
             raise ValueError(f"client {name} exists; rotate it or choose another name")
@@ -287,6 +303,18 @@ class FileClients(DeskMixin):
             raise ValueError(f"{name} is an {data[name]['keyClass']} key and has no daily ceiling; issue an automated key to limit it")
         data[name]["dailyUsd"] = daily_usd
         self._write(data)
+
+    def grant(self, name: str, scopes) -> list[str]:
+        """Add scopes to an active key without rotating it (B-162: `costs.read` for keys already delivered)."""
+        data = self._load()
+        if name not in data or data[name]["revokedAt"]:
+            raise KeyError(f"no active client {name}")
+        if DESK_SCOPE in data[name]["scopes"]:
+            raise ValueError(f"{name} is a desk key; a desk key reaches nothing but the desk tools")
+        wanted = _check(name, list(data[name]["scopes"]) + list(scopes))
+        data[name]["scopes"] = _class_scopes(data[name].get("keyClass") or DEFAULT_CLASS, wanted)
+        self._write(data)
+        return data[name]["scopes"]
 
     def monthly(self, name: str, monthly_usd: float) -> None:
         """Set an organization key's monthly ceiling (B-160)."""
@@ -410,6 +438,7 @@ class PostgresClients(DeskMixin):
         scopes = _check(name, scopes)
         key_class, daily_usd = _classed(key_class, daily_usd)
         org, monthly_usd = _org_fields(key_class, org, monthly_usd)
+        scopes = _class_scopes(key_class, scopes)
         db = self._db()
         with db.cursor() as cur:
             if cur.execute("SELECT 1 FROM prowl_research_clients WHERE name=%s", (name,)).fetchone():
@@ -443,6 +472,22 @@ class PostgresClients(DeskMixin):
                 raise ValueError(f"{name} is an {row[0]} key and has no daily ceiling; issue an automated key to limit it")
             cur.execute("UPDATE prowl_research_clients SET daily_usd=%s WHERE name=%s", (daily_usd, name))
         db.commit()
+
+    def grant(self, name: str, scopes) -> list[str]:
+        """Add scopes to an active key without rotating it (B-162: `costs.read` for keys already delivered)."""
+        db = self._db()
+        with db.cursor() as cur:
+            row = cur.execute("SELECT scopes, key_class FROM prowl_research_clients WHERE name=%s AND revoked_at IS NULL",
+                              (name,)).fetchone()
+            if not row:
+                raise KeyError(f"no active client {name}")
+            held = json.loads(row[0])
+            if DESK_SCOPE in held:
+                raise ValueError(f"{name} is a desk key; a desk key reaches nothing but the desk tools")
+            scopes = _class_scopes(row[1] or DEFAULT_CLASS, _check(name, held + list(scopes)))
+            cur.execute("UPDATE prowl_research_clients SET scopes=%s WHERE name=%s", (json.dumps(scopes), name))
+        db.commit()
+        return scopes
 
     def monthly(self, name: str, monthly_usd: float) -> None:
         """Set an organization key's monthly ceiling (B-160)."""

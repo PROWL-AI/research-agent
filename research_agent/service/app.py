@@ -57,7 +57,8 @@ DASHBOARD_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "
 SCOPE_OF = {"research.list_runbooks": "read", "research.artifact.get": "read", "research.tutorial": "read",
             "research.reports.list": "read",  # an organization's report memory (B-160)
             "research.run": "research.run", "research.tools.call": "tools.call",
-            # the Costs section (B-155) is the operator's: no client key holds these scopes, so every client is refused
+            # the Costs section (B-155) is the operator's. B-162: an organization key holds `costs.read` and reads its own
+            # organization's spend (`costs.org_panel`); no client key holds `costs.limits`, so every client is refused the edit
             "costs.panel": "costs.read", "spend.limits.set": "costs.limits",
             # the issuing desk (B-121): only a desk key, and a desk key reaches nothing else
             "client.issue": "keys.issue", "client.rotate": "keys.issue", "client.revoke": "keys.issue", "client.list": "keys.issue"}

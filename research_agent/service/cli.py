@@ -88,15 +88,16 @@ def cloud_root(environ=os.environ):
 
 
 def client_command(argv, environ=os.environ, out=print):
-    """`client add|rotate|limit|monthly|revoke|list`: the cloud instance's client keys (B-099 M3, B-100).
+    """`client add|rotate|limit|monthly|grant|revoke|list`: the cloud instance's client keys (B-099 M3, B-100).
     On Heroku: `heroku run prowl-research-service client add <name> --scopes read,tools.call --daily-usd 10`.
     `--raw` prints the key alone, for a pipe straight into the holder's vault slot (never into a transcript)."""
     from .clients import DAILY_FLOOR_USD, DEFAULT_CLASS, DESK_DEFAULT_GRANTS, KEY_CLASSES, SCOPES, from_env
 
     parser = argparse.ArgumentParser(prog="prowl-research-service client")
-    parser.add_argument("action", choices=["add", "add-desk", "rotate", "limit", "monthly", "revoke", "list"])
+    parser.add_argument("action", choices=["add", "add-desk", "rotate", "limit", "monthly", "grant", "revoke", "list"])
     parser.add_argument("name", nargs="?")
-    parser.add_argument("--scopes", default="read", help="comma-separated: " + ", ".join(SCOPES))
+    parser.add_argument("--scopes", default=None,
+                        help="comma-separated: " + ", ".join(SCOPES) + " (add: read by default; grant: the scopes to add, B-162)")
     parser.add_argument("--daily-usd", type=float, default=None,
                         help=f"an automated key's ceiling per UTC day, at least {DAILY_FLOOR_USD:g}, {DAILY_FLOOR_USD:g} by default (B-100)")
     parser.add_argument("--class", dest="key_class", choices=KEY_CLASSES, default=DEFAULT_CLASS,
@@ -134,10 +135,16 @@ def client_command(argv, environ=os.environ, out=print):
         clients.monthly(args.name, args.monthly_usd)
         out(f"{args.name}: monthly ceiling {args.monthly_usd:g} USD")
         return 0
+    if args.action == "grant":
+        if not args.scopes:
+            parser.error("grant needs --scopes")
+        held = clients.grant(args.name, args.scopes.split(","))
+        out(f"{args.name}: scopes {','.join(held)}")
+        return 0
     if args.action == "add-desk":
         key = clients.add_desk(args.name, args.grants.split(","), args.max_daily_usd)
     elif args.action == "add":
-        key = clients.add(args.name, args.scopes.split(","), args.daily_usd, args.key_class, args.org, args.monthly_usd)
+        key = clients.add(args.name, (args.scopes or "read").split(","), args.daily_usd, args.key_class, args.org, args.monthly_usd)
     else:
         key = clients.rotate(args.name)
     # The one time the key is shown: it is not stored, only its SHA-256.

@@ -14,7 +14,8 @@ What this module binds to the service:
 - **the one edit** (`set_limit`, the capability `spend.limits.set` and the dashboard's control alike): tightening is
   the caller's own act; raising, clearing or turning a limit off needs the operator's decision. Every change is a
   line of `spend-limits.jsonl` in the data root, appended and never rewritten.
-- **the read** (`panel`, the capability `costs.panel` and the dashboard's section alike).
+- **the read** (`panel`, the capability `costs.panel` and the dashboard's section alike). An organization key with the
+  scope `costs.read` reads `org_panel` instead (B-162): its own organization's spend and nothing of anyone else's.
 
 It sits beside the allowance (`allowance.py`: a caller's day ceiling and the agents' month ledger decide whether a
 job starts without a person); this module decides whether one more paid call may leave.
@@ -154,3 +155,40 @@ def set_limit(store, args: dict[str, Any], *, via: str, decision: dict[str, Any]
         with store.db:
             store.event("costs.limit_changed", f"Лимит расходов {change['limitId']} изменён: {amount}, {state}.")
     return result
+
+
+#: What an organization's read leaves out of the operator's panel (B-162): the edit is the operator's, and the
+#: history of limit changes carries the operator's reasons, not an organization's business.
+ORG_DROPPED = ("edit", "history")
+
+
+def org_panel(store, delegation: dict[str, Any], now: datetime | None = None) -> dict[str, Any]:
+    """`costs.panel` for an organization key (B-162, scope `costs.read`): the same windows and chart series counted
+    over the organization's own jobs only (`org:<org>`), its monthly ceiling with what it has spent and has left, and
+    the emergency stop as it stands for the whole instance (a stop explains a refused call). The instance's window
+    limits, its spend, the edit and the change history are the operator's and are not shown."""
+    now = now or datetime.now(timezone.utc)
+    principal = str(delegation.get("principal") or "")
+    if not principal.startswith("org:"):
+        raise ValueError("an organization's spend is read with an organization key")
+    start = cp.window_start(now, "month")
+    for _ in range(12):
+        start = cp._step_back(start, "month")
+    own = {j["id"] for j in store.jobs() if allowance.principal_of(j) == principal}
+    mine = [r for r in rows(store, start) if r["job"] in own]
+    data = cp.panel(mine, book(store), now)
+    whole = cp.panel(rows(store, min(cp.window_start(now, "day"), cp.window_start(now, "month"))), book(store), now)
+    for key in ORG_DROPPED + ("_states", "_spent"):
+        data.pop(key, None)
+    for window in data["windows"].values():  # the instance's own window limits are not the organization's
+        window.update(limit_usd=None, left_usd=None, tripped=False)
+    data["order"] = {"limit_usd": None}
+    data["emergency"] = whole["emergency"]
+    monthly = float(delegation.get("monthlyUsd") or 0.0)
+    spent = allowance.spent_this_month(store, principal, now.strftime("%Y-%m"))
+    data["scope"] = {"kind": "organization", "organization": principal[len("org:"):]}
+    data["organization"] = {"organization": principal[len("org:"):], "month": now.strftime("%Y-%m"),
+                            "monthlyCeilingUsd": monthly, "spentMonthUsd": round(spent, 4),
+                            "leftMonthUsd": round(max(monthly - spent, 0.0), 4),
+                            "counted": "approved jobs of the organization, at cost; a job still running at its worst case"}
+    return data

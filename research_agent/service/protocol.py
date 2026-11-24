@@ -456,6 +456,8 @@ class Protocol:
     def call(self, name, args, trace, delegation=None, decision=None):
         rt = self.runtime
         if name == "costs.panel":
+            if str((delegation or {}).get("principal") or "").startswith("org:"):  # B-162: its own organization only
+                return costs.org_panel(rt.store, delegation), child_trace(trace)
             return costs.panel(rt.store), child_trace(trace)
         if name == "spend.limits.set":
             # who asked is kept as an opaque reference; the operator's words, when relayed, travel in _meta.decision
