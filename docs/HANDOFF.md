@@ -1,5 +1,62 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-24: 0.6.24, every organization holds its key, organizations read their spend (supersedes every "Exact next task" below)
+
+**Objective.** Fabric request `1f46162c` from the Fabric CEO (result line to thread `bbd9139a`), the operator's word
+of 2026-11-24 09:05 UTC (Telegram), verbatim: «Смотри, я ставил задачу, чтобы для каждой организации proof-типа мы
+сгенерировали отдельный ключ, безлимитный, тот, который мы пометим, и будем считать косты по себестоимости. Это
+ключи, которые я буду делать под интеграции. Такие же ключи, как для Copilot, и такие же ключи для каких-то
+коммерческих агентов, которые мы строим. Давай проверим, что эта таска дошла. Если не дошла, найдем, разберем и
+сделаем так, чтобы во всех организациях сейчас были выданы ключи. PM-агентам раздадим команды, чтобы они быстро
+адаптировались, потому что в Affilis есть ребята, которым нужно найти ресерчи, и они сейчас не могут работать.»
+(«proof» is Prowl, «Affilis» is Appvillis.) The CEO's brief added: answer Zhenya through Аня about his old key, and
+give organization keys a read of their own organization's spend.
+
+**Reconciliation (2026-11-24 09:20 UTC, `client list` on both clouds).**
+
+| Organization | Key (class `organization`, no daily ceiling, at cost, monthly 1000 USD as the emergency line) | Cloud | Vault of | Probe |
+|---|---|---|---|---|
+| Appvillis | `org-appvillis` (B-160) | appvillis-prowl-research | studio-appvillis `ania-agent-appvillis/prod/PROWL_RESEARCH_ORG_KEY` | `costs.panel`, `research.reports.list`, a research run (below) |
+| PassionCode.ai | `org-passioncode` (B-160) | prowl-research | studio-passioncode `passioncode-pm-agent/prod/PROWL_RESEARCH_ORG_KEY` | `costs.panel` `organization: passioncode` |
+| PrivateClawd | `org-privateclawd` (new today) | prowl-research | studio-privateclawd `prowl-research/prod/PROWL_RESEARCH_ORG_KEY` | `costs.panel` `organization: privateclawd` |
+| SSHLG (personal) | `org-sshlg` (new today) | prowl-research | studio-sshlg `kira-agent/prod/PROWL_RESEARCH_ORG_KEY` | `costs.panel` `organization: sshlg` |
+
+Both new keys were issued with `client add --raw` through `scripts/heroku_run.py` and piped straight into
+`vault.py put` on the space (never printed), then bound to the gateway's origin (`vault.py bind --header-for`).
+
+**Decisions.** PrivateClawd has no PM agent (its space holds clawdbot, its docs and its support agent), so its key sits
+in the space's own `prowl-research` folder, beside where every space keeps its gateway key. The personal organization's
+PM is Кира (`kira-agent`); she was told the key never reaches the virtual number side. The family has no Prowl Research
+use (`family-agent` names neither Prowl nor research), so no key was issued; the virtual number side gets nothing, by
+the isolation rule. `studio-sshlg` (the operator's personal key) and `studio-assessment` stay, as decided 2026-11-23.
+
+**Done.** B-162 in 0.6.24 (PR #140, `8de47fe`): scope `costs.read`, held by an organization key alone and issued with
+each; `client grant` adds a scope to a delivered key without rotating it; `costs.panel` by an organization key answers
+`costs.org_panel` (its own jobs' windows and series, the month's ceiling, spent and left at cost, the emergency stop;
+never the instance's limits, edit or history). Deployed: prowl-research Heroku v34 (`0.6.24 ready degraded []`),
+appvillis-prowl-research Heroku v36 from copy `52a0aeb` (org-transfer audit `ready`, the copy's suite 1029 passed).
+`costs.read` granted to `org-appvillis` and `org-passioncode` (values unchanged).
+
+**Delivery.** Аня delivered `org-appvillis` on 2026-11-23 16:19 UTC to Анастасия Башкунова (was `appvillis-p053da8fc`)
+and Женя Парфианович (was `appvillis-p16add4a2`, the `prc_e1…` key of his `prowl-research.key`), and rotated the VM
+slot (`esim-vm` waits for studio-agent's VM access, STU-223). A research run under the key in Аня's slot started
+without a person: job `pr-7babcb17c97b4ea396a3` (market-pulse, travel eSIM apps), RESULT_LINE. The answer to Zhenya
+went to Аня as request `7fb22b7e` (thread `f1fa76d9`, due 2026-11-24 18:00 UTC). Морфеус was asked again for the
+PassionCode delivery list with a ready command (thread `822cb5e9`, message `072abbae`); Кира was told about `org-sshlg`
+(thread `7ea5e86b`).
+
+**Checks actually run.** Mac Studio, Python 3.11 (`~/DATA/_worktrees/b162-org-costs-read/.venv`): `pytest tests/` 1029
+passed, 1 skipped; `tests/test_org_costs_read.py` 9 passed; `ruff check .` clean; `scripts/check_add_only.py` ok;
+`scripts/build-fabric-manifest.py` regenerated nothing. Live: `costs.panel` and `research.reports.list` with each of the
+four organization keys from its own space.
+
+**Open.** (1) Revocation by 2026-11-25 18:00 UTC, unchanged from the entry below (`esim-vm` only after the VM has the
+new key). (2) `appvillis-catalogue`: Аня holds no such slot; it is this gateway's own catalogue key, to be moved to the
+organization key by us before revocation. (3) Prowl's SearchAPI monthly searches (429) still degrade news steps.
+
+**Exact next task:** read threads `f1fa76d9`, `822cb5e9`, `7ea5e86b`; by 2026-11-25 18:00 UTC revoke the keys in Open
+(1) of the entry below, read both clouds' `client list` back, complete board request `39a22ae6`, close B-160 and B-162.
+
 ## Current entry, 2026-11-23: 0.6.23, organization keys and report memory (supersedes every "Exact next task" below)
 
 **Objective.** Board request `39a22ae6` from the Fabric CEO (thread `1e2456ed`, due 2026-11-26), the operator's order
