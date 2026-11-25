@@ -1,5 +1,28 @@
 # Research-agent handoff
 
+## Current entry, 2026-11-25 (night): revocation handed to the Fabric CEO's session
+
+**Objective.** Fabric task `778fb057` (revoke the old Prowl Research client keys), resumed again by Fabric's board
+supervisor (workflow `wf_defb4e5f641578dd`) once project-observatory answered request `d21dd452`.
+
+**What project-observatory found** (reply `ff3bfc03`, thread `9541dec2`, 2026-11-25 00:48 UTC). The defect has two
+halves. Observatory's key gate wanted a `board-request:` in the packet; OBS-690 fixes that
+(passioncode-ai/project-observatory-dashboard PR #628, not merged). Fabric's dispatcher writes no `credentials` into any
+packet, so even with OBS-690 a dispatcher run gets `no-credentials`. This run's packet still reads
+`dispatch.keys = {slots: [], state: closed}`. Clearing `FABRIC_DISPATCH_WORKFLOW` inside a dispatched session is the
+bypass the gate names; not done.
+
+**Done.** Request `d499a991` (capability `ceo.task`, thread `1e2456ed`, due 2026-11-25 18:00 UTC) to the Fabric CEO:
+run the revocation in a session the dispatcher did not start, with the exact commands and the keep list. Request
+`918bfba8` (thread `c2f5e717`, due 2026-12-01) to the fabric project: the dispatcher writes `credentials` (names only)
+into the opening packet, for `board.resume` from a key declaration on the task.
+
+**Exact next task.** Read `d499a991`. If the CEO's session revoked the keys: read both clouds' `client list` back
+(`docs/CLOUD.md`, "One-off commands"), confirm only `studio-sshlg`, `studio-assessment`, the four `org-*` keys (and
+`esim-vm` if STU-223 is still open) remain, complete `39a22ae6` with the evidence, close B-160 and B-162. If it
+declined or did not answer by 18:00 UTC: put the step to the operator through `communicator_notify` as the one human
+step (the commands are in `d499a991`), owner's deadline 2026-11-26 18:00 UTC.
+
 ## Current entry, 2026-11-24 (evening): revocation of the old keys, confirmations read, keys gate on task resume
 
 **Objective.** Fabric task `778fb057` (revoke the old Prowl Research client keys after the organizations moved to
